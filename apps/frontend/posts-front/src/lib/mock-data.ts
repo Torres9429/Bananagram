@@ -1,6 +1,46 @@
 import type { PostStatus } from '@repo/ui';
 export type { PostStatus };
 
+export type SocialNetworkCode = 'IG' | 'TK' | 'LI' | 'FB' | 'X' | 'YT';
+
+// Espejo del modelo de brands-front (Brand → BrandProfile): cada microfront
+// mantiene su propia copia de mocks porque no hay un servicio compartido,
+// pero el concepto y la forma son los mismos. Un Post pertenece a un
+// BrandProfile (una cuenta de una Marca en una red social específica),
+// nunca tiene un campo `network`/`brand` propio.
+export interface BrandProfile {
+  id: string;
+  brandName: string;
+  socialNetwork: SocialNetworkCode;
+  handle: string;
+  networkBg: string;
+  networkColor: string;
+}
+
+export const MOCK_BRAND_PROFILES: BrandProfile[] = [
+  { id: 'bp1', brandName: 'Zara MX', socialNetwork: 'IG', handle: '@zaramx', networkBg: '#FCE4EC', networkColor: '#880E4F' },
+  { id: 'bp2', brandName: 'Zara MX', socialNetwork: 'LI', handle: 'Zara México', networkBg: '#E3F2FD', networkColor: '#0D47A1' },
+  { id: 'bp3', brandName: 'Zara MX', socialNetwork: 'FB', handle: 'Zara México', networkBg: '#FFF3E0', networkColor: '#E65100' },
+  { id: 'bp4', brandName: 'Nike MX', socialNetwork: 'TK', handle: '@nikemx', networkBg: '#E8EAF6', networkColor: '#283593' },
+  { id: 'bp5', brandName: 'Nike MX', socialNetwork: 'IG', handle: '@nikemexico', networkBg: '#FCE4EC', networkColor: '#880E4F' },
+];
+
+export function getBrandProfile(brandProfileId: string): BrandProfile | undefined {
+  return MOCK_BRAND_PROFILES.find((p) => p.id === brandProfileId);
+}
+
+// Helper de conveniencia: deriva todo lo que las vistas necesitan mostrar
+// (red, colores del avatar, nombre de marca) a partir del BrandProfile.
+export function getPostNetworkInfo(post: Pick<MockPost, 'brandProfileId'>) {
+  const profile = getBrandProfile(post.brandProfileId);
+  return {
+    network: profile?.socialNetwork ?? '—',
+    networkBg: profile?.networkBg ?? '#EEEEEE',
+    networkColor: profile?.networkColor ?? '#666666',
+    brand: profile?.brandName ?? '—',
+  };
+}
+
 export interface MockCampaign {
   id: string;
   name: string;
@@ -19,11 +59,8 @@ export interface PostMetrics {
 export interface MockPost {
   id: string;
   title: string;
-  network: string;
-  networkBg: string;
-  networkColor: string;
+  brandProfileId: string;
   campaign: { id: string; name: string; color: string } | null;
-  brand: string;
   designer: string;
   status: PostStatus;
   createdAt: string;
@@ -59,15 +96,25 @@ export const MOCK_CAMPAIGNS: MockCampaign[] = [
   { id: 'c3', name: 'Spotify Weekly', color: '#66BB6A', brand: 'Spotify MX' },
 ];
 
+// BrandProfiles disponibles por campaña (para el selector de "Perfil" en crear publicación).
+// La red social se selecciona eligiendo el BrandProfile; no hay campo `network` separado.
+export const CAMPAIGN_BRAND_PROFILES: Record<string, string[]> = {
+  c1: ['bp1', 'bp2', 'bp3'], // Campaña Verano → Zara (IG, LI, FB)
+  c2: ['bp4', 'bp5'],        // Nike Run Launch → Nike (TK, IG)
+  c3: [],                     // Spotify Weekly → sin perfiles en este microfront
+};
+
+export function getBrandProfilesForCampaign(campaignId: string): BrandProfile[] {
+  const ids = CAMPAIGN_BRAND_PROFILES[campaignId] ?? [];
+  return ids.map((id) => getBrandProfile(id)).filter((p): p is BrandProfile => !!p);
+}
+
 export const MOCK_POSTS: MockPost[] = [
   {
     id: 'p1',
     title: 'Post lanzamiento verano',
-    network: 'IG',
-    networkBg: '#FCE4EC',
-    networkColor: '#880E4F',
+    brandProfileId: 'bp1',
     campaign: { id: 'c1', name: 'Campaña Verano', color: '#FDC726' },
-    brand: 'Zara MX',
     designer: 'Rocío Rodríguez',
     status: 'borrador',
     createdAt: 'Hace 2 h',
@@ -80,11 +127,8 @@ export const MOCK_POSTS: MockPost[] = [
   {
     id: 'p2',
     title: 'Reel Nike 30 seg',
-    network: 'TK',
-    networkBg: '#E8EAF6',
-    networkColor: '#283593',
+    brandProfileId: 'bp4',
     campaign: { id: 'c2', name: 'Nike Run Launch', color: '#42A5F5' },
-    brand: 'Nike MX',
     designer: 'Alexa Delgado',
     status: 'rechazado',
     createdAt: 'Hace 28 min',
@@ -98,11 +142,8 @@ export const MOCK_POSTS: MockPost[] = [
   {
     id: 'p3',
     title: 'Carrusel colores SS25',
-    network: 'LI',
-    networkBg: '#E3F2FD',
-    networkColor: '#0D47A1',
+    brandProfileId: 'bp2',
     campaign: { id: 'c1', name: 'Campaña Verano', color: '#FDC726' },
-    brand: 'Zara MX',
     designer: 'Elías Bailón',
     status: 'en_revision',
     createdAt: 'Hace 5 h',
@@ -114,11 +155,8 @@ export const MOCK_POSTS: MockPost[] = [
   {
     id: 'p4',
     title: 'Story promo weekend',
-    network: 'FB',
-    networkBg: '#FFF3E0',
-    networkColor: '#E65100',
+    brandProfileId: 'bp3',
     campaign: null,
-    brand: 'Zara MX',
     designer: 'Rocío Rodríguez',
     status: 'programado',
     createdAt: 'Hoy 18:00',
@@ -130,11 +168,8 @@ export const MOCK_POSTS: MockPost[] = [
   {
     id: 'p5',
     title: 'Reels sustentabilidad',
-    network: 'IG',
-    networkBg: '#FCE4EC',
-    networkColor: '#880E4F',
+    brandProfileId: 'bp5',
     campaign: { id: 'c2', name: 'Nike Run Launch', color: '#42A5F5' },
-    brand: 'Nike MX',
     designer: 'Alexa Delgado',
     status: 'publicado',
     createdAt: 'Ayer 12:00',

@@ -14,11 +14,13 @@
     "@mui/icons-material": "^5.0.0",
     "@emotion/react": "^11.0.0",
     "@emotion/styled": "^11.0.0",
+    "@emotion/cache": "^11.0.0",
     "@reduxjs/toolkit": "^2.0.0",
     "react-redux": "^9.0.0",
     "react-big-calendar": "^1.8.0",
     "date-fns": "^3.0.0",
-    "@repo/ui": "workspace:*"
+    "@repo/ui": "workspace:*",
+    "recharts": "^2.0.0"
   },
   "devDependencies": {
     "typescript": "^5",

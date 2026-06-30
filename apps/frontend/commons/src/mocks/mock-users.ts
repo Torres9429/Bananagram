@@ -63,10 +63,13 @@ export const MOCK_USERS: MockUser[] = [
     name: 'Roberto Fernández',
     brandIds: ['brand-001', 'brand-002'],
     permissions: {
-      [AppModule.POST]:    [AppAction.APPROVE, AppAction.REJECT],
-      [AppModule.METRICS]: [AppAction.VIEW],
-      [AppModule.SCORE]:   [AppAction.VIEW],
-      [AppModule.REPORTS]: [AppAction.EXPORT],
+      // Permite iniciar el onboarding: crear/elegir campaña + CM (ver MD 6.2).
+      // No es 'view-own' (eso es para CM/Diseñador viendo campañas ya asignadas).
+      [AppModule.POST]:      [AppAction.APPROVE, AppAction.REJECT],
+      [AppModule.CAMPAIGNS]: [AppAction.CREATE],
+      [AppModule.METRICS]:   [AppAction.VIEW],
+      [AppModule.SCORE]:     [AppAction.VIEW],
+      [AppModule.REPORTS]:   [AppAction.EXPORT],
     },
   },
 ];

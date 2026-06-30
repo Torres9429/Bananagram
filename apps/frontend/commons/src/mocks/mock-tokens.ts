@@ -32,7 +32,7 @@ export const MOCK_TOKENS = {
     brandIds: ['brand-001'],
     permissions: {
       [AppModule.POST]:      [AppAction.CREATE, AppAction.SCHEDULE, AppAction.PUBLISH],
-      [AppModule.CAMPAIGNS]: [AppAction.MANAGE],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
       [AppModule.METRICS]:   [AppAction.VIEW],
       [AppModule.SCORE]:     [AppAction.VIEW],
     },
@@ -43,7 +43,8 @@ export const MOCK_TOKENS = {
     role: AppRole.DISENADOR,
     brandIds: ['brand-001'],
     permissions: {
-      [AppModule.POST]: [AppAction.CREATE],
+      [AppModule.POST]:      [AppAction.CREATE],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
     },
   }),
   cliente: encodeMockJwt({
@@ -52,10 +53,11 @@ export const MOCK_TOKENS = {
     role: AppRole.CLIENTE,
     brandIds: ['brand-001', 'brand-002'],
     permissions: {
-      [AppModule.POST]:    [AppAction.APPROVE, AppAction.REJECT],
-      [AppModule.METRICS]: [AppAction.VIEW],
-      [AppModule.SCORE]:   [AppAction.VIEW],
-      [AppModule.REPORTS]: [AppAction.EXPORT],
+      [AppModule.POST]:      [AppAction.APPROVE, AppAction.REJECT],
+      [AppModule.CAMPAIGNS]: [AppAction.CREATE],
+      [AppModule.METRICS]:   [AppAction.VIEW],
+      [AppModule.SCORE]:     [AppAction.VIEW],
+      [AppModule.REPORTS]:   [AppAction.EXPORT],
     },
   }),
 };

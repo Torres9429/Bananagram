@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -11,6 +12,7 @@ import Avatar from '@mui/material/Avatar';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { DataTable, type DataTableColumn, ProtectedAction } from '@repo/ui';
 import { AdminTabs } from '../../components/AdminTabs';
+import { CreateUserDialog } from '../../components/CreateUserDialog';
 import { MOCK_USERS, type MockUser } from '../../lib/mock-data';
 
 const STATUS_STYLE: Record<MockUser['status'], { bg: string; color: string; label: string }> = {
@@ -19,6 +21,9 @@ const STATUS_STYLE: Record<MockUser['status'], { bg: string; color: string; labe
 };
 
 export default function UsersPage() {
+  const [users, setUsers] = useState<MockUser[]>(MOCK_USERS);
+  const [createOpen, setCreateOpen] = useState(false);
+
   const columns: DataTableColumn<MockUser>[] = [
     {
       key: 'user',
@@ -69,13 +74,22 @@ export default function UsersPage() {
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Usuarios</Typography>
           <ProtectedAction module="users" action="manage">
-            <Button variant="contained" sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+              onClick={() => setCreateOpen(true)}
+            >
               + Nuevo usuario
             </Button>
           </ProtectedAction>
         </Stack>
-        <DataTable columns={columns} rows={MOCK_USERS} getRowKey={(u) => u.id} />
+        <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} />
       </Box>
+      <CreateUserDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreate={(user) => setUsers((prev) => [user, ...prev])}
+      />
     </Box>
   );
 }

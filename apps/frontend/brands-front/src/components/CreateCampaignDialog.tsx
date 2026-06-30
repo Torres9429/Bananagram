@@ -1,0 +1,183 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import MenuItem from '@mui/material/MenuItem';
+import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
+import Avatar from '@mui/material/Avatar';
+import Checkbox from '@mui/material/Checkbox';
+import Divider from '@mui/material/Divider';
+import { selectUser, findUserByEmail, FormDialog, LabeledField, LabeledSelect } from '@repo/ui';
+import type { MockCampaign, CampaignStatus, MockTeamMember } from '../lib/mock-data';
+import { getAvailableCMsForCategory } from '../lib/mock-data';
+
+const STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
+  { value: 'active', label: 'Activa' },
+  { value: 'paused', label: 'Pausada' },
+  { value: 'finished', label: 'Finalizada' },
+];
+
+interface Props {
+  open: boolean;
+  brandId: string;
+  brandCategory: string;
+  onClose: () => void;
+  onCreate: (campaign: MockCampaign, team: MockTeamMember[]) => void;
+}
+
+export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, onCreate }: Props) {
+  const user = useSelector(selectUser);
+  const [name, setName] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [status, setStatus] = useState<CampaignStatus>('active');
+  const [cmId, setCmId] = useState<string | null>(null);
+  const [designerIds, setDesignerIds] = useState<string[]>([]);
+
+  const availableCMs = getAvailableCMsForCategory(brandCategory);
+  const selectedCm = availableCMs.find((cm) => cm.id === cmId) ?? null;
+
+  useEffect(() => {
+    // Al elegir un CM, el sistema sugiere por defecto a los diseñadores que
+    // ya trabajan con él (simulación del paso 9 del onboarding).
+    setDesignerIds(selectedCm ? selectedCm.designers.map((d) => d.id) : []);
+  }, [cmId]);
+
+  function toggleDesigner(id: string) {
+    setDesignerIds((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
+  }
+
+  function handleCreate() {
+    if (!name.trim() || !selectedCm) return;
+
+    const clienteName = (user?.email && findUserByEmail(user.email)?.name) || 'Cliente';
+    const team: MockTeamMember[] = [
+      { id: selectedCm.id, name: selectedCm.name, role: 'Community Manager', avatarBg: selectedCm.avatarBg, avatarColor: selectedCm.avatarColor },
+      ...selectedCm.designers
+        .filter((d) => designerIds.includes(d.id))
+        .map((d) => ({ id: d.id, name: d.name, role: 'Diseñador', avatarBg: d.avatarBg, avatarColor: d.avatarColor })),
+      { id: user?.id ?? 'cliente', name: clienteName, role: 'Cliente', avatarBg: '#E8F5E9', avatarColor: '#2E7D32' },
+    ];
+
+    onCreate(
+      {
+        id: `c${Date.now()}`,
+        brandId,
+        name: name.trim(),
+        status,
+        startDate: startDate || 'Sin definir',
+        endDate: endDate || 'Sin definir',
+        postsCount: 0,
+      },
+      team,
+    );
+
+    setName('');
+    setStartDate('');
+    setEndDate('');
+    setStatus('active');
+    setCmId(null);
+    setDesignerIds([]);
+    onClose();
+  }
+
+  return (
+    <FormDialog
+      open={open}
+      title="Nueva campaña"
+      maxWidth="sm"
+      confirmLabel="Crear"
+      confirmDisabled={!name.trim() || !selectedCm}
+      onClose={onClose}
+      onConfirm={handleCreate}
+    >
+      <LabeledField label="Nombre" placeholder="Ej. Campaña Verano 2026" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+      <Stack direction="row" gap={2}>
+        <Box sx={{ flex: 1 }}>
+          <LabeledField label="Inicio" type="date" placeholder="dd/mm/aaaa" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </Box>
+        <Box sx={{ flex: 1 }}>
+          <LabeledField label="Fin" type="date" placeholder="dd/mm/aaaa" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </Box>
+      </Stack>
+      <LabeledSelect label="Estado" value={status} onChange={(e) => setStatus(e.target.value as CampaignStatus)}>
+        {STATUS_OPTIONS.map((s) => (
+          <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+        ))}
+      </LabeledSelect>
+
+      <Divider sx={{ mb: 2.5 }} />
+
+      <Box>
+        <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Elige un Community Manager</Typography>
+        <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+          Mostramos primero a quienes coinciden con la categoría de tu marca — puedes elegir libremente. Solo puedes seleccionar un CM por campaña.
+        </Typography>
+        <Stack gap={1}>
+          {availableCMs.map((cm) => {
+            const matches = cm.categories.includes(brandCategory);
+            const active = cmId === cm.id;
+            return (
+              <Stack
+                key={cm.id}
+                direction="row"
+                gap={1.5}
+                alignItems="center"
+                onClick={() => setCmId(cm.id)}
+                sx={{
+                  p: 1.5,
+                  border: active ? '1.5px solid #FDC726' : '1px solid #E8E8E8',
+                  bgcolor: active ? '#FFFDE7' : '#fff',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  '&:hover': { borderColor: '#FDC726' },
+                }}
+              >
+                <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 600 }}>
+                  {cm.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" fontWeight={600}>{cm.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{cm.categories.join(', ')}</Typography>
+                </Box>
+                {matches && (
+                  <Chip size="small" label="Coincide con tu categoría" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 600, fontSize: 11 }} />
+                )}
+              </Stack>
+            );
+          })}
+        </Stack>
+      </Box>
+
+      {selectedCm && (
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Diseñadores sugeridos por {selectedCm.name}</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+            Estos son los diseñadores con los que {selectedCm.name} ya suele trabajar — puedes ajustar la selección.
+          </Typography>
+          <Stack gap={0.5}>
+            {selectedCm.designers.map((d) => (
+              <Stack
+                key={d.id}
+                direction="row"
+                gap={1}
+                alignItems="center"
+                onClick={() => toggleDesigner(d.id)}
+                sx={{ p: 1, border: '1px solid #E8E8E8', borderRadius: 2, cursor: 'pointer' }}
+              >
+                <Checkbox size="small" checked={designerIds.includes(d.id)} sx={{ p: 0.5 }} />
+                <Avatar sx={{ bgcolor: d.avatarBg, color: d.avatarColor, width: 28, height: 28, fontSize: 11, fontWeight: 600 }}>
+                  {d.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                </Avatar>
+                <Typography variant="body2">{d.name}</Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+      )}
+    </FormDialog>
+  );
+}

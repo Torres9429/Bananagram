@@ -13,7 +13,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { StatusChip, ProtectedAction } from '@repo/ui';
-import { MOCK_POSTS, MOCK_STATUS_HISTORY } from '../../../lib/mock-data';
+import { MOCK_POSTS, MOCK_STATUS_HISTORY, getPostNetworkInfo } from '../../../lib/mock-data';
 
 const NETWORK_NAMES: Record<string, string> = {
   IG: 'Instagram',
@@ -29,6 +29,7 @@ export default function PostDetailPage() {
   const router = useRouter();
   const post = MOCK_POSTS.find((p) => p.id === params.id) ?? MOCK_POSTS.find((p) => p.id === 'p2')!;
   const history = MOCK_STATUS_HISTORY[post.id] ?? [];
+  const { network, networkBg, networkColor } = getPostNetworkInfo(post);
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
@@ -56,7 +57,7 @@ export default function PostDetailPage() {
                   Red social
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {NETWORK_NAMES[post.network] ?? post.network}
+                  {NETWORK_NAMES[network] ?? network}
                 </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
@@ -222,8 +223,8 @@ export default function PostDetailPage() {
             </Stack>
             <Chip
               size="small"
-              label={post.network}
-              sx={{ bgcolor: post.networkBg, color: post.networkColor, fontWeight: 600, mt: 1 }}
+              label={network}
+              sx={{ bgcolor: networkBg, color: networkColor, fontWeight: 600, mt: 1 }}
             />
           </Paper>
         </Grid>

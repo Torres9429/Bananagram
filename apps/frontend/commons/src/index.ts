@@ -3,10 +3,16 @@ export * from './ui/atoms/StatusChip/StatusChip';
 export * from './ui/atoms/CharCounter/CharCounter';
 export * from './ui/atoms/ScoreGauge/ScoreGauge';
 export * from './ui/atoms/SkeletonLoader/SkeletonLoader';
+export * from './ui/atoms/LabeledField/LabeledField';
+export * from './ui/atoms/LabeledField/LabeledSelect';
 
 // Molecules
+export * from './ui/molecules/WidgetCard/WidgetCard';
 export * from './ui/molecules/EmptyState/EmptyState';
+export * from './ui/molecules/ProfileCompletenessBadge/ProfileCompletenessBadge';
+export * from './ui/molecules/AvailabilityToggle/AvailabilityToggle';
 export * from './ui/molecules/ConfirmDialog/ConfirmDialog';
+export * from './ui/molecules/FormDialog/FormDialog';
 export * from './ui/molecules/NotificationBell/NotificationBell';
 export * from './ui/molecules/ProtectedAction/ProtectedAction';
 
@@ -36,6 +42,9 @@ export * from './theme/EmotionCacheProvider';
 export * from './utils/formatDate';
 export * from './utils/downloadBlob';
 export * from './utils/mockSession';
+
+// Session
+export * from './session/cookieSession';
 
 // Types
 export * from './types/post.types';

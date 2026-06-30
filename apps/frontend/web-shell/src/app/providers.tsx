@@ -2,11 +2,11 @@
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Provider as ReduxProvider } from 'react-redux';
-import { theme, EmotionCacheProvider, useMockSessionFromUrl } from '@repo/ui';
+import { theme, EmotionCacheProvider, useSessionBootstrap } from '@repo/ui';
 import { store } from '../store';
 
 function SessionBootstrap() {
-  useMockSessionFromUrl();
+  useSessionBootstrap();
   return null;
 }
 

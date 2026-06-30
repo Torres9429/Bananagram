@@ -13,11 +13,29 @@ export interface MockBrandMetric {
   score: BrandScore;
 }
 
+// Espejo del modelo Brand → BrandProfile de brands-front/posts-front: un Post
+// pertenece a un BrandProfile (cuenta de una Marca en una red), nunca tiene
+// `brand`/`network` como campos propios.
+export interface BrandProfile {
+  id: string;
+  brandName: string;
+  socialNetwork: string;
+}
+
+export const MOCK_BRAND_PROFILES: BrandProfile[] = [
+  { id: 'bp1', brandName: 'Nike MX', socialNetwork: 'IG' },
+  { id: 'bp2', brandName: 'Zara MX', socialNetwork: 'IG' },
+  { id: 'bp3', brandName: 'Spotify MX', socialNetwork: 'TK' },
+];
+
+export function getBrandProfile(brandProfileId: string): BrandProfile | undefined {
+  return MOCK_BRAND_PROFILES.find((p) => p.id === brandProfileId);
+}
+
 export interface MockTopPost {
   id: string;
   title: string;
-  brand: string;
-  network: string;
+  brandProfileId: string;
   likes: number;
   comments: number;
   shares: number;
@@ -70,7 +88,7 @@ export const MOCK_REACH_BY_NETWORK = [
 ];
 
 export const MOCK_TOP_POSTS: MockTopPost[] = [
-  { id: 'p5', title: 'Reels sustentabilidad', brand: 'Nike MX', network: 'IG', likes: 1240, comments: 87, shares: 34, engagementRate: 5.4 },
-  { id: 'p9', title: 'Carrusel verano SS25', brand: 'Zara MX', network: 'IG', likes: 980, comments: 52, shares: 21, engagementRate: 4.9 },
-  { id: 'p11', title: 'Playlist viernes', brand: 'Spotify MX', network: 'TK', likes: 760, comments: 40, shares: 65, engagementRate: 4.5 },
+  { id: 'p5', title: 'Reels sustentabilidad', brandProfileId: 'bp1', likes: 1240, comments: 87, shares: 34, engagementRate: 5.4 },
+  { id: 'p9', title: 'Carrusel verano SS25', brandProfileId: 'bp2', likes: 980, comments: 52, shares: 21, engagementRate: 4.9 },
+  { id: 'p11', title: 'Playlist viernes', brandProfileId: 'bp3', likes: 760, comments: 40, shares: 65, engagementRate: 4.5 },
 ];

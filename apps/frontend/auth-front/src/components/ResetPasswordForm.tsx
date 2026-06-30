@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -72,6 +73,12 @@ export function ResetPasswordForm() {
       >
         Restablecer contraseña
       </Button>
+
+      <Typography variant="body2" color="text.secondary" textAlign="center">
+        <Box component={Link} href="/login" sx={{ color: '#E6A817', fontWeight: 600, textDecoration: 'none' }}>
+          ← Volver a inicio de sesión
+        </Box>
+      </Typography>
     </Box>
   );
 }

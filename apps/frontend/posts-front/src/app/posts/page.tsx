@@ -13,9 +13,10 @@ import Typography from '@mui/material/Typography';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import { DataTable, type DataTableColumn, StatusChip, ProtectedAction } from '@repo/ui';
-import { MOCK_POSTS, type MockPost, type PostStatus } from '../../lib/mock-data';
+import { MOCK_POSTS, getPostNetworkInfo, type MockPost, type PostStatus } from '../../lib/mock-data';
 import { NetworkAvatar } from '../../components/NetworkAvatar';
 import { CampaignDot } from '../../components/CampaignDot';
+import { PostsTabs } from '../../components/PostsTabs';
 
 const FILTERS: { key: 'all' | PostStatus; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -37,7 +38,10 @@ export default function PostsListPage() {
       key: 'network',
       header: '',
       width: 48,
-      render: (post) => <NetworkAvatar network={post.network} networkBg={post.networkBg} networkColor={post.networkColor} />,
+      render: (post) => {
+        const { network, networkBg, networkColor } = getPostNetworkInfo(post);
+        return <NetworkAvatar network={network} networkBg={networkBg} networkColor={networkColor} />;
+      },
     },
     {
       key: 'info',
@@ -50,7 +54,7 @@ export default function PostsListPage() {
           <Stack direction="row" gap={1} mt={0.5} alignItems="center" flexWrap="wrap">
             {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
             <Typography variant="caption" color="text.secondary">
-              · {post.brand}
+              · {getPostNetworkInfo(post).brand}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               · {post.designer}
@@ -108,7 +112,9 @@ export default function PostsListPage() {
   ];
 
   return (
-    <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
+    <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh' }}>
+      <PostsTabs />
+      <Box sx={{ p: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Stack direction="row" gap={1} flexWrap="wrap">
           {FILTERS.map((f) => {
@@ -153,6 +159,7 @@ export default function PostsListPage() {
         getRowKey={(post) => post.id}
         onRowClick={(post) => router.push(`/posts/${post.id}`)}
       />
+      </Box>
     </Box>
   );
 }
