@@ -10,9 +10,10 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import { ProtectedAction, usePermissions } from '@repo/ui';
-import { MOCK_POSTS } from '../../../lib/mock-data';
+import { MOCK_POSTS, getPostNetworkInfo } from '../../../lib/mock-data';
 import { NetworkAvatar } from '../../../components/NetworkAvatar';
 import { CampaignDot } from '../../../components/CampaignDot';
+import { PostsTabs } from '../../../components/PostsTabs';
 
 export default function PostsApprovalPage() {
   const router = useRouter();
@@ -28,7 +29,9 @@ export default function PostsApprovalPage() {
   const showRejectedSection = can('post', 'create');
 
   return (
-    <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
+    <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh' }}>
+      <PostsTabs />
+      <Box sx={{ p: 3 }}>
       <Stack direction="row" gap={1.5} mb={3} flexWrap="wrap">
         <Chip label={`${draftPosts.length} para revisar`} sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 600 }} />
         <Chip
@@ -51,7 +54,7 @@ export default function PostsApprovalPage() {
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar network={post.network} networkBg={post.networkBg} networkColor={post.networkColor} size={32} />
+                    <NetworkAvatar {...getPostNetworkInfo(post)} size={32} />
                     <Typography fontWeight={600}>{post.title}</Typography>
                     {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
                   </Stack>
@@ -88,7 +91,7 @@ export default function PostsApprovalPage() {
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar network={post.network} networkBg={post.networkBg} networkColor={post.networkColor} size={32} />
+                    <NetworkAvatar {...getPostNetworkInfo(post)} size={32} />
                     <Typography fontWeight={600}>{post.title}</Typography>
                     {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
                   </Stack>
@@ -135,7 +138,7 @@ export default function PostsApprovalPage() {
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar network={post.network} networkBg={post.networkBg} networkColor={post.networkColor} size={32} />
+                    <NetworkAvatar {...getPostNetworkInfo(post)} size={32} />
                     <Typography fontWeight={600}>{post.title}</Typography>
                     {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
                   </Stack>
@@ -172,6 +175,7 @@ export default function PostsApprovalPage() {
           ))}
         </>
       )}
+      </Box>
     </Box>
   );
 }

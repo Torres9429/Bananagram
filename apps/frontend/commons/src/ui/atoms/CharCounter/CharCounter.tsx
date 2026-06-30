@@ -9,7 +9,7 @@ interface Props { network: string; current: number; }
 export function CharCounter({ network, current }: Props) {
   const limit = LIMITS[network] || 2200;
   const remaining = limit - current;
-  const color = remaining < 20 ? '#C62828' : remaining < 100 ? '#D4AC40' : '#6B6B6B';
+  const color = remaining < 20 ? 'error.main' : remaining < 100 ? 'primary.dark' : '#6B6B6B';
   return (
     <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', color }}>
       {remaining} / {limit}

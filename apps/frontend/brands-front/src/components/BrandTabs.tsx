@@ -4,6 +4,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const SECTIONS = [
   { suffix: '', label: 'Resumen' },
@@ -24,19 +28,26 @@ export function BrandTabs({ brandId }: { brandId: string }) {
       ?.suffix ?? '';
 
   return (
-    <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', px: 3 }}>
-      <Tabs
-        value={current}
-        onChange={(_, value) => router.push(`${base}${value}`)}
-        variant="scrollable"
-        scrollButtons="auto"
-        TabIndicatorProps={{ sx: { bgcolor: '#FDC726', height: 3 } }}
-        sx={{ '& .Mui-selected': { color: '#7A5C00 !important', fontWeight: 700 } }}
-      >
-        {SECTIONS.map((s) => (
-          <Tab key={s.suffix} value={s.suffix} label={s.label} sx={{ textTransform: 'none', fontWeight: 600 }} />
-        ))}
-      </Tabs>
+    <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', px: 1 }}>
+      <Stack direction="row" alignItems="center">
+        <Tooltip title="Volver">
+          <IconButton onClick={() => router.back()} sx={{ color: '#7A5C00', ml: 1 }}>
+            <ArrowBackIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tabs
+          value={current}
+          onChange={(_, value) => router.push(`${base}${value}`)}
+          variant="scrollable"
+          scrollButtons="auto"
+          TabIndicatorProps={{ sx: { bgcolor: '#FDC726', height: 3 } }}
+          sx={{ '& .Mui-selected': { color: '#7A5C00 !important', fontWeight: 700 } }}
+        >
+          {SECTIONS.map((s) => (
+            <Tab key={s.suffix} value={s.suffix} label={s.label} sx={{ textTransform: 'none', fontWeight: 600 }} />
+          ))}
+        </Tabs>
+      </Stack>
     </Box>
   );
 }

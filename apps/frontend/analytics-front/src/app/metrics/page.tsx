@@ -24,6 +24,7 @@ import {
   MOCK_BRAND_METRICS,
   MOCK_REACH_BY_NETWORK,
   MOCK_TOP_POSTS,
+  getBrandProfile,
   type MockTopPost,
 } from '../../lib/mock-data';
 
@@ -49,8 +50,18 @@ export default function MetricsPage() {
 
   const columns: DataTableColumn<MockTopPost>[] = [
     { key: 'title', header: 'Publicación', render: (p) => <Typography variant="body2" fontWeight={600}>{p.title}</Typography> },
-    { key: 'brand', header: 'Marca', render: (p) => <Typography variant="body2" color="text.secondary">{p.brand}</Typography> },
-    { key: 'network', header: 'Red', render: (p) => <Chip size="small" label={p.network} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} /> },
+    {
+      key: 'brand',
+      header: 'Marca',
+      render: (p) => <Typography variant="body2" color="text.secondary">{getBrandProfile(p.brandProfileId)?.brandName ?? '—'}</Typography>,
+    },
+    {
+      key: 'network',
+      header: 'Red',
+      render: (p) => (
+        <Chip size="small" label={getBrandProfile(p.brandProfileId)?.socialNetwork ?? '—'} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} />
+      ),
+    },
     { key: 'likes', header: 'Likes', align: 'right', render: (p) => <Typography variant="body2">{p.likes.toLocaleString()}</Typography> },
     {
       key: 'engagement',

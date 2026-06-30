@@ -5,7 +5,13 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { DataTable, type DataTableColumn, StatusChip } from '@repo/ui';
 import { CampaignTabs } from '../../../../../../components/CampaignTabs';
-import { MOCK_BRANDS, MOCK_CAMPAIGNS, MOCK_POSTS_BY_CAMPAIGN, type MockCampaignPost } from '../../../../../../lib/mock-data';
+import {
+  MOCK_BRANDS,
+  MOCK_CAMPAIGNS,
+  MOCK_POSTS_BY_CAMPAIGN,
+  getBrandProfile,
+  type MockCampaignPost,
+} from '../../../../../../lib/mock-data';
 
 export default function CampaignPostsPage() {
   const params = useParams<{ id: string; campaignId: string }>();
@@ -15,7 +21,15 @@ export default function CampaignPostsPage() {
 
   const columns: DataTableColumn<MockCampaignPost>[] = [
     { key: 'title', header: 'Publicación', render: (p) => <Typography variant="body2" fontWeight={600}>{p.title}</Typography> },
-    { key: 'network', header: 'Red', render: (p) => <Typography variant="caption" color="text.secondary">{p.network}</Typography> },
+    {
+      key: 'network',
+      header: 'Red',
+      render: (p) => (
+        <Typography variant="caption" color="text.secondary">
+          {getBrandProfile(p.brandProfileId)?.socialNetwork ?? '—'}
+        </Typography>
+      ),
+    },
     { key: 'status', header: 'Estado', render: (p) => <StatusChip status={p.status} /> },
     { key: 'scheduledAt', header: 'Programado', align: 'right', render: (p) => <Typography variant="caption" color="text.secondary">{p.scheduledAt}</Typography> },
   ];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -8,9 +8,6 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Alert from '@mui/material/Alert';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import { downloadBlob, ProtectedAction } from '@repo/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
@@ -18,7 +15,6 @@ import { MOCK_BRANDS } from '../../../../lib/mock-data';
 
 export default function BrandReportsPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
 
   function exportMock(format: 'csv' | 'pdf') {
@@ -33,16 +29,6 @@ export default function BrandReportsPage() {
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
-      <Box sx={{ px: 3, pt: 2 }}>
-        <Tooltip title="Volver">
-          <IconButton
-            onClick={() => router.back()}
-            sx={{ color: '#7A5C00', bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFF8E1' } }}
-          >
-            <ArrowBackIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
       <BrandTabs brandId={brand.id} />
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" fontWeight={700} mb={3}>Reportes — {brand.name}</Typography>

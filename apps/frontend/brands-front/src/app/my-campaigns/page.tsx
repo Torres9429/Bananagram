@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
+import { EmptyState } from '@repo/ui';
 import { getMyCampaigns, CAMPAIGN_STATUS_LABEL } from '../../lib/mock-data';
 
 export default function MyCampaignsPage() {
@@ -17,6 +18,12 @@ export default function MyCampaignsPage() {
       <Typography variant="body2" color="text.secondary" mb={3}>
         Campañas en las que participas, de todas las marcas asignadas.
       </Typography>
+      {campaigns.length === 0 && (
+        <EmptyState
+          title="Sin campañas asignadas"
+          description="Aún no participas en ninguna campaña. El CM o el Cliente te asignarán cuando haya trabajo disponible."
+        />
+      )}
       <Stack gap={1.5}>
         {campaigns.map((c) => {
           const s = CAMPAIGN_STATUS_LABEL[c.status];

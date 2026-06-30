@@ -11,6 +11,7 @@ export interface AuthState {
   accessToken: string | null;
   permissions: Record<string, string[]>;
   brandIds: string[];
+  isAuthenticated: boolean;
 }
 
 interface JwtPayload {
@@ -38,7 +39,7 @@ function decodeJwt(token: string): JwtPayload | null {
   }
 }
 
-const initialState: AuthState = { user: null, accessToken: null, permissions: {}, brandIds: [] };
+const initialState: AuthState = { user: null, accessToken: null, permissions: {}, brandIds: [], isAuthenticated: false };
 
 const authSlice = createSlice({
   name: 'auth',
@@ -51,18 +52,16 @@ const authSlice = createSlice({
         state.user = { id: payload.sub, email: payload.email, role: payload.role };
         state.permissions = payload.permissions ?? {};
         state.brandIds = payload.brandIds ?? [];
+        state.isAuthenticated = true;
       }
-    },
-    setPermissions(state, action: PayloadAction<{ permissions: Record<string, string[]>; brandIds: string[] }>) {
-      state.permissions = action.payload.permissions;
-      state.brandIds = action.payload.brandIds;
     },
     logout(state) { Object.assign(state, initialState); },
   },
 });
 
-export const { setCredentials, setPermissions, logout } = authSlice.actions;
+export const { setCredentials, logout } = authSlice.actions;
 export const authReducer = authSlice.reducer;
 export const selectUser = (s: AuthRootState) => s.auth.user;
 export const selectPermissions = (s: AuthRootState) => s.auth.permissions;
 export const selectBrandIds = (s: AuthRootState) => s.auth.brandIds;
+export const selectIsAuthenticated = (s: AuthRootState) => s.auth.isAuthenticated;

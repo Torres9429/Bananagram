@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -7,13 +8,21 @@ import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
 import { BrandTabs } from '../../../../components/BrandTabs';
-import { MOCK_BRANDS, MOCK_CAMPAIGNS, CAMPAIGN_STATUS_LABEL } from '../../../../lib/mock-data';
+import { CreateCampaignDialog } from '../../../../components/CreateCampaignDialog';
+import {
+  MOCK_BRANDS,
+  MOCK_CAMPAIGNS,
+  CAMPAIGN_STATUS_LABEL,
+  assignTeamToCampaign,
+  type MockCampaign,
+} from '../../../../lib/mock-data';
 
 export default function CampaignsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
-  const campaigns = MOCK_CAMPAIGNS.filter((c) => c.brandId === brand.id);
+  const [campaigns, setCampaigns] = useState<MockCampaign[]>(MOCK_CAMPAIGNS.filter((c) => c.brandId === brand.id));
+  const [createOpen, setCreateOpen] = useState(false);
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
@@ -21,7 +30,11 @@ export default function CampaignsPage() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Campañas — {brand.name}</Typography>
-          <Button variant="contained" sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+          <Button
+            variant="contained"
+            sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+            onClick={() => setCreateOpen(true)}
+          >
             + Nueva campaña
           </Button>
         </Stack>
@@ -47,6 +60,17 @@ export default function CampaignsPage() {
           })}
         </Stack>
       </Box>
+
+      <CreateCampaignDialog
+        open={createOpen}
+        brandId={brand.id}
+        brandCategory={brand.category}
+        onClose={() => setCreateOpen(false)}
+        onCreate={(campaign, team) => {
+          assignTeamToCampaign(campaign.id, team);
+          setCampaigns((prev) => [campaign, ...prev]);
+        }}
+      />
     </Box>
   );
 }

@@ -25,7 +25,7 @@ interface DataTableProps<T> {
 
 export function DataTable<T>({ columns, rows, getRowKey, onRowClick }: DataTableProps<T>) {
   return (
-    <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, overflow: 'hidden' }}>
+    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
       <Table>
         <TableHead>
           <TableRow>
@@ -35,10 +35,11 @@ export function DataTable<T>({ columns, rows, getRowKey, onRowClick }: DataTable
                 align={col.align}
                 sx={{
                   width: col.width,
-                  bgcolor: '#FFF8E1',
-                  color: '#7A5C00',
+                  bgcolor: 'primary.light',
+                  color: 'secondary.main',
                   fontWeight: 700,
-                  borderBottom: '1px solid #E8E8E8',
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
                 }}
               >
                 {col.header}
@@ -54,9 +55,9 @@ export function DataTable<T>({ columns, rows, getRowKey, onRowClick }: DataTable
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               sx={{
                 cursor: onRowClick ? 'pointer' : 'default',
-                bgcolor: i % 2 === 0 ? '#FFFFFF' : '#F7F7F7',
+                bgcolor: i % 2 === 0 ? 'background.paper' : 'background.default',
                 '&:hover': { bgcolor: '#FFF3D6' },
-                '& td': { borderBottom: '1px solid #E8E8E8' },
+                '& td': { borderBottom: '1px solid', borderColor: 'divider' },
                 '&:last-child td': { borderBottom: 0 },
               }}
             >

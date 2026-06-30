@@ -8,9 +8,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { ScoreGauge } from '@repo/ui';
 import { BrandTabs } from '../../../components/BrandTabs';
 import { MOCK_BRANDS, MOCK_CAMPAIGNS, CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
@@ -23,16 +20,6 @@ export default function BrandOverviewPage() {
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
-      <Box sx={{ px: 3, pt: 2 }}>
-        <Tooltip title="Volver">
-          <IconButton
-            onClick={() => router.back()}
-            sx={{ color: '#7A5C00', bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFF8E1' } }}
-          >
-            <ArrowBackIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
       <BrandTabs brandId={brand.id} />
       <Box sx={{ p: 3 }}>
         <Stack direction="row" gap={2} alignItems="center" mb={3}>

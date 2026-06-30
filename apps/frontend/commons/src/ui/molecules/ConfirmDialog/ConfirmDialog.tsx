@@ -37,18 +37,10 @@ export function ConfirmDialog({
         </DialogContent>
       )}
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onCancel} sx={{ color: '#6B6B6B' }}>
+        <Button onClick={onCancel} sx={{ color: 'text.secondary' }}>
           {cancelLabel}
         </Button>
-        <Button
-          onClick={onConfirm}
-          variant="contained"
-          sx={
-            destructive
-              ? { bgcolor: '#C62828', '&:hover': { bgcolor: '#B71C1C' } }
-              : { bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }
-          }
-        >
+        <Button onClick={onConfirm} variant="contained" color={destructive ? 'error' : 'primary'}>
           {confirmLabel}
         </Button>
       </DialogActions>

@@ -11,8 +11,6 @@ import Tooltip from '@mui/material/Tooltip';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
-const ACTIVE_BG = '#FDC726';
-const INACTIVE_COLOR = '#D4AC40';
 const WIDTH_EXPANDED = 220;
 const WIDTH_COLLAPSED = 76;
 
@@ -21,6 +19,9 @@ export interface SidebarNavItem {
   label: string;
   href: string;
   icon: ReactNode;
+  // Si el href navega a una ruta distinta de donde realmente "aterriza"
+  // (ej. un redirect), usa este prefijo para decidir el estado activo.
+  activeMatch?: string;
 }
 
 interface SidebarNavProps {
@@ -42,8 +43,9 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
         height: '100vh',
         position: 'sticky',
         top: 0,
-        bgcolor: '#fff',
-        borderRight: '1px solid #F0F0F0',
+        bgcolor: 'background.paper',
+        borderRight: '1px solid',
+        borderColor: 'divider',
         display: 'flex',
         flexDirection: 'column',
         py: 2,
@@ -60,11 +62,12 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
           zIndex: 2,
           width: 28,
           height: 28,
-          bgcolor: '#fff',
-          border: '1px solid #F0F0F0',
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
           boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-          color: INACTIVE_COLOR,
-          '&:hover': { bgcolor: '#fff' },
+          color: 'primary.dark',
+          '&:hover': { bgcolor: 'background.paper' },
         }}
       >
         {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
@@ -86,7 +89,8 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
 
       <List sx={{ px: collapsed ? 1 : 1.5, pt: 0 }}>
         {items.map((item) => {
-          const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
+          const matchHref = item.activeMatch ?? item.href;
+          const active = activeHref === matchHref || activeHref.startsWith(`${matchHref}/`);
           const button = (
             <ListItemButton
               key={item.key}
@@ -100,10 +104,10 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
                 display: 'flex',
                 alignItems: 'center',
                 px: collapsed ? 1 : 2,
-                color: active ? '#fff' : INACTIVE_COLOR,
-                bgcolor: active ? ACTIVE_BG : 'transparent',
-                '&:hover': { bgcolor: active ? ACTIVE_BG : 'rgba(253, 199, 38, 0.12)' },
-                '&.Mui-selected': { bgcolor: ACTIVE_BG, '&:hover': { bgcolor: ACTIVE_BG } },
+                color: active ? 'primary.contrastText' : 'primary.dark',
+                bgcolor: active ? 'primary.main' : 'transparent',
+                '&:hover': { bgcolor: active ? 'primary.main' : 'rgba(253, 199, 38, 0.12)' },
+                '&.Mui-selected': { bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.main' } },
               }}
             >
               <ListItemIcon sx={{ color: 'inherit', minWidth: collapsed ? 0 : 36, justifyContent: 'center' }}>
