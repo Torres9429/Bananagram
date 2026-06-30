@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"b:/9no/Bananagram/Bananagram/apps/backend/services\" && mkdir -p brands-service/src/campaigns/dto analytics-service/src/reports/dto && echo ok)",
+      "Bash(pnpm --filter @repo/posts-front exec tsc --noEmit -p tsconfig.json)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(pnpm --filter @repo/ui exec tsc --noEmit -p tsconfig.json)",
+      "Bash(pnpm install *)",
+      "Bash(powershell -NoProfile -Command 'Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object {\\($_.Path -ne $null\\)} | Select-Object Id')",
+      "Bash(pnpm --parallel --filter @repo/brands-front --filter @repo/web-shell run dev)",
+      "Bash(curl -s --max-time 5 \"http://localhost:3000/my-campaigns\")",
+      "Bash(curl -s --max-time 5 \"http://localhost:3000/team\")",
+      "Bash(powershell -NoProfile -Command 'Get-NetTCPConnection -LocalPort 3000,3013 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1; Get-NetTCPConnection -LocalPort 3000,3013 -State Listen -ErrorAction SilentlyContinue')",
+      "Bash(powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3010,3011,3012,3014 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalPort,OwningProcess\")",
+      "Bash(powershell -NoProfile -Command \"Stop-Process -Id 10996,29680,12608,15832 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Get-NetTCPConnection -LocalPort 3010,3011,3012,3014 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalPort,OwningProcess\")",
+      "Bash(pnpm tsc *)"
+    ],
+    "additionalDirectories": [
+      "b:\\9no\\Bananagram\\Bananagram\\apps\\backend\\services\\brands-service\\src\\campaigns"
+    ]
+  }
+}

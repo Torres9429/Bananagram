@@ -1,0 +1,31 @@
+{
+  "name": "@repo/analytics-front",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev --turbopack -p 3011",
+    "build": "next build",
+    "start": "next start -p 3011"
+  },
+  "dependencies": {
+    "next": "16.2.9",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "@mui/material": "^5.0.0",
+    "@mui/icons-material": "^5.0.0",
+    "@emotion/react": "^11.0.0",
+    "@emotion/styled": "^11.0.0",
+    "@reduxjs/toolkit": "^2.0.0",
+    "react-redux": "^9.0.0",
+    "@repo/ui": "workspace:*",
+    "recharts": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/node": "^20",
+    "tailwindcss": "^4",
+    "@tailwindcss/postcss": "^4",
+    "postcss": "^8.4.0"
+  }
+}

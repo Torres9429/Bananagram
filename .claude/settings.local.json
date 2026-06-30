@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf campaigns-service)",
+      "Bash(rm -rf reports-service)",
+      "Bash(mv posts-service *)",
+      "Bash(mv metrics-service *)"
+    ]
+  }
+}

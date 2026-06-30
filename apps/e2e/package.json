@@ -1,0 +1,6 @@
+{
+  "name": "@repo/e2e",
+  "private": true,
+  "scripts": { "test": "jest" },
+  "devDependencies": { "jest": "^29.0.0", "supertest": "^6.0.0" }
+}

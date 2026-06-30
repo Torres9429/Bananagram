@@ -1,0 +1,57 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gestor_redes
+    ports: ["5432:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+
+  adminer:
+    image: adminer
+    ports: ["8080:8080"]
+
+  auth-service:
+    build: ./apps/backend/services/auth-service
+    env_file: .env
+    ports: ["3001:3001"]
+    depends_on: [postgres]
+
+  brands-service:
+    build: ./apps/backend/services/brands-service
+    env_file: .env
+    ports: ["3002:3002"]
+    depends_on: [postgres]
+
+  content-service:
+    build: ./apps/backend/services/content-service
+    env_file: .env
+    ports: ["3003:3003"]
+    depends_on: [postgres]
+
+  analytics-service:
+    build: ./apps/backend/services/analytics-service
+    env_file: .env
+    ports: ["3005:3005"]
+    depends_on: [postgres]
+
+  api-gateway:
+    build: ./apps/backend/gateway
+    env_file: .env
+    ports: ["4000:4000"]
+    depends_on:
+      - auth-service
+      - brands-service
+      - content-service
+      - analytics-service
+
+  web-shell:
+    build: ./apps/frontend/web-shell
+    env_file: .env
+    ports: ["3000:3000"]
+    depends_on: [api-gateway]
+
+volumes:
+  postgres_data:
