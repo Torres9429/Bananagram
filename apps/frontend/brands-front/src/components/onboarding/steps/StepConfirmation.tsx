@@ -1,5 +1,8 @@
 'use client';
 
+// LEGACY/DEPRECATED (dominio v3): step de OnboardingWizard, que ya no forma
+// parte de ningún flujo alcanzable (ver OnboardingWizard.tsx). Se conserva
+// sin borrar por si se reutiliza más adelante.
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -12,12 +15,12 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import { AVAILABLE_SOCIAL_NETWORKS, type MockAvailableCM } from '../../../lib/mock-data';
-import type { BrandDraft } from './StepBrand';
+import type { ProfileDraft } from './StepProfile';
 import type { CampaignDraft } from './StepCampaign';
 import type { SocialNetworkCode } from '../../../lib/mock-data';
 
 interface Props {
-  brand: BrandDraft;
+  profile: ProfileDraft;
   networks: SocialNetworkCode[];
   campaign: CampaignDraft;
   cm: MockAvailableCM | null;
@@ -35,7 +38,7 @@ function SummarySection({ icon, title, children }: { icon: React.ReactNode; titl
   );
 }
 
-export function StepConfirmation({ brand, networks, campaign, cm }: Props) {
+export function StepConfirmation({ profile, networks, campaign, cm }: Props) {
   return (
     <Stack gap={0.5}>
       <Stack direction="row" gap={1.5} alignItems="center" mb={2}>
@@ -50,15 +53,15 @@ export function StepConfirmation({ brand, networks, campaign, cm }: Props) {
 
       <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 2.5 }}>
         <Stack gap={2.5} divider={<Divider />}>
-          <SummarySection icon={<StorefrontOutlinedIcon fontSize="small" />} title="Marca">
+          <SummarySection icon={<StorefrontOutlinedIcon fontSize="small" />} title="Perfil">
             <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="body2" fontWeight={600}>{brand.name}</Typography>
+              <Typography variant="body2" fontWeight={600}>{profile.name}</Typography>
               <Chip
-                label={brand.type === 'brand' ? 'Marca comercial' : 'Perfil personal'}
+                label={profile.type === 'brand' ? 'Marca comercial' : 'Perfil personal'}
                 size="small"
                 sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }}
               />
-              <Chip label={brand.category} size="small" variant="outlined" />
+              <Chip label={profile.category} size="small" variant="outlined" />
             </Stack>
             <Stack direction="row" gap={0.75} mt={1} flexWrap="wrap">
               {networks.map((code) => {

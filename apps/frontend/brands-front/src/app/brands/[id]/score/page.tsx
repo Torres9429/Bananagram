@@ -9,17 +9,17 @@ import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 import { ScoreGauge } from '@repo/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
-import { MOCK_BRANDS } from '../../../../lib/mock-data';
+import { MOCK_PROFILES } from '../../../../lib/mock-data';
 
 const COMPONENTS = [
-  { key: 'consistency', label: 'Consistencia', weight: 30, color: '#FDC726' },
+  { key: 'consistency', label: 'Consistencia', weight: 30, color: '#E0A800' },
   { key: 'engagement', label: 'Engagement', weight: 40, color: '#42A5F5' },
   { key: 'frequency', label: 'Frecuencia', weight: 30, color: '#66BB6A' },
 ] as const;
 
 export default function BrandScorePage() {
   const params = useParams<{ id: string }>();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>

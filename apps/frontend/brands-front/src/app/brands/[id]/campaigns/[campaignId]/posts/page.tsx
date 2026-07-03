@@ -6,16 +6,16 @@ import Typography from '@mui/material/Typography';
 import { DataTable, type DataTableColumn, StatusChip } from '@repo/ui';
 import { CampaignTabs } from '../../../../../../components/CampaignTabs';
 import {
-  MOCK_BRANDS,
+  MOCK_PROFILES,
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
-  getBrandProfile,
+  getSocialAccount,
   type MockCampaignPost,
 } from '../../../../../../lib/mock-data';
 
 export default function CampaignPostsPage() {
   const params = useParams<{ id: string; campaignId: string }>();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === params.campaignId) ?? MOCK_CAMPAIGNS[0];
   const posts = MOCK_POSTS_BY_CAMPAIGN[campaign.id] ?? [];
 
@@ -26,7 +26,7 @@ export default function CampaignPostsPage() {
       header: 'Red',
       render: (p) => (
         <Typography variant="caption" color="text.secondary">
-          {getBrandProfile(p.brandProfileId)?.socialNetwork ?? '—'}
+          {getSocialAccount(p.brandProfileId)?.socialNetwork ?? '—'}
         </Typography>
       ),
     },

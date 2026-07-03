@@ -9,12 +9,17 @@ const poppins = Poppins({
   variable: '--font-poppins',
 });
 
-export const metadata: Metadata = { title: 'Posts — Bananagram' };
+export const metadata: Metadata = { title: 'Posts — Bananagram', icons: { icon: '/LogoMonkey.png' } };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={poppins.variable}>
-      <body style={{ margin: 0, backgroundColor: '#F7F7F7', fontFamily: 'var(--font-poppins), Arial, sans-serif' }}>
+      {/* suppressHydrationWarning: algunas extensiones del navegador (ej.
+          ColorZilla) inyectan atributos en <body> (cz-shortcut-listen) antes
+          de que React hidrate, disparando un falso positivo de hydration
+          mismatch. Solo silencia el warning de atributos de este tag, no de
+          sus hijos. */}
+      <body style={{ margin: 0, backgroundColor: '#F7F7F7', fontFamily: 'var(--font-poppins), Arial, sans-serif' }} suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

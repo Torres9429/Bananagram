@@ -37,7 +37,7 @@ export function DashboardAdmin() {
           variant="contained"
           startIcon={<PersonAddOutlinedIcon />}
           onClick={() => nav('/users')}
-          sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
         >
           Crear usuario
         </Button>
@@ -91,7 +91,7 @@ export function DashboardAdmin() {
                     variant="outlined"
                     startIcon={item.icon}
                     onClick={() => nav(item.path)}
-                    sx={{ justifyContent: 'flex-start', borderColor: '#E8E8E8', color: '#3D3D3D', '&:hover': { borderColor: '#FDC726', color: '#7A5C00' } }}
+                    sx={{ justifyContent: 'flex-start', borderColor: '#E8E8E8', color: '#3D3D3D', '&:hover': { borderColor: '#E0A800', color: '#7A5C00' } }}
                   >
                     {item.label}
                   </Button>

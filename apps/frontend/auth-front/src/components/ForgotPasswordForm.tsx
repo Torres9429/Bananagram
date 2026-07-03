@@ -56,7 +56,7 @@ export function ForgotPasswordForm() {
           py: 1.25,
           color: '#fff',
           fontWeight: 700,
-          background: '#FDC726',
+          background: '#E0A800',
           '&:hover': { background: '#D4AC40' },
         }}
       >

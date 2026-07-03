@@ -109,7 +109,7 @@ export default function RolesPage() {
           <Button
             variant="contained"
             onClick={handleSave}
-            sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
           >
             Guardar cambios
           </Button>
@@ -156,10 +156,10 @@ export default function RolesPage() {
                                 sx={{
                                   cursor: 'pointer',
                                   px: 1, py: 0.25,
-                                  border: `1px solid ${active ? '#FDC726' : '#E8E8E8'}`,
+                                  border: `1px solid ${active ? '#E0A800' : '#E8E8E8'}`,
                                   borderRadius: 1.5,
                                   bgcolor: active ? '#FFF8E1' : 'transparent',
-                                  '&:hover': { borderColor: '#FDC726' },
+                                  '&:hover': { borderColor: '#E0A800' },
                                 }}
                               >
                                 <Switch
@@ -168,8 +168,8 @@ export default function RolesPage() {
                                   onChange={() => {}}
                                   sx={{
                                     width: 32, height: 20, p: 0,
-                                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#FDC726', transform: 'translateX(12px)' },
-                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#FDC726' },
+                                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#E0A800', transform: 'translateX(12px)' },
+                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#E0A800' },
                                     '& .MuiSwitch-thumb': { width: 14, height: 14 },
                                     '& .MuiSwitch-track': { borderRadius: 10 },
                                   }}

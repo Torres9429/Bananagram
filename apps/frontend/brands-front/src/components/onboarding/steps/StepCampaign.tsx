@@ -1,5 +1,8 @@
 'use client';
 
+// LEGACY/DEPRECATED (dominio v3): step de OnboardingWizard, que ya no forma
+// parte de ningún flujo alcanzable (ver OnboardingWizard.tsx). Se conserva
+// sin borrar por si se reutiliza más adelante.
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -15,14 +18,14 @@ export interface CampaignDraft {
 interface Props {
   value: CampaignDraft;
   onChange: (v: CampaignDraft) => void;
-  brandName: string;
+  profileName: string;
 }
 
-export function StepCampaign({ value, onChange, brandName }: Props) {
+export function StepCampaign({ value, onChange, profileName }: Props) {
   return (
     <Stack gap={2}>
       <Typography variant="caption" color="text.secondary">
-        Esta será la primera campaña de <strong>{brandName}</strong>. Podrás crear más campañas después.
+        Esta será la primera campaña de <strong>{profileName}</strong>. Podrás crear más campañas después.
       </Typography>
 
       <LabeledField

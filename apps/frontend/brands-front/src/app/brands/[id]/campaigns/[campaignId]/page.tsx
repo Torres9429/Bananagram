@@ -10,7 +10,7 @@ import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
 import { CampaignTabs } from '../../../../../components/CampaignTabs';
 import {
-  MOCK_BRANDS,
+  MOCK_PROFILES,
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
   CAMPAIGN_STATUS_LABEL,
@@ -18,7 +18,7 @@ import {
 
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string; campaignId: string }>();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === params.campaignId) ?? MOCK_CAMPAIGNS[0];
   const posts = MOCK_POSTS_BY_CAMPAIGN[campaign.id] ?? [];
   const published = posts.filter((p) => p.status === 'publicado').length;
@@ -46,7 +46,7 @@ export default function CampaignDetailPage() {
               <LinearProgress
                 variant="determinate"
                 value={progress}
-                sx={{ mt: 1.5, height: 8, borderRadius: 4, bgcolor: '#F5F5F5', '& .MuiLinearProgress-bar': { backgroundColor: '#FDC726' } }}
+                sx={{ mt: 1.5, height: 8, borderRadius: 4, bgcolor: '#F5F5F5', '& .MuiLinearProgress-bar': { backgroundColor: '#E0A800' } }}
               />
             </Paper>
           </Grid>

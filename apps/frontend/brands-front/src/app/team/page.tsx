@@ -35,7 +35,7 @@ export default function TeamPage() {
               </Stack>
               <Stack direction="row" gap={0.75} flexWrap="wrap">
                 {member.campaigns.map((c) => (
-                  <Chip key={c.id} size="small" variant="outlined" label={`${c.name} · ${c.brandName}`} sx={{ fontSize: 11 }} />
+                  <Chip key={c.id} size="small" variant="outlined" label={`${c.name} · ${c.profileName}`} sx={{ fontSize: 11 }} />
                 ))}
               </Stack>
             </Box>

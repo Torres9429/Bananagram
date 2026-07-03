@@ -24,7 +24,7 @@ export function PostsTabs() {
       <Tabs
         value={current}
         onChange={(_, value) => router.push(`${base}${value}`)}
-        TabIndicatorProps={{ sx: { bgcolor: '#FDC726', height: 3 } }}
+        TabIndicatorProps={{ sx: { bgcolor: '#E0A800', height: 3 } }}
         sx={{ '& .Mui-selected': { color: '#7A5C00 !important', fontWeight: 700 } }}
       >
         {SECTIONS.map((s) => (

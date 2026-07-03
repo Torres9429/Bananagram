@@ -27,8 +27,8 @@ export function AvailabilityToggle({ value, onChange, disabled }: AvailabilityTo
         disabled={disabled}
         onChange={(_, checked) => onChange(checked ? 'disponible' : 'no_disponible')}
         sx={{
-          '& .MuiSwitch-switchBase.Mui-checked': { color: '#FDC726' },
-          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#FDC726' },
+          '& .MuiSwitch-switchBase.Mui-checked': { color: '#E0A800' },
+          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#E0A800' },
         }}
       />
       <Chip

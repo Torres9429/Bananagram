@@ -21,8 +21,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   CHAR_LIMITS,
   MOCK_CAMPAIGNS,
-  getBrandProfilesForCampaign,
-  type BrandProfile,
+  getSocialAccountsForCampaign,
+  type SocialAccount,
 } from '../../../lib/mock-data';
 
 const NETWORK_LABEL: Record<string, string> = {
@@ -44,7 +44,7 @@ export default function NewPostPage() {
   const [content, setContent] = useState('');
   const [datetime, setDatetime] = useState('');
 
-  const profiles: BrandProfile[] = getBrandProfilesForCampaign(campaignId);
+  const profiles: SocialAccount[] = getSocialAccountsForCampaign(campaignId);
   const selectedProfile = profiles.find((p) => p.id === brandProfileId) ?? profiles[0] ?? null;
 
   const network = selectedProfile?.socialNetwork ?? 'IG';
@@ -58,7 +58,7 @@ export default function NewPostPage() {
     const newCampaignId = e.target.value;
     setCampaignId(newCampaignId);
     // Reseteamos al primer perfil disponible de la nueva campaña.
-    const newProfiles = getBrandProfilesForCampaign(newCampaignId);
+    const newProfiles = getSocialAccountsForCampaign(newCampaignId);
     setBrandProfileId(newProfiles[0]?.id ?? '');
   }
 
@@ -67,7 +67,7 @@ export default function NewPostPage() {
       <Tooltip title="Volver">
         <IconButton
           onClick={() => router.back()}
-          sx={{ mb: 2, color: '#7A5C00', bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFF8E1' } }}
+          sx={{ mb: 2, color: 'secondary.main', bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFF8E1' } }}
         >
           <ArrowBackIcon fontSize="small" />
         </IconButton>
@@ -97,7 +97,7 @@ export default function NewPostPage() {
               <MenuItem value="none"><em>Sin campaña</em></MenuItem>
             </Select>
 
-            {/* BrandProfile (red social de la marca) */}
+            {/* SocialAccount (red social de la marca) */}
             <Typography variant="subtitle2" color="text.secondary" mb={1}>Perfil de publicación</Typography>
             {profiles.length === 0 ? (
               <Alert severity="info" sx={{ mb: 2.5, borderRadius: 2 }}>
@@ -120,7 +120,7 @@ export default function NewPostPage() {
                       sx={{
                         cursor: 'pointer',
                         height: 32,
-                        border: `1px solid ${active ? '#FDC726' : '#E8E8E8'}`,
+                        border: `1px solid ${active ? '#E0A800' : '#E8E8E8'}`,
                         bgcolor: active ? '#FFF8E1' : 'transparent',
                         color: active ? '#7A5C00' : '#1A1A1A',
                       }}
@@ -172,8 +172,8 @@ export default function NewPostPage() {
             <Divider sx={{ mb: 2 }} />
 
             {/* Panel IA mock */}
-            <Box sx={{ border: '1.5px solid #FDC726', borderRadius: 2, bgcolor: '#FFFDE7', p: 2, mb: 3 }}>
-              <Chip label="IA · Análisis pre-publicación" size="small" sx={{ bgcolor: '#FDC726', color: '#7A5C00', fontWeight: 700, mb: 1.5 }} />
+            <Box sx={{ border: '1.5px solid #E0A800', borderRadius: 2, bgcolor: '#FFFDE7', p: 2, mb: 3 }}>
+              <Chip label="IA · Análisis pre-publicación" size="small" sx={{ bgcolor: '#E0A800', color: '#7A5C00', fontWeight: 700, mb: 1.5 }} />
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
                 <Box>
                   <Typography variant="caption" color="text.secondary">Engagement estimado</Typography>
@@ -185,7 +185,7 @@ export default function NewPostPage() {
                     vs benchmark {NETWORK_LABEL[network] ?? network} 3.5%
                   </Typography>
                 </Box>
-                <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: '#FDC726', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: '#E0A800', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <Typography fontWeight={700} sx={{ color: '#7A5C00' }}>84</Typography>
                   <Typography variant="caption" sx={{ color: '#7A5C00', fontSize: 9 }}>Score</Typography>
                 </Box>
@@ -220,7 +220,7 @@ export default function NewPostPage() {
               <Button
                 variant="contained"
                 disabled={!content.trim() || !selectedProfile}
-                sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+                sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
                 onClick={() => router.push('/posts/approvals')}
               >
                 Enviar a revisión →
@@ -237,7 +237,7 @@ export default function NewPostPage() {
               {selectedProfile ? (
                 <>
                   <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
-                    <Avatar sx={{ bgcolor: '#FDC726', color: '#7A5C00', width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
+                    <Avatar sx={{ bgcolor: '#E0A800', color: '#7A5C00', width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
                       {selectedProfile.handle.replace('@', '').slice(0, 2).toUpperCase()}
                     </Avatar>
                     <Box>

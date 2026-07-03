@@ -1,5 +1,10 @@
 'use client';
 
+// LEGACY/DEPRECATED (dominio v3): el registro ya crea el Perfil directamente
+// (§A.2 del análisis de dominio) y /onboarding redirige a /profile — este
+// wizard ya no forma parte de ningún flujo alcanzable. Se conserva sin borrar
+// por si alguno de sus steps se reutiliza más adelante; candidato a eliminar
+// por completo en una fase futura de limpieza de dominio v3.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
@@ -12,20 +17,20 @@ import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Image from 'next/image';
 import {
-  MOCK_BRANDS,
+  MOCK_PROFILES,
   MOCK_CAMPAIGNS,
-  MOCK_BRAND_PROFILES,
+  MOCK_SOCIAL_ACCOUNTS,
   assignTeamToCampaign,
   type MockAvailableCM,
   type SocialNetworkCode,
 } from '../../lib/mock-data';
-import { StepBrand, type BrandDraft } from './steps/StepBrand';
+import { StepProfile, type ProfileDraft } from './steps/StepProfile';
 import { StepNetworks } from './steps/StepNetworks';
 import { StepCampaign, type CampaignDraft } from './steps/StepCampaign';
 import { StepSelectCM } from './steps/StepSelectCM';
 import { StepConfirmation } from './steps/StepConfirmation';
 
-const STEPS = ['Crear marca', 'Redes sociales', 'Campaña', 'Community Manager', 'Confirmación'];
+const STEPS = ['Crear perfil', 'Redes sociales', 'Campaña', 'Community Manager', 'Confirmación'];
 const BRANDS_FRONT_URL = 'http://localhost:3013';
 
 export function OnboardingWizard() {
@@ -33,14 +38,14 @@ export function OnboardingWizard() {
 
   const [activeStep, setActiveStep] = useState(0);
 
-  const [brand, setBrand] = useState<BrandDraft>({ name: '', type: 'brand', category: '' });
+  const [profile, setProfile] = useState<ProfileDraft>({ name: '', type: 'brand', category: '' });
   const [networks, setNetworks] = useState<SocialNetworkCode[]>([]);
   const [campaign, setCampaign] = useState<CampaignDraft>({ name: '', startDate: '', endDate: '', objective: '' });
   const [selectedCM, setSelectedCM] = useState<MockAvailableCM | null>(null);
 
   function canAdvance(): boolean {
     switch (activeStep) {
-      case 0: return brand.name.trim() !== '' && brand.category !== '';
+      case 0: return profile.name.trim() !== '' && profile.category !== '';
       case 1: return networks.length > 0;
       case 2: return campaign.name.trim() !== '' && campaign.startDate !== '' && campaign.endDate !== '';
       case 3: return selectedCM !== null;
@@ -62,52 +67,53 @@ export function OnboardingWizard() {
     // En producción: POST /brands → POST /brand-profiles (por cada red) →
     // POST /campaigns → POST /campaign-team { cmId }.
 
-    const newBrandId = `b${Date.now()}`;
+    const newProfileId = `b${Date.now()}`;
     const defaultScore = {
       score: 0, consistency: 0, engagement: 0, coverage: 0,
       frequency: 0, classification: 'bajo' as const, snapshotDate: new Date().toLocaleDateString('es-MX'),
     };
 
-    // Añadimos la marca a los mocks en memoria.
-    MOCK_BRANDS.push({
-      id: newBrandId,
-      name: brand.name,
-      type: brand.type,
-      color: '#FDC726',
-      category: brand.category,
+    // Añadimos el perfil a los mocks en memoria.
+    MOCK_PROFILES.push({
+      id: newProfileId,
+      name: profile.name,
+      type: profile.type,
+      color: '#E0A800',
+      category: profile.category,
       activeCampaigns: 1,
       score: defaultScore,
       profiles: networks.map((code, i) => ({
         id: `bp-new-${i}`,
-        brandId: newBrandId,
+        brandId: newProfileId,
         socialNetwork: code,
-        handle: `@${brand.name.toLowerCase().replace(/\s/g, '')}`,
+        handle: `@${profile.name.toLowerCase().replace(/\s/g, '')}`,
         followers: 0,
         active: true,
       })),
     });
 
-    // Añadimos los BrandProfiles al array global.
-    const newProfiles = networks.map((code, i) => ({
+    // Añadimos las SocialAccount al array global.
+    const newSocialAccounts = networks.map((code, i) => ({
       id: `bp-new-${i}`,
-      brandId: newBrandId,
+      brandId: newProfileId,
       socialNetwork: code,
-      handle: `@${brand.name.toLowerCase().replace(/\s/g, '')}`,
+      handle: `@${profile.name.toLowerCase().replace(/\s/g, '')}`,
       followers: 0,
       active: true,
     }));
-    MOCK_BRAND_PROFILES.push(...newProfiles);
+    MOCK_SOCIAL_ACCOUNTS.push(...newSocialAccounts);
 
     // Campaña.
     const newCampaignId = `c-new-${Date.now()}`;
     MOCK_CAMPAIGNS.push({
       id: newCampaignId,
-      brandId: newBrandId,
+      brandId: newProfileId,
       name: campaign.name,
       status: 'active',
       startDate: campaign.startDate,
       endDate: campaign.endDate,
       postsCount: 0,
+      socialAccountIds: [],
     });
 
     // Team (CM).
@@ -123,17 +129,17 @@ export function OnboardingWizard() {
       ]);
     }
 
-    // Navegar a la vista de la marca recién creada.
+    // Navegar a la vista del perfil recién creado.
     // La cookie bananagram_token viaja automáticamente con la navegación.
-    window.location.href = `${BRANDS_FRONT_URL}/brands/${newBrandId}`;
+    window.location.href = `${BRANDS_FRONT_URL}/brands/${newProfileId}`;
   }
 
   const stepContent = [
-    <StepBrand key="brand" value={brand} onChange={setBrand} />,
+    <StepProfile key="profile" value={profile} onChange={setProfile} />,
     <StepNetworks key="networks" selected={networks} onChange={setNetworks} />,
-    <StepCampaign key="campaign" value={campaign} onChange={setCampaign} brandName={brand.name || 'tu marca'} />,
-    <StepSelectCM key="cm" category={brand.category} selectedCMId={selectedCM?.id ?? null} onChange={setSelectedCM} />,
-    <StepConfirmation key="confirm" brand={brand} networks={networks} campaign={campaign} cm={selectedCM} />,
+    <StepCampaign key="campaign" value={campaign} onChange={setCampaign} profileName={profile.name || 'tu perfil'} />,
+    <StepSelectCM key="cm" category={profile.category} selectedCMId={selectedCM?.id ?? null} onChange={setSelectedCM} />,
+    <StepConfirmation key="confirm" profile={profile} networks={networks} campaign={campaign} cm={selectedCM} />,
   ];
 
   const isLastStep = activeStep === STEPS.length - 1;
@@ -143,7 +149,7 @@ export function OnboardingWizard() {
       {/* Header */}
       <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #E8E8E8', px: 3, py: 2 }}>
         <Stack direction="row" alignItems="center" gap={2}>
-          <Image src="/LogoName.png" alt="Bananagram" width={1146} height={308} style={{ width: 120, height: 'auto' }} />
+          <Image src="/LogoNameMonkey.png" alt="Bananagram" width={1146} height={308} style={{ width: 120, height: 'auto' }} />
           <Typography variant="caption" color="text.secondary">
             Configura tu cuenta
           </Typography>
@@ -159,8 +165,8 @@ export function OnboardingWizard() {
             sx={{
               mb: 4,
               '& .MuiStepLabel-label': { fontSize: 12 },
-              '& .MuiStepIcon-root.Mui-active': { color: '#FDC726' },
-              '& .MuiStepIcon-root.Mui-completed': { color: '#FDC726' },
+              '& .MuiStepIcon-root.Mui-active': { color: '#E0A800' },
+              '& .MuiStepIcon-root.Mui-completed': { color: '#E0A800' },
             }}
           >
             {STEPS.map((label) => (
@@ -197,16 +203,16 @@ export function OnboardingWizard() {
               <Button
                 variant="contained"
                 onClick={handleFinish}
-                sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+                sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
               >
-                Ir a mi marca →
+                Ir a mi perfil →
               </Button>
             ) : (
               <Button
                 variant="contained"
                 disabled={!canAdvance()}
                 onClick={handleNext}
-                sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' }, '&:disabled': { bgcolor: '#E8E8E8', color: '#AAAAAA' } }}
+                sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' }, '&:disabled': { bgcolor: '#E8E8E8', color: '#AAAAAA' } }}
               >
                 Siguiente →
               </Button>

@@ -10,7 +10,9 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
-import { SidebarNav, type SidebarNavItem, usePermissions } from '@repo/ui';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import { SidebarNav, type SidebarNavItem, usePermissions, selectUser, AppRole } from '@repo/ui';
+import { useSelector } from 'react-redux';
 
 const WEB_SHELL_URL = 'http://localhost:3000';
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -24,12 +26,19 @@ interface NavItemWithPermission extends SidebarNavItem {
 const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
   { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'post', action: 'approve' }] },
+  // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
+  // browsing multi-perfil que se conserva por compatibilidad (ver
+  // brands-front/src/app/brands). No quitar hasta que /brands se retire.
   { key: 'brands', label: 'Marcas', href: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: 'brands', action: 'manage' }] },
   { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', icon: <CampaignIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
-  { key: 'my-brand', label: 'Mi marca', href: '/my-brand', activeMatch: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
+  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
+  // Calendario (fase UX): mismo par de permisos ya usado por "Mi perfil"/"Team"
+  // — Cliente (campaigns:create) o CM/Diseñador (campaigns:view-own). No es un
+  // permiso nuevo. Admin queda excluido igual que el resto vía isAdmin, abajo.
+  { key: 'calendar', label: 'Calendario', href: '/profile/calendar', icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }, { module: 'campaigns', action: 'view-own' }] },
   { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: [{ module: 'metrics', action: 'view' }] },
   { key: 'team', label: 'Team', href: '/team', icon: <GroupIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
-  { key: 'profile', label: 'Mi perfil', href: '/profile', icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'campaigns', action: 'view-own' }] },
+  { key: 'profile', label: 'Mi perfil', href: '/profile', exactMatch: true, icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'campaigns', action: 'view-own' }] },
   { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: 'users', action: 'manage' }] },
 ];
 
@@ -37,10 +46,18 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { can } = usePermissions();
+  const user = useSelector(selectUser);
+  const isAdmin = user?.role === AppRole.ADMINISTRADOR;
 
-  const visibleItems = NAV_ITEMS_WITH_PERMISSION.filter(
+  const permissionVisible = NAV_ITEMS_WITH_PERMISSION.filter(
     (item) => !item.requirePermission || item.requirePermission.some((p) => can(p.module, p.action)),
   );
+  // Ajuste de UX (no de permisos): Admin no debe operar como usuario de negocio
+  // (Marcas/Posts/Métricas/Mis Campañas/Team/Mi perfil), solo Dashboard y Admin
+  // (que ya contiene Usuarios/Roles/Catálogos/Auditoría vía AdminTabs).
+  const visibleItems = isAdmin
+    ? permissionVisible.filter((item) => item.key === 'dashboard' || item.key === 'admin')
+    : permissionVisible;
 
   function handleNavigate(href: string) {
     if (href.startsWith('http')) {
@@ -56,10 +73,10 @@ export function Sidebar() {
       activeHref={pathname}
       onNavigate={handleNavigate}
       header={
-        <Image src="/LogoName.png" alt="Bananagram" width={1146} height={308} style={{ width: '100%', maxWidth: 150, height: 'auto' }} />
+        <Image src="/LogoNameMonkey.png" alt="Bananagram" width={1146} height={308} style={{ width: '100%', maxWidth: 150, height: 'auto' }} />
       }
       collapsedHeader={
-        <Image src="/Logo.png" alt="Bananagram" width={308} height={308} style={{ width: '100%', maxWidth: 38, height: 'auto' }} />
+        <Image src="/LogoMonkey.png" alt="Bananagram" width={308} height={308} style={{ width: '100%', maxWidth: 38, height: 'auto' }} />
       }
     />
   );

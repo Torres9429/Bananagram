@@ -9,7 +9,7 @@ import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { BrandTabs } from '../../../../components/BrandTabs';
-import { MOCK_BRANDS, MOCK_CALENDAR_EVENTS, getBrandProfile } from '../../../../lib/mock-data';
+import { MOCK_PROFILES, MOCK_CALENDAR_EVENTS, getSocialAccount } from '../../../../lib/mock-data';
 
 const localizer = dateFnsLocalizer({
   format,
@@ -21,13 +21,13 @@ const localizer = dateFnsLocalizer({
 
 export default function BrandCalendarPage() {
   const params = useParams<{ id: string }>();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
 
   const events = useMemo(
     () =>
       MOCK_CALENDAR_EVENTS.filter((e) => e.brandId === brand.id).map((e) => ({
         id: e.id,
-        title: `${e.title} · ${getBrandProfile(e.brandProfileId)?.socialNetwork ?? '—'}`,
+        title: `${e.title} · ${getSocialAccount(e.brandProfileId)?.socialNetwork ?? '—'}`,
         start: new Date(e.start),
         end: new Date(e.end),
       })),

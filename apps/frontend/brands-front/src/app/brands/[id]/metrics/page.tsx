@@ -6,7 +6,7 @@ import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { BrandTabs } from '../../../../components/BrandTabs';
-import { MOCK_BRANDS, MOCK_CAMPAIGNS } from '../../../../lib/mock-data';
+import { MOCK_PROFILES, MOCK_CAMPAIGNS } from '../../../../lib/mock-data';
 
 function KpiCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -19,7 +19,7 @@ function KpiCard({ label, value }: { label: string; value: string | number }) {
 
 export default function BrandMetricsPage() {
   const params = useParams<{ id: string }>();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
   const campaigns = MOCK_CAMPAIGNS.filter((c) => c.brandId === brand.id);
   const totalPosts = campaigns.reduce((acc, c) => acc + c.postsCount, 0);
 

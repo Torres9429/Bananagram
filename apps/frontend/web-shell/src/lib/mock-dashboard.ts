@@ -7,18 +7,18 @@ export interface MockCampaignSummary {
   progress: number;
 }
 
-export interface BrandProfile {
+export interface SocialAccount {
   id: string;
   socialNetwork: string;
 }
 
-export const MOCK_BRAND_PROFILES: BrandProfile[] = [
+export const MOCK_SOCIAL_ACCOUNTS: SocialAccount[] = [
   { id: 'bp1', socialNetwork: 'Instagram' },
   { id: 'bp2', socialNetwork: 'Facebook' },
 ];
 
-export function getBrandProfile(brandProfileId: string): BrandProfile | undefined {
-  return MOCK_BRAND_PROFILES.find((p) => p.id === brandProfileId);
+export function getSocialAccount(id: string): SocialAccount | undefined {
+  return MOCK_SOCIAL_ACCOUNTS.find((p) => p.id === id);
 }
 
 export interface MockRecentPost {
@@ -38,7 +38,7 @@ export const MOCK_DASHBOARD = {
     nextScheduled: 'Hoy · 18:00',
   },
   campaigns: [
-    { id: 'c1', name: 'Lanzamiento Verano', color: '#FDC726', progress: 65 },
+    { id: 'c1', name: 'Lanzamiento Verano', color: '#E0A800', progress: 65 },
     { id: 'c2', name: 'Black Friday', color: '#D4AC40', progress: 30 },
     { id: 'c3', name: 'Embajadores', color: '#8F8F8F', progress: 80 },
   ] as MockCampaignSummary[],
@@ -58,7 +58,7 @@ export const MOCK_POSTS_BY_STATUS = [
 ];
 
 export const MOCK_POSTS_BY_NETWORK = [
-  { network: 'Instagram', count: 14, color: '#FDC726' },
+  { network: 'Instagram', count: 14, color: '#E0A800' },
   { network: 'TikTok', count: 8, color: '#D4AC40' },
   { network: 'Facebook', count: 5, color: '#8F8F8F' },
   { network: 'X', count: 3, color: '#7A5C00' },
@@ -117,7 +117,7 @@ export const MOCK_DISENADOR_DASHBOARD = {
     published: 5,
   },
   assignedCampaigns: [
-    { id: 'c1', name: 'Campaña Verano', brandName: 'Zara MX', color: '#FDC726' },
+    { id: 'c1', name: 'Campaña Verano', brandName: 'Zara MX', color: '#E0A800' },
   ],
   recentPosts: [
     { id: 'p1', title: 'Post lanzamiento verano', status: 'borrador' as PostStatus, brandProfileId: 'bp1' },

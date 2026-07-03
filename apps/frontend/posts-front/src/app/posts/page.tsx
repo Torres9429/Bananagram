@@ -101,7 +101,7 @@ export default function PostsListPage() {
                 e.stopPropagation();
                 router.push(`/posts/${post.id}`);
               }}
-              sx={{ color: '#D4AC40', '&:hover': { bgcolor: 'rgba(253, 199, 38, 0.12)' } }}
+              sx={{ color: 'secondary.main', '&:hover': { bgcolor: 'rgba(192, 142, 6, 0.12)' } }}
             >
               <VisibilityOutlinedIcon fontSize="small" />
             </IconButton>
@@ -127,7 +127,7 @@ export default function PostsListPage() {
                 onClick={() => setFilter(f.key)}
                 sx={{
                   cursor: 'pointer',
-                  bgcolor: active ? '#FDC726' : 'transparent',
+                  bgcolor: active ? '#E0A800' : 'transparent',
                   color: active ? '#7A5C00' : '#1A1A1A',
                   borderColor: active ? '#D4AC40' : '#E8E8E8',
                   fontWeight: active ? 600 : 400,
@@ -139,7 +139,7 @@ export default function PostsListPage() {
         <ProtectedAction module="post" action="create">
           <Button
             variant="contained"
-            sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
             onClick={() => router.push('/posts/new')}
           >
             + Nueva publicación

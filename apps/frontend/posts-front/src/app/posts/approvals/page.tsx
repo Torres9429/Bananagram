@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -9,8 +10,9 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Snackbar from '@mui/material/Snackbar';
 import { ProtectedAction, usePermissions } from '@repo/ui';
-import { MOCK_POSTS, getPostNetworkInfo } from '../../../lib/mock-data';
+import { MOCK_POSTS, getPostNetworkInfo, type MockPost } from '../../../lib/mock-data';
 import { NetworkAvatar } from '../../../components/NetworkAvatar';
 import { CampaignDot } from '../../../components/CampaignDot';
 import { PostsTabs } from '../../../components/PostsTabs';
@@ -18,9 +20,24 @@ import { PostsTabs } from '../../../components/PostsTabs';
 export default function PostsApprovalPage() {
   const router = useRouter();
   const { can, canAny } = usePermissions();
-  const draftPosts = MOCK_POSTS.filter((p) => p.status === 'borrador');
-  const reviewPosts = MOCK_POSTS.filter((p) => p.status === 'en_revision');
-  const rejectedPosts = MOCK_POSTS.filter((p) => p.status === 'rechazado');
+  // Mock: estado local, sin persistencia — mismo patrón ya usado en
+  // ClientSection.tsx (brands-front) para acciones sin backend real.
+  const [posts, setPosts] = useState<MockPost[]>(MOCK_POSTS);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  function handleApprove(id: string) {
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'aprobado' } : p)));
+    setFeedback('Publicación aprobada.');
+  }
+
+  function handleReject(id: string) {
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'rechazado' } : p)));
+    setFeedback('Publicación rechazada.');
+  }
+
+  const draftPosts = posts.filter((p) => p.status === 'borrador');
+  const reviewPosts = posts.filter((p) => p.status === 'en_revision');
+  const rejectedPosts = posts.filter((p) => p.status === 'rechazado');
 
   const showDraftsSection = can('post', 'create');
   // El CM también debe ver esta sección (en espera del cliente), aunque no tenga
@@ -68,7 +85,7 @@ export default function PostsApprovalPage() {
                   </Typography>
                 </Box>
                 <Stack direction="row" gap={1} justifyContent="flex-end">
-                  <Button size="small" variant="contained" sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+                  <Button size="small" variant="contained" sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
                     Enviar a revisión →
                   </Button>
                 </Stack>
@@ -108,12 +125,12 @@ export default function PostsApprovalPage() {
                   <Chip size="small" label="En espera del cliente" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />
                   <Stack direction="row" gap={1}>
                     <ProtectedAction module="post" action="reject">
-                      <Button size="small" variant="outlined" sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                      <Button size="small" variant="outlined" onClick={() => handleReject(post.id)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
                         Rechazar
                       </Button>
                     </ProtectedAction>
                     <ProtectedAction module="post" action="approve">
-                      <Button size="small" variant="contained" sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
+                      <Button size="small" variant="contained" onClick={() => handleApprove(post.id)} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
                         Aprobar
                       </Button>
                     </ProtectedAction>
@@ -163,7 +180,7 @@ export default function PostsApprovalPage() {
                     <Button
                       size="small"
                       variant="contained"
-                      sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+                      sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
                       onClick={() => router.push('/posts/new')}
                     >
                       Editar y reenviar →
@@ -176,6 +193,13 @@ export default function PostsApprovalPage() {
         </>
       )}
       </Box>
+      <Snackbar
+        open={!!feedback}
+        autoHideDuration={2500}
+        onClose={() => setFeedback(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        message={feedback}
+      />
     </Box>
   );
 }

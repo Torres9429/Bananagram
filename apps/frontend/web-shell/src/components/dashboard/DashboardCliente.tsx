@@ -12,7 +12,7 @@ import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import { ScoreGauge, StatusChip, WidgetCard } from '@repo/ui';
-import { MOCK_CLIENTE_DASHBOARD, getBrandProfile } from '../../lib/mock-dashboard';
+import { MOCK_CLIENTE_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
 const BRANDS_FRONT_URL = 'http://localhost:3013';
@@ -25,11 +25,11 @@ export function DashboardCliente() {
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Box>
           <Typography variant="h5" fontWeight={700}>{brandName}</Typography>
-          <Typography variant="body2" color="text.secondary">Panel de tu marca · {activeCampaigns} campañas activas</Typography>
+          <Typography variant="body2" color="text.secondary">Panel de tu perfil · {activeCampaigns} campañas activas</Typography>
         </Box>
-        <Button variant="contained" onClick={() => { window.location.href = `${BRANDS_FRONT_URL}/my-brand`; }}
-          sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
-          Ver mi marca →
+        <Button variant="contained" onClick={() => { window.location.href = `${BRANDS_FRONT_URL}/profile`; }}
+          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+          Ver mi perfil →
         </Button>
       </Stack>
 
@@ -62,11 +62,11 @@ export function DashboardCliente() {
                 {postsToApprove.map((post) => (
                   <Stack key={post.id} direction="row" justifyContent="space-between" alignItems="center"
                     onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/${post.id}`; }}
-                    sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#FDC726' } }}>
+                    sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}>
                     <Box>
                       <Typography variant="body2" fontWeight={600}>{post.title}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {post.campaign} · {getBrandProfile(post.brandProfileId)?.socialNetwork ?? '—'}
+                        {post.campaign} · {getSocialAccount(post.brandProfileId)?.socialNetwork ?? '—'}
                       </Typography>
                     </Box>
                     <StatusChip status={post.status} />

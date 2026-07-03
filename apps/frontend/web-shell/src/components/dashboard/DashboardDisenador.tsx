@@ -12,7 +12,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import PublishedWithChangesOutlinedIcon from '@mui/icons-material/PublishedWithChangesOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { StatusChip, WidgetCard, EmptyState } from '@repo/ui';
-import { MOCK_DISENADOR_DASHBOARD, getBrandProfile } from '../../lib/mock-dashboard';
+import { MOCK_DISENADOR_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
 const BRANDS_FRONT_URL = 'http://localhost:3013';
@@ -32,7 +32,7 @@ export function DashboardDisenador() {
         </Box>
         <Button variant="contained" startIcon={<AddCircleOutlineIcon />}
           onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/new`; }}
-          sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
           Nueva publicación
         </Button>
       </Stack>
@@ -55,7 +55,7 @@ export function DashboardDisenador() {
               <Stack gap={1.5}>
                 {assignedCampaigns.map((c) => (
                   <Stack key={c.id} direction="row" gap={1.5} alignItems="center"
-                    sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#FDC726' } }}>
+                    sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}>
                     <Avatar sx={{ bgcolor: c.color, width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{c.name[0]}</Avatar>
                     <Box>
                       <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
@@ -85,10 +85,10 @@ export function DashboardDisenador() {
                 {recentPosts.map((post) => (
                   <Stack key={post.id} direction="row" justifyContent="space-between" alignItems="center"
                     onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/${post.id}`; }}
-                    sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#FDC726' } }}>
+                    sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}>
                     <Box>
                       <Typography variant="body2" fontWeight={600}>{post.title}</Typography>
-                      <Typography variant="caption" color="text.secondary">{getBrandProfile(post.brandProfileId)?.socialNetwork ?? '—'}</Typography>
+                      <Typography variant="caption" color="text.secondary">{getSocialAccount(post.brandProfileId)?.socialNetwork ?? '—'}</Typography>
                     </Box>
                     <StatusChip status={post.status} />
                   </Stack>

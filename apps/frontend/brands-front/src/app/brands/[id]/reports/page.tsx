@@ -11,11 +11,11 @@ import Alert from '@mui/material/Alert';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import { downloadBlob, ProtectedAction } from '@repo/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
-import { MOCK_BRANDS } from '../../../../lib/mock-data';
+import { MOCK_PROFILES } from '../../../../lib/mock-data';
 
 export default function BrandReportsPage() {
   const params = useParams<{ id: string }>();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
 
   function exportMock(format: 'csv' | 'pdf') {
     // Diseño sin backend: genera un archivo mock en el cliente, sin llamar API.
