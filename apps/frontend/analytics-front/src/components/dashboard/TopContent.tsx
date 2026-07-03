@@ -44,7 +44,14 @@ export function TopContent() {
       <Typography variant="caption" color="text.secondary" mb={2} display="block">
         Clic en una fila para ver el detalle de esa publicación.
       </Typography>
-      <DataTable columns={columns} rows={topContent} getRowKey={(p) => p.id} onRowClick={(p) => dispatch(selectPost(p.postId))} />
+      <DataTable
+        columns={columns}
+        rows={topContent}
+        getRowKey={(p) => p.id}
+        onRowClick={(p) => dispatch(selectPost(p.postId))}
+        pagination
+        initialPageSize={10}
+      />
       {activeProfiles > 0 && (
         <Chip
           size="small"

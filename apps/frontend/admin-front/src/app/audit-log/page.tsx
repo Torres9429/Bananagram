@@ -26,7 +26,7 @@ export default function AuditLogPage() {
         <Alert severity="info" sx={{ mb: 2 }}>
           Este registro es inmutable: ningún evento puede editarse ni borrarse, solo consultarse.
         </Alert>
-        <DataTable columns={columns} rows={MOCK_AUDIT_LOG} getRowKey={(e) => e.id} />
+        <DataTable columns={columns} rows={MOCK_AUDIT_LOG} getRowKey={(e) => e.id} pagination initialPageSize={10} />
       </Box>
     </Box>
   );
