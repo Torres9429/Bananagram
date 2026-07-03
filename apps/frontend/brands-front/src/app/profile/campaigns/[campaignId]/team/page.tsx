@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -17,25 +16,27 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction, selectUser } from '@repo/ui';
+import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction } from '@repo/ui';
 import {
   MOCK_CAMPAIGNS,
   MOCK_TEAM_BY_CAMPAIGN,
+  MOCK_PROFILES,
   getAvailableDesigners,
   assignTeamToCampaign,
-  getCurrentClientProfile,
   type MockTeamMember,
 } from '../../../../../lib/mock-data';
 
 // Equipo de campaña en /profile — mismo contenido que
 // brands-front/app/brands/[id]/campaigns/[campaignId]/team, pero SIN
 // CampaignTabs. Solo un botón simple de volver al detalle de la campaña.
+// Compartida por Cliente/CM (Diseñador no llega aquí desde la UI — el detalle
+// le oculta "Ver equipo"): el perfil se resuelve por campaign.brandId, no por
+// el usuario logueado, igual que en el detalle de campaña.
 export default function ProfileCampaignTeamPage() {
   const router = useRouter();
   const params = useParams<{ campaignId: string }>();
-  const user = useSelector(selectUser);
-  const profile = getCurrentClientProfile(user?.email);
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === params.campaignId) ?? MOCK_CAMPAIGNS[0];
+  const profile = MOCK_PROFILES.find((p) => p.id === campaign.brandId) ?? MOCK_PROFILES[0];
 
   const [team, setTeam] = useState<MockTeamMember[]>(MOCK_TEAM_BY_CAMPAIGN[campaign.id] ?? []);
   const [addOpen, setAddOpen] = useState(false);

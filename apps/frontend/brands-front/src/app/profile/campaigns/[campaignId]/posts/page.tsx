@@ -52,7 +52,7 @@ export default function ProfileCampaignPostsPage() {
       </Box>
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" fontWeight={700} mb={3}>Publicaciones — {campaign.name}</Typography>
-        <DataTable columns={columns} rows={posts} getRowKey={(p) => p.id} />
+        <DataTable columns={columns} rows={posts} getRowKey={(p) => p.id} pagination initialPageSize={10} />
       </Box>
     </Box>
   );

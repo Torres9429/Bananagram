@@ -18,17 +18,15 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { EmptyState, FormDialog, LabeledField, LabeledSelect, ScoreGauge, selectUser } from '@repo/ui';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
+import { CampaignCard } from '../campaigns/CampaignCard';
 import {
   MOCK_CAMPAIGNS,
   MOCK_CATEGORIES,
   PROFILE_TYPE_LABELS,
-  CAMPAIGN_STATUS_LABEL,
   AVAILABLE_SOCIAL_NETWORKS,
   getSocialAccountsByProfile,
-  getCampaignSocialAccounts,
   getCurrentClientProfile,
   assignTeamToCampaign,
 } from '../../lib/mock-data';
@@ -231,46 +229,11 @@ export function ClientSection() {
           />
         ) : (
           <Grid container spacing={2}>
-            {campaigns.map((c) => {
-              const s = CAMPAIGN_STATUS_LABEL[c.status];
-              const usedNetworks = Array.from(new Set(getCampaignSocialAccounts(c.id).map((a) => a.socialNetwork)));
-              return (
-                <Grid item xs={12} sm={6} md={4} key={c.id}>
-                  <Paper
-                    elevation={0}
-                    onClick={() => router.push(`/profile/campaigns/${c.id}`)}
-                    sx={{
-                      p: 2.5, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%',
-                      cursor: 'pointer', transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                      display: 'flex', flexDirection: 'column',
-                      '&:hover': { borderColor: '#E0A800', boxShadow: '0 2px 10px rgba(224,168,0,0.15)' },
-                    }}
-                  >
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                      <Typography variant="body1" fontWeight={700}>{c.name}</Typography>
-                      <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-                      {c.startDate} – {c.endDate} · {c.postsCount} publicaciones
-                    </Typography>
-                    <Stack direction="row" gap={0.5} flexWrap="wrap" mb={2}>
-                      {usedNetworks.length === 0 ? (
-                        <Typography variant="caption" color="text.secondary">Sin redes asignadas</Typography>
-                      ) : (
-                        usedNetworks.map((code) => {
-                          const netColor = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === code)?.color ?? '#6B6B6B';
-                          return <Chip key={code} size="small" label={code} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700, height: 20, fontSize: 11 }} />;
-                        })
-                      )}
-                    </Stack>
-                    <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5} mt="auto" sx={{ color: '#7A5C00' }}>
-                      <Typography variant="caption" fontWeight={700}>Ver detalle</Typography>
-                      <ArrowForwardIcon sx={{ fontSize: 16 }} />
-                    </Stack>
-                  </Paper>
-                </Grid>
-              );
-            })}
+            {campaigns.map((c) => (
+              <Grid item xs={12} sm={6} md={4} key={c.id}>
+                <CampaignCard campaign={c} onClick={() => router.push(`/profile/campaigns/${c.id}`)} />
+              </Grid>
+            ))}
           </Grid>
         )}
       </Paper>

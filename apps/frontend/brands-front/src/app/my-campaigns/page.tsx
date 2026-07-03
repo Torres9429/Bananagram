@@ -2,12 +2,17 @@
 
 import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
+import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
 import { EmptyState } from '@repo/ui';
-import { getMyCampaigns, CAMPAIGN_STATUS_LABEL } from '../../lib/mock-data';
+import { CampaignCard } from '../../components/campaigns/CampaignCard';
+import { getMyCampaigns } from '../../lib/mock-data';
 
+// Modernizada (§1 rediseño campañas CM/Diseñador) para verse igual que las
+// campañas del Cliente en /profile — mismo CampaignCard, mismo destino de
+// detalle (/profile/campaigns/[id], sin CampaignTabs). Antes navegaba a la
+// ruta legacy /brands/[id]/campaigns/[id] (con CampaignTabs) — eso NO se
+// borra (sigue accesible directamente), pero ya no es el destino por defecto.
 export default function MyCampaignsPage() {
   const router = useRouter();
   const campaigns = getMyCampaigns();
@@ -18,38 +23,20 @@ export default function MyCampaignsPage() {
       <Typography variant="body2" color="text.secondary" mb={3}>
         Campañas en las que participas, de todos los perfiles asignados.
       </Typography>
-      {campaigns.length === 0 && (
+      {campaigns.length === 0 ? (
         <EmptyState
           title="Sin campañas asignadas"
           description="Aún no participas en ninguna campaña. El CM o el Cliente te asignarán cuando haya trabajo disponible."
         />
+      ) : (
+        <Grid container spacing={2}>
+          {campaigns.map((c) => (
+            <Grid item xs={12} sm={6} md={4} key={c.id}>
+              <CampaignCard campaign={c} profileName={c.profileName} onClick={() => router.push(`/profile/campaigns/${c.id}`)} />
+            </Grid>
+          ))}
+        </Grid>
       )}
-      <Stack gap={1.5}>
-        {campaigns.map((c) => {
-          const s = CAMPAIGN_STATUS_LABEL[c.status];
-          return (
-            <Stack
-              key={c.id}
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-              onClick={() => router.push(`/brands/${c.brandId}/campaigns/${c.id}`)}
-              sx={{ p: 2, bgcolor: '#fff', border: '1px solid #E8E8E8', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
-            >
-              <Stack direction="row" gap={1.5} alignItems="center">
-                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c.profileColor }} />
-                <Box>
-                  <Typography variant="body1" fontWeight={600}>{c.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {c.profileName} · {c.startDate} – {c.endDate} · {c.postsCount} publicaciones
-                  </Typography>
-                </Box>
-              </Stack>
-              <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
-            </Stack>
-          );
-        })}
-      </Stack>
     </Box>
   );
 }

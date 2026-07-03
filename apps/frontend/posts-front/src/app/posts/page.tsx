@@ -83,17 +83,19 @@ export default function PostsListPage() {
       align: 'right',
       render: (post) => (
         <Stack direction="row" justifyContent="flex-end">
-          <ProtectedAction module="post" action="publish">
-            <Tooltip title="Publicar">
-              <IconButton
-                size="small"
-                onClick={(e) => e.stopPropagation()}
-                sx={{ color: '#2E7D32', '&:hover': { bgcolor: 'rgba(46, 125, 50, 0.12)' } }}
-              >
-                <SendOutlinedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </ProtectedAction>
+          {(post.status === 'aprobado' || post.status === 'programado') && (
+            <ProtectedAction module="post" action="publish">
+              <Tooltip title="Publicar">
+                <IconButton
+                  size="small"
+                  onClick={(e) => e.stopPropagation()}
+                  sx={{ color: 'secondary.main', '&:hover': { bgcolor: 'rgba(192, 142, 6, 0.12)' } }}
+                >
+                  <SendOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </ProtectedAction>
+          )}
           <Tooltip title="Ver publicación">
             <IconButton
               size="small"
@@ -158,6 +160,8 @@ export default function PostsListPage() {
         rows={posts}
         getRowKey={(post) => post.id}
         onRowClick={(post) => router.push(`/posts/${post.id}`)}
+        pagination
+        initialPageSize={10}
       />
       </Box>
     </Box>

@@ -83,7 +83,7 @@ export default function UsersPage() {
             </Button>
           </ProtectedAction>
         </Stack>
-        <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} />
+        <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} pagination initialPageSize={10} />
       </Box>
       <CreateUserDialog
         open={createOpen}

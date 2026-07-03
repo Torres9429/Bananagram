@@ -17,14 +17,15 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import { StatusChip, usePermissions, selectUser } from '@repo/ui';
 import {
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
   MOCK_TEAM_BY_CAMPAIGN,
+  MOCK_PROFILES,
   CAMPAIGN_STATUS_LABEL,
   getSocialAccount,
-  getCurrentClientProfile,
 } from '../../../../lib/mock-data';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -35,13 +36,23 @@ const POSTS_FRONT_URL = 'http://localhost:3014';
 // publicaciones recientes se muestran inline en la misma pantalla — no hace
 // falta navegar para ver un resumen de ambos; "Ver todas"/"Ver equipo" siguen
 // llevando al detalle completo cuando se necesita.
+//
+// Compartido por los 3 roles (§1/§2 modernización de campañas CM/Diseñador):
+// Cliente llega desde /profile/campaigns, CM/Diseñador desde /my-campaigns.
+// El perfil se resuelve por campaign.brandId (no por el usuario logueado) —
+// es lo único que funciona igual sin importar quién esté viendo la campaña.
 export default function ProfileCampaignDetailPage() {
   const router = useRouter();
   const { can } = usePermissions();
   const params = useParams<{ campaignId: string }>();
   const user = useSelector(selectUser);
-  const profile = getCurrentClientProfile(user?.email);
+  const role = user?.role ?? '';
+  const isClient = role === 'cliente';
+  const isDesigner = role === 'disenador';
+  const backHref = isClient ? '/profile' : '/my-campaigns';
+  const backLabel = isClient ? 'Volver a mi perfil' : 'Volver a mis campañas';
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === params.campaignId) ?? MOCK_CAMPAIGNS[0];
+  const profile = MOCK_PROFILES.find((p) => p.id === campaign.brandId) ?? MOCK_PROFILES[0];
   const posts = MOCK_POSTS_BY_CAMPAIGN[campaign.id] ?? [];
   const team = MOCK_TEAM_BY_CAMPAIGN[campaign.id] ?? [];
   const published = posts.filter((p) => p.status === 'publicado').length;
@@ -55,8 +66,8 @@ export default function ProfileCampaignDetailPage() {
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
       <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', px: 1 }}>
         <Stack direction="row" alignItems="center">
-          <Tooltip title="Volver a mi perfil">
-            <IconButton onClick={() => router.push('/profile')} sx={{ color: 'secondary.main', ml: 1, my: 0.5 }}>
+          <Tooltip title={backLabel}>
+            <IconButton onClick={() => router.push(backHref)} sx={{ color: 'secondary.main', ml: 1, my: 0.5 }}>
               <ArrowBackIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -71,7 +82,8 @@ export default function ProfileCampaignDetailPage() {
           <Chip label={statusStyle.label} sx={{ bgcolor: statusStyle.bg, color: statusStyle.color, fontWeight: 700 }} />
         </Stack>
 
-        {/* Accesos claros */}
+        {/* Accesos claros — equipo oculto para Diseñador (no gestiona
+            equipo); aprobaciones solo para Cliente (post:approve) */}
         <Stack direction="row" gap={1.5} flexWrap="wrap" mb={3}>
           <Button
             variant="outlined"
@@ -81,14 +93,26 @@ export default function ProfileCampaignDetailPage() {
           >
             Ver todas las publicaciones
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<GroupOutlinedIcon />}
-            onClick={() => router.push(`/profile/campaigns/${campaign.id}/team`)}
-            sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
-          >
-            Ver equipo
-          </Button>
+          {!isDesigner && (
+            <Button
+              variant="outlined"
+              startIcon={<GroupOutlinedIcon />}
+              onClick={() => router.push(`/profile/campaigns/${campaign.id}/team`)}
+              sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
+            >
+              Ver equipo
+            </Button>
+          )}
+          {can('post', 'approve') && (
+            <Button
+              variant="outlined"
+              startIcon={<RateReviewOutlinedIcon />}
+              onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/approvals`; }}
+              sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
+            >
+              Ver aprobaciones
+            </Button>
+          )}
           {can('post', 'create') && (
             <Button
               variant="contained"
@@ -103,7 +127,7 @@ export default function ProfileCampaignDetailPage() {
 
         <Grid container spacing={2} mb={3}>
           {/* Resumen de campaña */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={isDesigner ? 12 : 6}>
             <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
               <Typography variant="subtitle2" color="text.secondary" mb={1}>Publicaciones</Typography>
               <Typography variant="h4" fontWeight={700} mb={1}>{campaign.postsCount}</Typography>
@@ -116,43 +140,45 @@ export default function ProfileCampaignDetailPage() {
             </Paper>
           </Grid>
 
-          {/* Equipo asignado — resumen inline */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
-              <Typography variant="subtitle2" color="text.secondary" mb={1.5}>Equipo asignado</Typography>
-              {team.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">Sin equipo asignado todavía.</Typography>
-              ) : (
-                <Stack gap={1.25}>
-                  {cm && (
-                    <Stack direction="row" gap={1.5} alignItems="center">
-                      <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>
-                        {cm.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                      </Avatar>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={600}>{cm.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">Community Manager</Typography>
-                      </Box>
-                    </Stack>
-                  )}
-                  {designers.slice(0, 2).map((d) => (
-                    <Stack key={d.id} direction="row" gap={1.5} alignItems="center">
-                      <Avatar sx={{ bgcolor: d.avatarBg, color: d.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>
-                        {d.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                      </Avatar>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={600}>{d.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">{d.role}</Typography>
-                      </Box>
-                    </Stack>
-                  ))}
-                  {designers.length > 2 && (
-                    <Typography variant="caption" color="text.secondary">+{designers.length - 2} más — ver equipo completo</Typography>
-                  )}
-                </Stack>
-              )}
-            </Paper>
-          </Grid>
+          {/* Equipo asignado — resumen inline, oculto para Diseñador */}
+          {!isDesigner && (
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
+                <Typography variant="subtitle2" color="text.secondary" mb={1.5}>Equipo asignado</Typography>
+                {team.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">Sin equipo asignado todavía.</Typography>
+                ) : (
+                  <Stack gap={1.25}>
+                    {cm && (
+                      <Stack direction="row" gap={1.5} alignItems="center">
+                        <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>
+                          {cm.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                        </Avatar>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={600}>{cm.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">Community Manager</Typography>
+                        </Box>
+                      </Stack>
+                    )}
+                    {designers.slice(0, 2).map((d) => (
+                      <Stack key={d.id} direction="row" gap={1.5} alignItems="center">
+                        <Avatar sx={{ bgcolor: d.avatarBg, color: d.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>
+                          {d.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                        </Avatar>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={600}>{d.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{d.role}</Typography>
+                        </Box>
+                      </Stack>
+                    ))}
+                    {designers.length > 2 && (
+                      <Typography variant="caption" color="text.secondary">+{designers.length - 2} más — ver equipo completo</Typography>
+                    )}
+                  </Stack>
+                )}
+              </Paper>
+            </Grid>
+          )}
         </Grid>
 
         {/* Publicaciones recientes — resumen inline */}
