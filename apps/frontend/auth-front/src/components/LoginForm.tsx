@@ -27,6 +27,7 @@ export function LoginForm() {
       '\n  cm@bananagram.mx / cm123456',
       '\n  disenador@bananagram.mx / diseno123',
       '\n  cliente@bananagram.mx / cliente123',
+      '\n  alex@bananagram.mx / alex12345 (Cliente, perfil personal)',
     );
   }, []);
 
@@ -77,7 +78,7 @@ export function LoginForm() {
         sx={{
           mt: 1, mb: 2, py: 1.25,
           color: '#fff', fontWeight: 700,
-          background: '#FDC726',
+          background: '#E0A800',
           '&:hover': { background: '#D4AC40' },
         }}
       >

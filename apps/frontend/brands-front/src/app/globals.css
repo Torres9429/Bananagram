@@ -4,7 +4,7 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @theme {
-  --color-brand-primary: #FDC726;
+  --color-brand-primary: #E0A800;
   --color-brand-primary-dark: #D4AC40;
   --color-brand-primary-light: #FFF8E1;
   --color-brand-text-on-yellow: #7A5C00;
@@ -27,8 +27,8 @@
   }
   .rbc-toolbar button:active,
   .rbc-toolbar button.rbc-active {
-    background-color: #fdc726;
-    border-color: #fdc726;
+    background-color: #e0a800;
+    border-color: #e0a800;
     color: #7a5c00;
     box-shadow: none;
   }
@@ -66,7 +66,7 @@
     border-color: #e8e8e8;
   }
   .rbc-event {
-    background-color: #fdc726;
+    background-color: #e0a800;
     color: #7a5c00;
     border-radius: 6px;
     border: none;

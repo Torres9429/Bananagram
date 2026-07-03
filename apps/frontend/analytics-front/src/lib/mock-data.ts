@@ -13,23 +13,23 @@ export interface MockBrandMetric {
   score: BrandScore;
 }
 
-// Espejo del modelo Brand → BrandProfile de brands-front/posts-front: un Post
-// pertenece a un BrandProfile (cuenta de una Marca en una red), nunca tiene
+// Espejo del modelo Brand → SocialAccount de brands-front/posts-front: un Post
+// pertenece a una SocialAccount (cuenta de una Marca en una red), nunca tiene
 // `brand`/`network` como campos propios.
-export interface BrandProfile {
+export interface SocialAccount {
   id: string;
   brandName: string;
   socialNetwork: string;
 }
 
-export const MOCK_BRAND_PROFILES: BrandProfile[] = [
+export const MOCK_SOCIAL_ACCOUNTS: SocialAccount[] = [
   { id: 'bp1', brandName: 'Nike MX', socialNetwork: 'IG' },
   { id: 'bp2', brandName: 'Zara MX', socialNetwork: 'IG' },
   { id: 'bp3', brandName: 'Spotify MX', socialNetwork: 'TK' },
 ];
 
-export function getBrandProfile(brandProfileId: string): BrandProfile | undefined {
-  return MOCK_BRAND_PROFILES.find((p) => p.id === brandProfileId);
+export function getSocialAccount(id: string): SocialAccount | undefined {
+  return MOCK_SOCIAL_ACCOUNTS.find((p) => p.id === id);
 }
 
 export interface MockTopPost {
@@ -63,7 +63,7 @@ export const MOCK_BRAND_METRICS: MockBrandMetric[] = [
   {
     id: 'b1',
     name: 'Zara MX',
-    color: '#FDC726',
+    color: '#E0A800',
     score: { score: 82, consistency: 88, engagement: 80, coverage: 75, frequency: 85, classification: 'alto', snapshotDate: '28 jun' },
   },
   {
@@ -81,7 +81,7 @@ export const MOCK_BRAND_METRICS: MockBrandMetric[] = [
 ];
 
 export const MOCK_REACH_BY_NETWORK = [
-  { network: 'Instagram', reach: 38000, color: '#FDC726' },
+  { network: 'Instagram', reach: 38000, color: '#E0A800' },
   { network: 'TikTok', reach: 24000, color: '#D4AC40' },
   { network: 'Facebook', reach: 15000, color: '#8F8F8F' },
   { network: 'X', reach: 9400, color: '#7A5C00' },

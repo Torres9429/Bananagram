@@ -1,44 +1,57 @@
 'use client';
 
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-} from 'recharts';
-import { DataTable, type DataTableColumn, ScoreGauge, EmptyState, usePermissions } from '@repo/ui';
-import {
-  MOCK_KPIS,
-  MOCK_ENGAGEMENT_SERIES,
-  MOCK_BRAND_METRICS,
-  MOCK_REACH_BY_NETWORK,
-  MOCK_TOP_POSTS,
-  getBrandProfile,
-  type MockTopPost,
-} from '../../lib/mock-data';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
+import { useDispatch, useSelector } from 'react-redux';
+import { EmptyState, usePermissions } from '@repo/ui';
+import { AnalyticsFilterBar } from '../../components/dashboard/AnalyticsFilterBar';
+import { AnalyticsBreadcrumb } from '../../components/dashboard/AnalyticsBreadcrumb';
+import { NetworkOverview } from '../../components/dashboard/NetworkOverview';
+import { EngagementChart } from '../../components/dashboard/EngagementChart';
+import { NetworkMetricCards } from '../../components/dashboard/NetworkMetricCards';
+import { GeneralMetricCards } from '../../components/dashboard/GeneralMetricCards';
+import { CampaignBreakdown } from '../../components/dashboard/CampaignBreakdown';
+import { TopContent } from '../../components/dashboard/TopContent';
+import { InsightsPanel } from '../../components/dashboard/InsightsPanel';
+import { ScoreExplanationPanel } from '../../components/dashboard/ScoreExplanationPanel';
+import { SelectedPostDetail } from '../../components/dashboard/SelectedPostDetail';
+import { NetworkComparison } from '../../components/dashboard/NetworkComparison';
+import { CampaignComparison } from '../../components/dashboard/CampaignComparison';
+import { TrendAnalysis } from '../../components/dashboard/TrendAnalysis';
+import { PostingHeatMap } from '../../components/dashboard/PostingHeatMap';
+import { ActivityTimeline } from '../../components/dashboard/ActivityTimeline';
+import { AudienceOverview } from '../../components/dashboard/AudienceOverview';
+import { selectNetwork } from '../../store/analyticsFilters.slice';
+import { selectAnalyticsFilters, selectSelectedNetwork } from '../../store/analytics.selectors';
+import type { SocialNetworkCode } from '../../lib/analytics/types';
 
-function KpiCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <Paper elevation={0} sx={{ p: 2.5, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
-      <Typography variant="h5" fontWeight={700}>{value}</Typography>
-      <Typography variant="caption" color="text.secondary">{label}</Typography>
-    </Paper>
-  );
-}
+// Pestañas de primer nivel (§B.1/§B.2 del rediseño de dominio): "General" + una por
+// red. El valor de cada Tab reutiliza directamente SocialNetworkCode — no existe un
+// estado de tab separado del filtro de red ya existente en Redux (selectedNetwork):
+// cambiar de tab ES seleccionar la red, mismo mecanismo que ya usaban
+// SocialNetworkTabs/NetworkComparison, ahora promovido a navegación de primer nivel.
+type TabValue = 'general' | SocialNetworkCode;
+
+const TABS: { value: TabValue; label: string }[] = [
+  { value: 'general', label: 'General' },
+  { value: 'IG', label: 'Instagram' },
+  { value: 'FB', label: 'Facebook' },
+  { value: 'TK', label: 'TikTok' },
+  { value: 'LI', label: 'LinkedIn' },
+  { value: 'X', label: 'X' },
+  { value: 'YT', label: 'YouTube' },
+];
 
 export default function MetricsPage() {
   const { can } = usePermissions();
+  const dispatch = useDispatch();
+  const filters = useSelector(selectAnalyticsFilters);
+  const selectedNetwork = useSelector(selectSelectedNetwork);
+  const activeTab: TabValue = selectedNetwork ?? 'general';
 
   if (!can('metrics', 'view')) {
     return (
@@ -48,99 +61,71 @@ export default function MetricsPage() {
     );
   }
 
-  const columns: DataTableColumn<MockTopPost>[] = [
-    { key: 'title', header: 'Publicación', render: (p) => <Typography variant="body2" fontWeight={600}>{p.title}</Typography> },
-    {
-      key: 'brand',
-      header: 'Marca',
-      render: (p) => <Typography variant="body2" color="text.secondary">{getBrandProfile(p.brandProfileId)?.brandName ?? '—'}</Typography>,
-    },
-    {
-      key: 'network',
-      header: 'Red',
-      render: (p) => (
-        <Chip size="small" label={getBrandProfile(p.brandProfileId)?.socialNetwork ?? '—'} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} />
-      ),
-    },
-    { key: 'likes', header: 'Likes', align: 'right', render: (p) => <Typography variant="body2">{p.likes.toLocaleString()}</Typography> },
-    {
-      key: 'engagement',
-      header: 'Engagement',
-      align: 'right',
-      render: (p) => <Typography variant="body2" fontWeight={700} sx={{ color: '#2E7D32' }}>{p.engagementRate}%</Typography>,
-    },
-  ];
-
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%', p: 3 }}>
-      <Typography variant="h5" fontWeight={700} mb={3}>Métricas</Typography>
+      <AnalyticsFilterBar />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Engagement promedio" value={`${MOCK_KPIS.avgEngagement}%`} />
-        <KpiCard label="Alcance total" value={MOCK_KPIS.totalReach.toLocaleString()} />
-        <KpiCard label="Score promedio" value={MOCK_KPIS.avgScore} />
-        <KpiCard label="Publicaciones analizadas" value={MOCK_KPIS.postsAnalyzed} />
-      </div>
+      {/* Sin título propio arriba (el TopBar ya muestra "Métricas") — el botón
+          de exportar va junto a las pestañas para no dejar una fila vacía. */}
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, value: TabValue) => dispatch(selectNetwork(value === 'general' ? null : value))}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ minHeight: 40, flex: 1, minWidth: 0, '& .MuiTab-root': { minHeight: 40, py: 1 } }}
+        >
+          {TABS.map((tab) => (
+            <Tab key={tab.value} value={tab.value} label={tab.label} sx={{ textTransform: 'none', fontWeight: 600, '&.Mui-selected': { color: '#E0A800' }  }} />
+          ))}
+        </Tabs>
 
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} md={8}>
-          <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>Engagement — últimos 7 días</Typography>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={MOCK_ENGAGEMENT_SERIES}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
-                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} unit="%" />
-                <RechartsTooltip />
-                <Line type="monotone" dataKey="engagement" stroke="#FDC726" strokeWidth={3} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
-            <Typography variant="subtitle1" fontWeight={700} mb={1}>Score Digital promedio</Typography>
-            <ScoreGauge score={MOCK_KPIS.avgScore} classification="alto" />
-          </Paper>
-        </Grid>
-      </Grid>
+        {/* Exportación pendiente (§B.5): debe serializar exactamente la vista ya
+            renderizada de la pestaña activa, nunca recalcular ni pedir configuración
+            — ReportExporter.tsx existente apunta a un backend inexistente (POST
+            /api/reports) y no sigue ese contrato, por eso no se conecta aquí todavía. */}
+        <Tooltip title="Exportación pendiente — próxima fase">
+          <span>
+            <Button variant="outlined" size="small" disabled sx={{ borderColor: '#E8E8E8', color: '#9E9E9E', flexShrink: 0 }}>
+              Exportar
+            </Button>
+          </span>
+        </Tooltip>
+      </Stack>
 
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12}>
-          <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>Score por marca</Typography>
-            <Grid container spacing={2}>
-              {MOCK_BRAND_METRICS.map((b) => (
-                <Grid item xs={12} sm={4} key={b.id}>
-                  <Stack direction="row" gap={1} alignItems="center" mb={1}>
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: b.color }} />
-                    <Typography variant="body2" fontWeight={600}>{b.name}</Typography>
-                  </Stack>
-                  <ScoreGauge score={b.score.score} classification={b.score.classification} />
-                </Grid>
-              ))}
-            </Grid>
-          </Paper>
-        </Grid>
-      </Grid>
+      <AnalyticsBreadcrumb />
 
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
-        <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparativa de alcance por red social</Typography>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={MOCK_REACH_BY_NETWORK}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E8E8E8" />
-            <XAxis dataKey="network" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <RechartsTooltip />
-            <Bar dataKey="reach" fill="#FDC726" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </Paper>
+      {filters.postId ? (
+        <SelectedPostDetail />
+      ) : selectedNetwork ? (
+        // ── Pestaña de red — estructura estricta, idéntica en las 6 (§B.2) ──
+        <>
+          <NetworkOverview networkCode={selectedNetwork} />
+          <EngagementChart />
+          <NetworkMetricCards />
+          <CampaignBreakdown />
+          <TopContent />
+          <InsightsPanel />
+        </>
+      ) : (
+        // ── General — misma base de 6 secciones + widgets embebidos (§B.3), nunca sub-tabs ──
+        <>
+          <NetworkOverview networkCode={null} />
+          <EngagementChart />
+          <GeneralMetricCards />
+          <CampaignBreakdown />
+          <TopContent />
+          <InsightsPanel />
+          <ScoreExplanationPanel />
 
-      <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3 }}>
-        <Typography variant="subtitle1" fontWeight={700} mb={2}>Publicaciones con mejor desempeño</Typography>
-        <DataTable columns={columns} rows={MOCK_TOP_POSTS} getRowKey={(p) => p.id} />
-      </Paper>
+          <NetworkComparison />
+          <CampaignComparison />
+          <TrendAnalysis />
+          <PostingHeatMap />
+          <ActivityTimeline />
+          <AudienceOverview />
+        </>
+      )}
     </Box>
   );
 }

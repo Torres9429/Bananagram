@@ -3,12 +3,12 @@ export type { PostStatus };
 
 export type SocialNetworkCode = 'IG' | 'TK' | 'LI' | 'FB' | 'X' | 'YT';
 
-// Espejo del modelo de brands-front (Brand → BrandProfile): cada microfront
+// Espejo del modelo de brands-front (Brand → SocialAccount): cada microfront
 // mantiene su propia copia de mocks porque no hay un servicio compartido,
-// pero el concepto y la forma son los mismos. Un Post pertenece a un
-// BrandProfile (una cuenta de una Marca en una red social específica),
+// pero el concepto y la forma son los mismos. Un Post pertenece a una
+// SocialAccount (una cuenta de una Marca en una red social específica),
 // nunca tiene un campo `network`/`brand` propio.
-export interface BrandProfile {
+export interface SocialAccount {
   id: string;
   brandName: string;
   socialNetwork: SocialNetworkCode;
@@ -17,7 +17,7 @@ export interface BrandProfile {
   networkColor: string;
 }
 
-export const MOCK_BRAND_PROFILES: BrandProfile[] = [
+export const MOCK_SOCIAL_ACCOUNTS: SocialAccount[] = [
   { id: 'bp1', brandName: 'Zara MX', socialNetwork: 'IG', handle: '@zaramx', networkBg: '#FCE4EC', networkColor: '#880E4F' },
   { id: 'bp2', brandName: 'Zara MX', socialNetwork: 'LI', handle: 'Zara México', networkBg: '#E3F2FD', networkColor: '#0D47A1' },
   { id: 'bp3', brandName: 'Zara MX', socialNetwork: 'FB', handle: 'Zara México', networkBg: '#FFF3E0', networkColor: '#E65100' },
@@ -25,14 +25,14 @@ export const MOCK_BRAND_PROFILES: BrandProfile[] = [
   { id: 'bp5', brandName: 'Nike MX', socialNetwork: 'IG', handle: '@nikemexico', networkBg: '#FCE4EC', networkColor: '#880E4F' },
 ];
 
-export function getBrandProfile(brandProfileId: string): BrandProfile | undefined {
-  return MOCK_BRAND_PROFILES.find((p) => p.id === brandProfileId);
+export function getSocialAccount(id: string): SocialAccount | undefined {
+  return MOCK_SOCIAL_ACCOUNTS.find((p) => p.id === id);
 }
 
 // Helper de conveniencia: deriva todo lo que las vistas necesitan mostrar
-// (red, colores del avatar, nombre de marca) a partir del BrandProfile.
+// (red, colores del avatar, nombre de marca) a partir de la SocialAccount.
 export function getPostNetworkInfo(post: Pick<MockPost, 'brandProfileId'>) {
-  const profile = getBrandProfile(post.brandProfileId);
+  const profile = getSocialAccount(post.brandProfileId);
   return {
     network: profile?.socialNetwork ?? '—',
     networkBg: profile?.networkBg ?? '#EEEEEE',
@@ -91,22 +91,22 @@ export const MOCK_USER = {
 };
 
 export const MOCK_CAMPAIGNS: MockCampaign[] = [
-  { id: 'c1', name: 'Campaña Verano', color: '#FDC726', brand: 'Zara MX' },
+  { id: 'c1', name: 'Campaña Verano', color: '#E0A800', brand: 'Zara MX' },
   { id: 'c2', name: 'Nike Run Launch', color: '#42A5F5', brand: 'Nike MX' },
   { id: 'c3', name: 'Spotify Weekly', color: '#66BB6A', brand: 'Spotify MX' },
 ];
 
-// BrandProfiles disponibles por campaña (para el selector de "Perfil" en crear publicación).
-// La red social se selecciona eligiendo el BrandProfile; no hay campo `network` separado.
-export const CAMPAIGN_BRAND_PROFILES: Record<string, string[]> = {
+// SocialAccounts disponibles por campaña (para el selector de "Perfil" en crear publicación).
+// La red social se selecciona eligiendo la SocialAccount; no hay campo `network` separado.
+export const CAMPAIGN_SOCIAL_ACCOUNTS: Record<string, string[]> = {
   c1: ['bp1', 'bp2', 'bp3'], // Campaña Verano → Zara (IG, LI, FB)
   c2: ['bp4', 'bp5'],        // Nike Run Launch → Nike (TK, IG)
-  c3: [],                     // Spotify Weekly → sin perfiles en este microfront
+  c3: [],                     // Spotify Weekly → sin cuentas en este microfront
 };
 
-export function getBrandProfilesForCampaign(campaignId: string): BrandProfile[] {
-  const ids = CAMPAIGN_BRAND_PROFILES[campaignId] ?? [];
-  return ids.map((id) => getBrandProfile(id)).filter((p): p is BrandProfile => !!p);
+export function getSocialAccountsForCampaign(campaignId: string): SocialAccount[] {
+  const ids = CAMPAIGN_SOCIAL_ACCOUNTS[campaignId] ?? [];
+  return ids.map((id) => getSocialAccount(id)).filter((p): p is SocialAccount => !!p);
 }
 
 export const MOCK_POSTS: MockPost[] = [
@@ -114,7 +114,7 @@ export const MOCK_POSTS: MockPost[] = [
     id: 'p1',
     title: 'Post lanzamiento verano',
     brandProfileId: 'bp1',
-    campaign: { id: 'c1', name: 'Campaña Verano', color: '#FDC726' },
+    campaign: { id: 'c1', name: 'Campaña Verano', color: '#E0A800' },
     designer: 'Rocío Rodríguez',
     status: 'borrador',
     createdAt: 'Hace 2 h',
@@ -143,7 +143,7 @@ export const MOCK_POSTS: MockPost[] = [
     id: 'p3',
     title: 'Carrusel colores SS25',
     brandProfileId: 'bp2',
-    campaign: { id: 'c1', name: 'Campaña Verano', color: '#FDC726' },
+    campaign: { id: 'c1', name: 'Campaña Verano', color: '#E0A800' },
     designer: 'Elías Bailón',
     status: 'en_revision',
     createdAt: 'Hace 5 h',

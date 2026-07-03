@@ -72,6 +72,24 @@ export const MOCK_USERS: MockUser[] = [
       [AppModule.REPORTS]:   [AppAction.EXPORT],
     },
   },
+  {
+    // Segundo Cliente, ProfileType 'personal' (§Parte C del rediseño de
+    // dominio) — valida que el modelo de Perfil único funciona igual de bien
+    // para un creador de contenido individual que para una marca comercial.
+    // Mismos permisos que el Cliente existente — ningún permiso nuevo.
+    email: 'alex@bananagram.mx',
+    password: 'alex12345',
+    role: AppRole.CLIENTE,
+    name: 'Alex Rivera',
+    brandIds: ['brand-004'],
+    permissions: {
+      [AppModule.POST]:      [AppAction.APPROVE, AppAction.REJECT],
+      [AppModule.CAMPAIGNS]: [AppAction.CREATE],
+      [AppModule.METRICS]:   [AppAction.VIEW],
+      [AppModule.SCORE]:     [AppAction.VIEW],
+      [AppModule.REPORTS]:   [AppAction.EXPORT],
+    },
+  },
 ];
 
 function normalizeEmail(email: string): string {

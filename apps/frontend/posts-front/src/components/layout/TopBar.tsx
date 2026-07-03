@@ -25,7 +25,7 @@ export function TopBar({ title }: { title: string }) {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>{title}</Typography>
         <NotificationBell />
         <Tooltip title="Cerrar sesión">
-          <IconButton onClick={handleLogout} sx={{ color: '#7A5C00' }}>
+          <IconButton onClick={handleLogout} sx={{ color: 'secondary.main' }}>
             <LogoutIcon />
           </IconButton>
         </Tooltip>

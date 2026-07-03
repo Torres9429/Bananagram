@@ -125,7 +125,7 @@ export function CreateUserDialog({ open, onClose, onCreate }: Props) {
                   {confirmed.activationUrl}
                 </Typography>
                 <Tooltip title={copied ? '¡Copiado!' : 'Copiar enlace'}>
-                  <IconButton size="small" onClick={copyUrl} sx={{ color: '#7A5C00' }}>
+                  <IconButton size="small" onClick={copyUrl} sx={{ color: 'secondary.main' }}>
                     <ContentCopyOutlinedIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -140,7 +140,7 @@ export function CreateUserDialog({ open, onClose, onCreate }: Props) {
           <Button
             variant="contained"
             onClick={handleClose}
-            sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
           >
             Listo
           </Button>
@@ -181,7 +181,7 @@ export function CreateUserDialog({ open, onClose, onCreate }: Props) {
         ))}
       </LabeledSelect>
       <LabeledField
-        label="Marca asignada (opcional)"
+        label="Perfil asignado (opcional)"
         placeholder="Ej. Zara MX"
         value={brand}
         onChange={(e) => setBrand(e.target.value)}

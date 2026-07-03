@@ -10,9 +10,10 @@ import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import Checkbox from '@mui/material/Checkbox';
 import Divider from '@mui/material/Divider';
+import Alert from '@mui/material/Alert';
 import { selectUser, findUserByEmail, FormDialog, LabeledField, LabeledSelect } from '@repo/ui';
 import type { MockCampaign, CampaignStatus, MockTeamMember } from '../lib/mock-data';
-import { getAvailableCMsForCategory } from '../lib/mock-data';
+import { getAvailableCMsForCategory, getSocialAccountsByProfile, AVAILABLE_SOCIAL_NETWORKS } from '../lib/mock-data';
 
 const STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
   { value: 'active', label: 'Activa' },
@@ -36,9 +37,15 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
   const [status, setStatus] = useState<CampaignStatus>('active');
   const [cmId, setCmId] = useState<string | null>(null);
   const [designerIds, setDesignerIds] = useState<string[]>([]);
+  const [socialAccountIds, setSocialAccountIds] = useState<string[]>([]);
 
   const availableCMs = getAvailableCMsForCategory(brandCategory);
   const selectedCm = availableCMs.find((cm) => cm.id === cmId) ?? null;
+  const availableSocialAccounts = getSocialAccountsByProfile(brandId);
+
+  function toggleSocialAccount(id: string) {
+    setSocialAccountIds((prev) => (prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]));
+  }
 
   useEffect(() => {
     // Al elegir un CM, el sistema sugiere por defecto a los diseñadores que
@@ -51,7 +58,7 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
   }
 
   function handleCreate() {
-    if (!name.trim() || !selectedCm) return;
+    if (!name.trim() || !selectedCm || socialAccountIds.length === 0) return;
 
     const clienteName = (user?.email && findUserByEmail(user.email)?.name) || 'Cliente';
     const team: MockTeamMember[] = [
@@ -71,6 +78,7 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
         startDate: startDate || 'Sin definir',
         endDate: endDate || 'Sin definir',
         postsCount: 0,
+        socialAccountIds,
       },
       team,
     );
@@ -81,6 +89,7 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
     setStatus('active');
     setCmId(null);
     setDesignerIds([]);
+    setSocialAccountIds([]);
     onClose();
   }
 
@@ -90,7 +99,7 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
       title="Nueva campaña"
       maxWidth="sm"
       confirmLabel="Crear"
-      confirmDisabled={!name.trim() || !selectedCm}
+      confirmDisabled={!name.trim() || !selectedCm || socialAccountIds.length === 0}
       onClose={onClose}
       onConfirm={handleCreate}
     >
@@ -111,10 +120,57 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
 
       <Divider sx={{ mb: 2.5 }} />
 
+      <Box sx={{ mb: 2.5 }}>
+        <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Cuentas sociales que usará esta campaña</Typography>
+        <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+          Selecciona al menos una de las cuentas ya conectadas al perfil. Puedes agregar más después.
+        </Typography>
+
+        {availableSocialAccounts.length === 0 ? (
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            Este perfil todavía no tiene cuentas sociales conectadas.
+          </Alert>
+        ) : (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+            {availableSocialAccounts.map((account) => {
+              const active = socialAccountIds.includes(account.id);
+              const color = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === account.socialNetwork)?.color ?? '#6B6B6B';
+              return (
+                <Chip
+                  key={account.id}
+                  label={`${account.socialNetwork} · ${account.handle}`}
+                  onClick={() => toggleSocialAccount(account.id)}
+                  sx={{
+                    px: 2,
+                    py: 3,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    border: `2px solid ${active ? color : '#E8E8E8'}`,
+                    bgcolor: active ? `${color}18` : '#fff',
+                    color: active ? color : '#6B6B6B',
+                    cursor: 'pointer',
+                    '&:hover': { borderColor: color, bgcolor: `${color}10` },
+                    height: 'auto',
+                  }}
+                />
+              );
+            })}
+          </Box>
+        )}
+
+        {availableSocialAccounts.length > 0 && socialAccountIds.length === 0 && (
+          <Alert severity="info" sx={{ mt: 1.5, borderRadius: 2 }}>
+            Selecciona al menos una cuenta social para continuar.
+          </Alert>
+        )}
+      </Box>
+
+      <Divider sx={{ mb: 2.5 }} />
+
       <Box>
         <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Elige un Community Manager</Typography>
         <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-          Mostramos primero a quienes coinciden con la categoría de tu marca — puedes elegir libremente. Solo puedes seleccionar un CM por campaña.
+          Mostramos primero a quienes coinciden con la categoría de tu perfil — puedes elegir libremente. Solo puedes seleccionar un CM por campaña.
         </Typography>
         <Stack gap={1}>
           {availableCMs.map((cm) => {
@@ -129,11 +185,11 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
                 onClick={() => setCmId(cm.id)}
                 sx={{
                   p: 1.5,
-                  border: active ? '1.5px solid #FDC726' : '1px solid #E8E8E8',
+                  border: active ? '1.5px solid #E0A800' : '1px solid #E8E8E8',
                   bgcolor: active ? '#FFFDE7' : '#fff',
                   borderRadius: 2,
                   cursor: 'pointer',
-                  '&:hover': { borderColor: '#FDC726' },
+                  '&:hover': { borderColor: '#E0A800' },
                 }}
               >
                 <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 600 }}>

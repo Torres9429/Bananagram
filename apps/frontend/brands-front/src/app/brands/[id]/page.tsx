@@ -10,12 +10,12 @@ import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
 import { ScoreGauge } from '@repo/ui';
 import { BrandTabs } from '../../../components/BrandTabs';
-import { MOCK_BRANDS, MOCK_CAMPAIGNS, CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
+import { MOCK_PROFILES, MOCK_CAMPAIGNS, CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
 
 export default function BrandOverviewPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
   const campaigns = MOCK_CAMPAIGNS.filter((c) => c.brandId === brand.id);
 
   return (
@@ -54,7 +54,7 @@ export default function BrandOverviewPage() {
                       justifyContent="space-between"
                       alignItems="center"
                       onClick={() => router.push(`/brands/${brand.id}/campaigns/${c.id}`)}
-                      sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#FDC726' } }}
+                      sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
                     >
                       <Box>
                         <Typography variant="body2" fontWeight={600}>{c.name}</Typography>

@@ -95,7 +95,7 @@ export function ActivateForm() {
           <PasswordField label="Confirmar contraseña:" value={confirmPassword} placeholder="●●●●●●●●●" onChange={(e) => setConfirmPassword(e.target.value)} required />
 
           <Button type="submit" fullWidth size="large"
-            sx={{ mt: 1, mb: 2, py: 1.25, color: '#fff', fontWeight: 700, background: '#FDC726', '&:hover': { background: '#D4AC40' } }}>
+            sx={{ mt: 1, mb: 2, py: 1.25, color: '#fff', fontWeight: 700, background: '#E0A800', '&:hover': { background: '#D4AC40' } }}>
             Activar cuenta y acceder
           </Button>
         </>

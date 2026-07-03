@@ -51,7 +51,7 @@ export function BrandPanel() {
         }}
       >
         <Image
-          src="/LogoName.png"
+          src="/LogoNameMonkey.png"
           alt="Bananagram"
           width={1408}
           height={768}

@@ -10,7 +10,7 @@ import Button from '@mui/material/Button';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { CreateCampaignDialog } from '../../../../components/CreateCampaignDialog';
 import {
-  MOCK_BRANDS,
+  MOCK_PROFILES,
   MOCK_CAMPAIGNS,
   CAMPAIGN_STATUS_LABEL,
   assignTeamToCampaign,
@@ -20,7 +20,7 @@ import {
 export default function CampaignsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
   const [campaigns, setCampaigns] = useState<MockCampaign[]>(MOCK_CAMPAIGNS.filter((c) => c.brandId === brand.id));
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -32,7 +32,7 @@ export default function CampaignsPage() {
           <Typography variant="h5" fontWeight={700}>Campañas — {brand.name}</Typography>
           <Button
             variant="contained"
-            sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
             onClick={() => setCreateOpen(true)}
           >
             + Nueva campaña
@@ -48,7 +48,7 @@ export default function CampaignsPage() {
                 justifyContent="space-between"
                 alignItems="center"
                 onClick={() => router.push(`/brands/${brand.id}/campaigns/${c.id}`)}
-                sx={{ p: 2, bgcolor: '#fff', border: '1px solid #E8E8E8', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: '#FDC726' } }}
+                sx={{ p: 2, bgcolor: '#fff', border: '1px solid #E8E8E8', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
               >
                 <Box>
                   <Typography variant="body1" fontWeight={600}>{c.name}</Typography>

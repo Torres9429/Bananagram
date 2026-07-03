@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
@@ -27,9 +28,19 @@ const NETWORK_NAMES: Record<string, string> = {
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const post = MOCK_POSTS.find((p) => p.id === params.id) ?? MOCK_POSTS.find((p) => p.id === 'p2')!;
+  // Mock: estado local, sin persistencia — mismo patrón ya usado en
+  // /posts/approvals y en ClientSection.tsx (brands-front).
+  const [post, setPost] = useState(() => MOCK_POSTS.find((p) => p.id === params.id) ?? MOCK_POSTS.find((p) => p.id === 'p2')!);
   const history = MOCK_STATUS_HISTORY[post.id] ?? [];
   const { network, networkBg, networkColor } = getPostNetworkInfo(post);
+
+  function handleApprove() {
+    setPost((prev) => ({ ...prev, status: 'aprobado' }));
+  }
+
+  function handleReject() {
+    setPost((prev) => ({ ...prev, status: 'rechazado' }));
+  }
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
@@ -118,7 +129,7 @@ export default function PostDetailPage() {
               <ProtectedAction module="post" action="create">
                 <Button
                   variant="contained"
-                  sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+                  sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
                   onClick={() => router.push('/posts/new')}
                 >
                   Enviar a revisión →
@@ -130,12 +141,12 @@ export default function PostDetailPage() {
                 </Button>
               </ProtectedAction>
               <ProtectedAction module="post" action="reject">
-                <Button variant="outlined" sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                <Button variant="outlined" onClick={handleReject} sx={{ color: '#C62828', borderColor: '#C62828' }}>
                   Rechazar
                 </Button>
               </ProtectedAction>
               <ProtectedAction module="post" action="approve">
-                <Button variant="contained" sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
+                <Button variant="contained" onClick={handleApprove} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
                   Aprobar
                 </Button>
               </ProtectedAction>

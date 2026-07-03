@@ -35,8 +35,8 @@ export function DataTable<T>({ columns, rows, getRowKey, onRowClick }: DataTable
                 align={col.align}
                 sx={{
                   width: col.width,
-                  bgcolor: 'primary.light',
-                  color: 'secondary.main',
+                  bgcolor: 'primary.main',
+                  color: 'secondary.contrastText',
                   fontWeight: 700,
                   borderBottom: '1px solid',
                   borderColor: 'divider',
@@ -56,7 +56,7 @@ export function DataTable<T>({ columns, rows, getRowKey, onRowClick }: DataTable
               sx={{
                 cursor: onRowClick ? 'pointer' : 'default',
                 bgcolor: i % 2 === 0 ? 'background.paper' : 'background.default',
-                '&:hover': { bgcolor: '#FFF3D6' },
+                '&:hover': { bgcolor: '#FFF8E1' },
                 '& td': { borderBottom: '1px solid', borderColor: 'divider' },
                 '&:last-child td': { borderBottom: 0 },
               }}

@@ -1,5 +1,10 @@
 'use client';
 
+// LEGACY/DEPRECATED (dominio v3): step de OnboardingWizard, que ya no forma
+// parte de ningún flujo alcanzable (ver OnboardingWizard.tsx). Se conserva sin
+// borrar — sigue siendo la candidata más directa a reutilizar si en el futuro
+// se necesita un selector de redes fuera del wizard (CreateCampaignDialog
+// terminó construyendo su propio selector de SocialAccount, no reutilizó este).
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -28,7 +33,7 @@ export function StepNetworks({ selected, onChange }: Props) {
           Selecciona las redes donde publicarás
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          Cada red generará un perfil independiente (BrandProfile). Puedes agregar más después.
+          Cada red generará una cuenta social independiente (SocialAccount). Puedes agregar más después.
         </Typography>
       </Box>
 

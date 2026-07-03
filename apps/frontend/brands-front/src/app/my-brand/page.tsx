@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation';
-import { MOCK_BRANDS } from '../../lib/mock-data';
 
-// La cookie bananagram_token viaja con la petición — no se necesita
-// reenviar ?mock_user ni leer searchParams.
+// LEGACY/DEPRECATED (dominio v3): /my-brand ya no es un flujo funcional —
+// ningún Sidebar enlaza aquí, todos apuntan directo a /profile. Se conserva
+// como redirect en vez de eliminar la ruta, por si queda algún enlace externo
+// o marcador guardado apuntando a esta URL. Candidata a eliminar por completo
+// en una fase futura de limpieza de dominio v3 (junto con /brands).
 export default function Page() {
-  redirect(`/brands/${MOCK_BRANDS[0].id}`);
+  redirect('/profile');
 }

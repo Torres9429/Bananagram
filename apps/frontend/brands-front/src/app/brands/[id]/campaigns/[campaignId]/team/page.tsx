@@ -18,7 +18,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction } from '@repo/ui';
 import { CampaignTabs } from '../../../../../../components/CampaignTabs';
 import {
-  MOCK_BRANDS,
+  MOCK_PROFILES,
   MOCK_CAMPAIGNS,
   MOCK_TEAM_BY_CAMPAIGN,
   getAvailableDesigners,
@@ -29,7 +29,7 @@ import {
 
 export default function CampaignTeamPage() {
   const params = useParams<{ id: string; campaignId: string }>();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === params.campaignId) ?? MOCK_CAMPAIGNS[0];
 
   const [team, setTeam] = useState<MockTeamMember[]>(MOCK_TEAM_BY_CAMPAIGN[campaign.id] ?? []);
@@ -89,7 +89,7 @@ export default function CampaignTeamPage() {
               startIcon={<PersonAddOutlinedIcon />}
               onClick={() => setAddOpen(true)}
               disabled={availableDesigners.length === 0}
-              sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+              sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
             >
               Agregar Diseñador
             </Button>
@@ -193,11 +193,11 @@ export default function CampaignTeamPage() {
                   onClick={() => setSelectedDesignerId(isSelected ? null : d.id)}
                   sx={{
                     p: 2,
-                    border: `2px solid ${isSelected ? '#FDC726' : '#E8E8E8'}`,
+                    border: `2px solid ${isSelected ? '#E0A800' : '#E8E8E8'}`,
                     borderRadius: 3,
                     bgcolor: isSelected ? '#FFF8E1' : '#fff',
                     cursor: 'pointer',
-                    '&:hover': { borderColor: '#FDC726' },
+                    '&:hover': { borderColor: '#E0A800' },
                   }}
                 >
                   <Stack direction="row" gap={1.5} alignItems="center">
@@ -212,7 +212,7 @@ export default function CampaignTeamPage() {
                         ))}
                       </Stack>
                     </Box>
-                    {isSelected && <CheckCircleOutlineIcon sx={{ color: '#FDC726' }} />}
+                    {isSelected && <CheckCircleOutlineIcon sx={{ color: '#E0A800' }} />}
                   </Stack>
                 </Paper>
               );

@@ -1,5 +1,8 @@
 'use client';
 
+// LEGACY/DEPRECATED (dominio v3): step de OnboardingWizard, que ya no forma
+// parte de ningún flujo alcanzable (ver OnboardingWizard.tsx). Se conserva
+// sin borrar por si se reutiliza más adelante.
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -34,13 +37,13 @@ export function StepSelectCM({ category, selectedCMId, onChange }: Props) {
             elevation={0}
             onClick={() => onChange(cm)}
             sx={{
-              border: `2px solid ${isSelected ? '#FDC726' : '#E8E8E8'}`,
+              border: `2px solid ${isSelected ? '#E0A800' : '#E8E8E8'}`,
               borderRadius: 3,
               p: 2,
               cursor: 'pointer',
               bgcolor: isSelected ? '#FFF8E1' : '#fff',
               position: 'relative',
-              '&:hover': { borderColor: '#FDC726' },
+              '&:hover': { borderColor: '#E0A800' },
             }}
           >
             <Stack direction="row" gap={2} alignItems="center">
@@ -64,7 +67,7 @@ export function StepSelectCM({ category, selectedCMId, onChange }: Props) {
                 </Typography>
               </Box>
               {isSelected && (
-                <CheckCircleIcon sx={{ color: '#FDC726', fontSize: 24 }} />
+                <CheckCircleIcon sx={{ color: '#E0A800', fontSize: 24 }} />
               )}
             </Stack>
           </Paper>

@@ -41,7 +41,7 @@ export default function UsersPage() {
       ),
     },
     { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={u.role} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} /> },
-    { key: 'brand', header: 'Marca', render: (u) => <Typography variant="body2">{u.brand ?? '—'}</Typography> },
+    { key: 'brand', header: 'Perfil', render: (u) => <Typography variant="body2">{u.brand ?? '—'}</Typography> },
     {
       key: 'status',
       header: 'Estado',
@@ -58,7 +58,7 @@ export default function UsersPage() {
       render: () => (
         <ProtectedAction module="users" action="manage">
           <Tooltip title="Editar">
-            <IconButton size="small" onClick={(e) => e.stopPropagation()} sx={{ color: '#D4AC40' }}>
+            <IconButton size="small" onClick={(e) => e.stopPropagation()} sx={{ color: 'secondary.main' }}>
               <EditOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -76,7 +76,7 @@ export default function UsersPage() {
           <ProtectedAction module="users" action="manage">
             <Button
               variant="contained"
-              sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+              sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
               onClick={() => setCreateOpen(true)}
             >
               + Nuevo usuario

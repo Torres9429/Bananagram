@@ -36,7 +36,7 @@ export function CampaignTabs({ brandId, campaignId, backHref }: Props) {
         <Tooltip title="Volver">
           <IconButton
             onClick={() => (backHref ? router.push(backHref) : router.back())}
-            sx={{ color: '#7A5C00', ml: 1 }}
+            sx={{ color: 'secondary.main', ml: 1 }}
           >
             <ArrowBackIcon fontSize="small" />
           </IconButton>
@@ -44,7 +44,7 @@ export function CampaignTabs({ brandId, campaignId, backHref }: Props) {
         <Tabs
           value={current}
           onChange={(_, value) => router.push(`${base}${value}`)}
-          TabIndicatorProps={{ sx: { bgcolor: '#FDC726', height: 3 } }}
+          TabIndicatorProps={{ sx: { bgcolor: '#E0A800', height: 3 } }}
           sx={{ '& .Mui-selected': { color: '#7A5C00 !important', fontWeight: 700 } }}
         >
           {SECTIONS.map((s) => (

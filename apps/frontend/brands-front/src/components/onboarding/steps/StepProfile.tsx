@@ -1,5 +1,9 @@
 'use client';
 
+// LEGACY/DEPRECATED (dominio v3): step de OnboardingWizard, que ya no forma
+// parte de ningún flujo alcanzable (ver OnboardingWizard.tsx) — el registro
+// (auth-front/RegisterForm.tsx) ya captura tipo/nombre/categoría de perfil
+// directamente. Se conserva sin borrar por si se reutiliza más adelante.
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -10,20 +14,20 @@ import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import { LabeledField, LabeledSelect } from '@repo/ui';
 import { MOCK_CATEGORIES } from '../../../lib/mock-data';
-import type { BrandType } from '../../../lib/mock-data';
+import type { ProfileType } from '../../../lib/mock-data';
 
-export interface BrandDraft {
+export interface ProfileDraft {
   name: string;
-  type: BrandType;
+  type: ProfileType;
   category: string;
 }
 
 interface Props {
-  value: BrandDraft;
-  onChange: (v: BrandDraft) => void;
+  value: ProfileDraft;
+  onChange: (v: ProfileDraft) => void;
 }
 
-export function StepBrand({ value, onChange }: Props) {
+export function StepProfile({ value, onChange }: Props) {
   return (
     <Stack gap={3}>
       <Box>
@@ -45,7 +49,7 @@ export function StepBrand({ value, onChange }: Props) {
               borderRadius: '12px !important',
               flexDirection: 'column',
               gap: 0.75,
-              '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#FDC726 !important', color: '#7A5C00' },
+              '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#E0A800 !important', color: '#7A5C00' },
             }}
           >
             <BusinessOutlinedIcon />
@@ -55,7 +59,7 @@ export function StepBrand({ value, onChange }: Props) {
             </Typography>
           </ToggleButton>
           <ToggleButton
-            value="profile"
+            value="personal"
             sx={{
               flex: 1,
               py: 2,
@@ -63,7 +67,7 @@ export function StepBrand({ value, onChange }: Props) {
               borderRadius: '12px !important',
               flexDirection: 'column',
               gap: 0.75,
-              '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#FDC726 !important', color: '#7A5C00' },
+              '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#E0A800 !important', color: '#7A5C00' },
             }}
           >
             <PersonOutlineOutlinedIcon />

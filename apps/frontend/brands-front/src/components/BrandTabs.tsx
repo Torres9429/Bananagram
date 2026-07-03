@@ -31,7 +31,7 @@ export function BrandTabs({ brandId }: { brandId: string }) {
     <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', px: 1 }}>
       <Stack direction="row" alignItems="center">
         <Tooltip title="Volver">
-          <IconButton onClick={() => router.back()} sx={{ color: '#7A5C00', ml: 1 }}>
+          <IconButton onClick={() => router.back()} sx={{ color: 'secondary.main', ml: 1 }}>
             <ArrowBackIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -40,7 +40,7 @@ export function BrandTabs({ brandId }: { brandId: string }) {
           onChange={(_, value) => router.push(`${base}${value}`)}
           variant="scrollable"
           scrollButtons="auto"
-          TabIndicatorProps={{ sx: { bgcolor: '#FDC726', height: 3 } }}
+          TabIndicatorProps={{ sx: { bgcolor: '#E0A800', height: 3 } }}
           sx={{ '& .Mui-selected': { color: '#7A5C00 !important', fontWeight: 700 } }}
         >
           {SECTIONS.map((s) => (

@@ -16,7 +16,7 @@ import {
   Tooltip as RechartsTooltip, PieChart, Pie, Cell,
 } from 'recharts';
 import { StatusChip, WidgetCard } from '@repo/ui';
-import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, MOCK_POSTS_BY_NETWORK, getBrandProfile } from '../../lib/mock-dashboard';
+import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, MOCK_POSTS_BY_NETWORK, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
 
@@ -34,7 +34,7 @@ export function DashboardCM() {
           variant="contained"
           endIcon={<ArrowForwardIcon />}
           onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts`; }}
-          sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
+          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
         >
           Ir a Publicaciones
         </Button>
@@ -76,7 +76,7 @@ export function DashboardCM() {
                 <Stack key={post.id} direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 1.5, border: '1px solid #F0F0F0', borderRadius: 2 }}>
                   <Box>
                     <Typography variant="body2" fontWeight={600}>{post.title}</Typography>
-                    <Typography variant="caption" color="text.secondary">{getBrandProfile(post.brandProfileId)?.socialNetwork ?? '—'}</Typography>
+                    <Typography variant="caption" color="text.secondary">{getSocialAccount(post.brandProfileId)?.socialNetwork ?? '—'}</Typography>
                   </Box>
                   <StatusChip status={post.status} />
                 </Stack>
@@ -95,7 +95,7 @@ export function DashboardCM() {
               <XAxis dataKey="status" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
               <RechartsTooltip />
-              <Bar dataKey="count" fill="#FDC726" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#E0A800" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Paper>
