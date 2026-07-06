@@ -5,6 +5,7 @@ export * from './ui/atoms/ScoreGauge/ScoreGauge';
 export * from './ui/atoms/SkeletonLoader/SkeletonLoader';
 export * from './ui/atoms/LabeledField/LabeledField';
 export * from './ui/atoms/LabeledField/LabeledSelect';
+export * from './ui/atoms/PrimaryButton/PrimaryButton';
 
 // Molecules
 export * from './ui/molecules/WidgetCard/WidgetCard';

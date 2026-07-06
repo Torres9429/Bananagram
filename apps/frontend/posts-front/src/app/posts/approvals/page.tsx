@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
@@ -11,28 +12,48 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Snackbar from '@mui/material/Snackbar';
-import { ProtectedAction, usePermissions } from '@repo/ui';
-import { MOCK_POSTS, getPostNetworkInfo, type MockPost } from '../../../lib/mock-data';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import { ProtectedAction, usePermissions, PrimaryButton, selectUser, findUserByEmail } from '@repo/ui';
+import { MOCK_POSTS, addStatusHistoryEntry, getPostNetworkInfo, type MockPost, type StatusHistoryItem } from '../../../lib/mock-data';
 import { NetworkAvatar } from '../../../components/NetworkAvatar';
 import { CampaignDot } from '../../../components/CampaignDot';
 import { PostsTabs } from '../../../components/PostsTabs';
+import { RejectPostDialog } from '../../../components/RejectPostDialog';
 
 export default function PostsApprovalPage() {
   const router = useRouter();
   const { can, canAny } = usePermissions();
+  const user = useSelector(selectUser);
   // Mock: estado local, sin persistencia — mismo patrón ya usado en
   // ClientSection.tsx (brands-front) para acciones sin backend real.
   const [posts, setPosts] = useState<MockPost[]>(MOCK_POSTS);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
 
   function handleApprove(id: string) {
     setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'aprobado' } : p)));
     setFeedback('Publicación aprobada.');
   }
 
-  function handleReject(id: string) {
-    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'rechazado' } : p)));
+  // Rechazar pide motivo en un modal (§3) — el estado y el historial solo se
+  // actualizan al confirmar, nunca al abrir el modal.
+  function handleConfirmReject(reason: string) {
+    const id = rejectTargetId;
+    if (!id) return;
+    const actor = findUserByEmail(user?.email ?? '')?.name ?? user?.email ?? 'Cliente';
+    const entry: StatusHistoryItem = {
+      status: 'rechazado',
+      label: 'Rechazado',
+      color: '#C62828',
+      actor,
+      role: 'Cliente',
+      date: new Date().toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+      comment: reason,
+    };
+    addStatusHistoryEntry(id, entry);
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'rechazado', rejectionReason: reason } : p)));
     setFeedback('Publicación rechazada.');
+    setRejectTargetId(null);
   }
 
   const draftPosts = posts.filter((p) => p.status === 'borrador');
@@ -67,7 +88,12 @@ export default function PostsApprovalPage() {
             Revisa el trabajo de tus diseñadores antes de enviarlo al cliente.
           </Alert>
           {draftPosts.map((post) => (
-            <Card key={post.id} elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2 }}>
+            <Card
+              key={post.id}
+              elevation={0}
+              onClick={() => router.push(`/posts/${post.id}`)}
+              sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
+            >
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
@@ -85,9 +111,17 @@ export default function PostsApprovalPage() {
                   </Typography>
                 </Box>
                 <Stack direction="row" gap={1} justifyContent="flex-end">
-                  <Button size="small" variant="contained" sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
-                    Enviar a revisión →
+                  <Button
+                    size="small"
+                    startIcon={<VisibilityOutlinedIcon fontSize="small" />}
+                    onClick={(e) => { e.stopPropagation(); router.push(`/posts/${post.id}`); }}
+                    sx={{ color: 'secondary.main' }}
+                  >
+                    Ver detalle
                   </Button>
+                  <PrimaryButton size="small" onClick={(e) => e.stopPropagation()}>
+                    Enviar a revisión →
+                  </PrimaryButton>
                 </Stack>
               </CardContent>
             </Card>
@@ -104,7 +138,12 @@ export default function PostsApprovalPage() {
             Estas publicaciones ya pasaron tu revisión y esperan aprobación del cliente.
           </Alert>
           {reviewPosts.map((post) => (
-            <Card key={post.id} elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2 }}>
+            <Card
+              key={post.id}
+              elevation={0}
+              onClick={() => router.push(`/posts/${post.id}`)}
+              sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
+            >
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
@@ -124,13 +163,31 @@ export default function PostsApprovalPage() {
                 <Stack direction="row" gap={1} justifyContent="space-between" alignItems="center" flexWrap="wrap">
                   <Chip size="small" label="En espera del cliente" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />
                   <Stack direction="row" gap={1}>
+                    <Button
+                      size="small"
+                      startIcon={<VisibilityOutlinedIcon fontSize="small" />}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/posts/${post.id}`); }}
+                      sx={{ color: 'secondary.main' }}
+                    >
+                      Ver detalle
+                    </Button>
                     <ProtectedAction module="post" action="reject">
-                      <Button size="small" variant="outlined" onClick={() => handleReject(post.id)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => { e.stopPropagation(); setRejectTargetId(post.id); }}
+                        sx={{ color: '#C62828', borderColor: '#C62828' }}
+                      >
                         Rechazar
                       </Button>
                     </ProtectedAction>
                     <ProtectedAction module="post" action="approve">
-                      <Button size="small" variant="contained" onClick={() => handleApprove(post.id)} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={(e) => { e.stopPropagation(); handleApprove(post.id); }}
+                        sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
+                      >
                         Aprobar
                       </Button>
                     </ProtectedAction>
@@ -151,7 +208,12 @@ export default function PostsApprovalPage() {
             El cliente rechazó estas publicaciones con comentarios. Corrígelas y reenvíalas.
           </Alert>
           {rejectedPosts.map((post) => (
-            <Card key={post.id} elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2 }}>
+            <Card
+              key={post.id}
+              elevation={0}
+              onClick={() => router.push(`/posts/${post.id}`)}
+              sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
+            >
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
@@ -175,16 +237,22 @@ export default function PostsApprovalPage() {
                     </Typography>
                   </Box>
                 )}
-                <Stack direction="row" justifyContent="flex-end">
+                <Stack direction="row" justifyContent="flex-end" gap={1}>
+                  <Button
+                    size="small"
+                    startIcon={<VisibilityOutlinedIcon fontSize="small" />}
+                    onClick={(e) => { e.stopPropagation(); router.push(`/posts/${post.id}`); }}
+                    sx={{ color: 'secondary.main' }}
+                  >
+                    Ver detalle
+                  </Button>
                   <ProtectedAction module="post" action="create">
-                    <Button
+                    <PrimaryButton
                       size="small"
-                      variant="contained"
-                      sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-                      onClick={() => router.push('/posts/new')}
+                      onClick={(e) => { e.stopPropagation(); router.push('/posts/new'); }}
                     >
                       Editar y reenviar →
-                    </Button>
+                    </PrimaryButton>
                   </ProtectedAction>
                 </Stack>
               </CardContent>
@@ -199,6 +267,11 @@ export default function PostsApprovalPage() {
         onClose={() => setFeedback(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         message={feedback}
+      />
+      <RejectPostDialog
+        open={!!rejectTargetId}
+        onClose={() => setRejectTargetId(null)}
+        onConfirm={handleConfirmReject}
       />
     </Box>
   );

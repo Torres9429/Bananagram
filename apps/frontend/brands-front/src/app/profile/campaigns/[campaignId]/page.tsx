@@ -18,7 +18,7 @@ import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { StatusChip, usePermissions, selectUser } from '@repo/ui';
+import { StatusChip, usePermissions, selectUser, PrimaryButton } from '@repo/ui';
 import {
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
@@ -88,7 +88,7 @@ export default function ProfileCampaignDetailPage() {
           <Button
             variant="outlined"
             startIcon={<ArticleOutlinedIcon />}
-            onClick={() => router.push(`/profile/campaigns/${campaign.id}/posts`)}
+            onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts?campaign=${campaign.id}`; }}
             sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
           >
             Ver todas las publicaciones
@@ -114,14 +114,12 @@ export default function ProfileCampaignDetailPage() {
             </Button>
           )}
           {can('post', 'create') && (
-            <Button
-              variant="contained"
+            <PrimaryButton
               startIcon={<AddCircleOutlineIcon />}
               onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/new`; }}
-              sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
             >
               Crear publicación
-            </Button>
+            </PrimaryButton>
           )}
         </Stack>
 
@@ -188,7 +186,7 @@ export default function ProfileCampaignDetailPage() {
             {posts.length > 3 && (
               <Typography
                 variant="caption"
-                onClick={() => router.push(`/profile/campaigns/${campaign.id}/posts`)}
+                onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts?campaign=${campaign.id}`; }}
                 sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}
               >
                 Ver todas →

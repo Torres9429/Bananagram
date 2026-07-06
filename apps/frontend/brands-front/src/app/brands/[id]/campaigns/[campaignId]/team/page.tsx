@@ -7,7 +7,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Paper from '@mui/material/Paper';
@@ -15,7 +14,7 @@ import Alert from '@mui/material/Alert';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction } from '@repo/ui';
+import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction, PrimaryButton } from '@repo/ui';
 import { CampaignTabs } from '../../../../../../components/CampaignTabs';
 import {
   MOCK_PROFILES,
@@ -84,15 +83,13 @@ export default function CampaignTeamPage() {
             </Typography>
           </Box>
           <ProtectedAction module="post" action="schedule">
-            <Button
-              variant="contained"
+            <PrimaryButton
               startIcon={<PersonAddOutlinedIcon />}
               onClick={() => setAddOpen(true)}
               disabled={availableDesigners.length === 0}
-              sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
             >
               Agregar Diseñador
-            </Button>
+            </PrimaryButton>
           </ProtectedAction>
         </Stack>
 

@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
@@ -15,7 +14,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, PieChart, Pie, Cell,
 } from 'recharts';
-import { StatusChip, WidgetCard } from '@repo/ui';
+import { StatusChip, WidgetCard, PrimaryButton } from '@repo/ui';
 import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, MOCK_POSTS_BY_NETWORK, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -30,14 +29,12 @@ export function DashboardCM() {
           <Typography variant="h5" fontWeight={700}>Hola, {MOCK_DASHBOARD.cmName} 👋</Typography>
           <Typography variant="body2" color="text.secondary">Resumen de tu actividad como Community Manager</Typography>
         </Box>
-        <Button
-          variant="contained"
+        <PrimaryButton
           endIcon={<ArrowForwardIcon />}
           onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts`; }}
-          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
         >
           Ir a Publicaciones
-        </Button>
+        </PrimaryButton>
       </Stack>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -12,7 +12,7 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
-import { WidgetCard } from '@repo/ui';
+import { WidgetCard, PrimaryButton } from '@repo/ui';
 import { MOCK_ADMIN_DASHBOARD } from '../../lib/mock-dashboard';
 
 const ADMIN_FRONT_URL = 'http://localhost:3010';
@@ -33,14 +33,12 @@ export function DashboardAdmin() {
             Vista general del sistema — {users.total} usuarios registrados
           </Typography>
         </Box>
-        <Button
-          variant="contained"
+        <PrimaryButton
           startIcon={<PersonAddOutlinedIcon />}
           onClick={() => nav('/users')}
-          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
         >
           Crear usuario
-        </Button>
+        </PrimaryButton>
       </Stack>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

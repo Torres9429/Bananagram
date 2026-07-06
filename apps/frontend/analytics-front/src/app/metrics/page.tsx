@@ -122,7 +122,7 @@ export default function MetricsPage() {
           <CampaignComparison />
           <TrendAnalysis />
           <PostingHeatMap />
-          <ActivityTimeline />
+          {/* <ActivityTimeline /> */}
           <AudienceOverview />
         </>
       )}

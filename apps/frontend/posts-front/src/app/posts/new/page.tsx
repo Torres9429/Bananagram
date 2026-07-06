@@ -18,6 +18,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { PrimaryButton } from '@repo/ui';
 import {
   CHAR_LIMITS,
   MOCK_CAMPAIGNS,
@@ -217,14 +218,12 @@ export default function NewPostPage() {
               >
                 Guardar borrador
               </Button>
-              <Button
-                variant="contained"
+              <PrimaryButton
                 disabled={!content.trim() || !selectedProfile}
-                sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
                 onClick={() => router.push('/posts/approvals')}
               >
                 Enviar a revisión →
-              </Button>
+              </PrimaryButton>
             </Stack>
           </Paper>
         </Grid>

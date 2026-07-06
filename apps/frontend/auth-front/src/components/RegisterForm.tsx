@@ -171,7 +171,7 @@ export function RegisterForm() {
         >
           <Box sx={{ mt: 1, mb: 1.5 }}>
             <Typography variant="subtitle2" color="text.secondary" mb={1}>
-              ¿Qué tipo de perfil vas a gestionar?
+              ¿Qué tipo de perfil quieres crear?
             </Typography>
             <ToggleButtonGroup
               value={profileType}

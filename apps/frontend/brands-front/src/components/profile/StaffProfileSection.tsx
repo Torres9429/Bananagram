@@ -5,12 +5,11 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Alert from '@mui/material/Alert';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { LabeledField, ProfileCompletenessBadge, AvailabilityToggle } from '@repo/ui';
+import { LabeledField, ProfileCompletenessBadge, AvailabilityToggle, PrimaryButton } from '@repo/ui';
 import { MOCK_CATEGORIES, MOCK_SPECIALTIES } from '../../lib/mock-data';
 import type { Availability, MockAvailableCM, MockAvailableDesigner } from '../../lib/mock-data';
 
@@ -149,13 +148,9 @@ export function StaffProfileSection({ mockProfile, name, onNameChange }: StaffPr
                 })}
               </Box>
 
-              <Button
-                variant="contained"
-                onClick={handleSave}
-                sx={{ alignSelf: 'flex-end', bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-              >
+              <PrimaryButton onClick={handleSave} sx={{ alignSelf: 'flex-end' }}>
                 Guardar cambios
-              </Button>
+              </PrimaryButton>
             </Stack>
           </Paper>
         </div>

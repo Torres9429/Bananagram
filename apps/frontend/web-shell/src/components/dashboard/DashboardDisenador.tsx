@@ -4,14 +4,13 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
 import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import PublishedWithChangesOutlinedIcon from '@mui/icons-material/PublishedWithChangesOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import { StatusChip, WidgetCard, EmptyState } from '@repo/ui';
+import { StatusChip, WidgetCard, EmptyState, PrimaryButton } from '@repo/ui';
 import { MOCK_DISENADOR_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -30,11 +29,10 @@ export function DashboardDisenador() {
             {hasCampaigns ? `Participas en ${assignedCampaigns.length} campaña${assignedCampaigns.length > 1 ? 's' : ''} activa${assignedCampaigns.length > 1 ? 's' : ''}` : 'Aún no tienes campañas asignadas'}
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddCircleOutlineIcon />}
-          onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/new`; }}
-          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+        <PrimaryButton startIcon={<AddCircleOutlineIcon />}
+          onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/new`; }}>
           Nueva publicación
-        </Button>
+        </PrimaryButton>
       </Stack>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

@@ -80,7 +80,7 @@ export function PostPreviewDialog({
           <CloseIcon fontSize="large" />
         </IconButton>
       </DialogTitle>
-      <DialogContent sx={{ pt: 3 }}>
+      <DialogContent sx={{ pt: 3, mt: 2 }}>
         {status && (
           <Box mb={2}>
             <StatusChip status={status} />
