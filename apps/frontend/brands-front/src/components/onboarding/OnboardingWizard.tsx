@@ -16,6 +16,7 @@ import MuiStepper from '@mui/material/Stepper';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Image from 'next/image';
+import { PrimaryButton } from '@repo/ui';
 import {
   MOCK_PROFILES,
   MOCK_CAMPAIGNS,
@@ -200,22 +201,13 @@ export function OnboardingWizard() {
             </Button>
 
             {isLastStep ? (
-              <Button
-                variant="contained"
-                onClick={handleFinish}
-                sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-              >
+              <PrimaryButton onClick={handleFinish}>
                 Ir a mi perfil →
-              </Button>
+              </PrimaryButton>
             ) : (
-              <Button
-                variant="contained"
-                disabled={!canAdvance()}
-                onClick={handleNext}
-                sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' }, '&:disabled': { bgcolor: '#E8E8E8', color: '#AAAAAA' } }}
-              >
+              <PrimaryButton disabled={!canAdvance()} onClick={handleNext}>
                 Siguiente →
-              </Button>
+              </PrimaryButton>
             )}
           </Stack>
         </Box>

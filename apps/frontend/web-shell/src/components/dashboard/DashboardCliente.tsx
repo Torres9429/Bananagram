@@ -4,14 +4,13 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
-import { ScoreGauge, StatusChip, WidgetCard } from '@repo/ui';
+import { ScoreGauge, StatusChip, WidgetCard, PrimaryButton } from '@repo/ui';
 import { MOCK_CLIENTE_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -27,16 +26,15 @@ export function DashboardCliente() {
           <Typography variant="h5" fontWeight={700}>{brandName}</Typography>
           <Typography variant="body2" color="text.secondary">Panel de tu perfil · {activeCampaigns} campañas activas</Typography>
         </Box>
-        <Button variant="contained" onClick={() => { window.location.href = `${BRANDS_FRONT_URL}/profile`; }}
-          sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+        <PrimaryButton onClick={() => { window.location.href = `${BRANDS_FRONT_URL}/profile`; }}>
           Ver mi perfil →
-        </Button>
+        </PrimaryButton>
       </Stack>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <WidgetCard icon={<RateReviewOutlinedIcon />} label="Pendientes de aprobación" value={pendingApprovals} iconBg={pendingApprovals > 0 ? '#FFF3E0' : '#F5F5F5'} iconColor={pendingApprovals > 0 ? '#E65100' : '#9E9E9E'} />
         <WidgetCard icon={<CampaignOutlinedIcon />} label="Campañas activas" value={activeCampaigns} />
-        <WidgetCard icon={<InsightsOutlinedIcon />} label="Alcance últimas 24h" value={metrics24h.reach.toLocaleString()} />
+        <WidgetCard icon={<InsightsOutlinedIcon />} label="Alcance últimas 24h" value={metrics24h.reach.toLocaleString('es-MX')} />
         <WidgetCard icon={<TrendingUpOutlinedIcon />} label="Engagement 24h" value={`${metrics24h.engagement}%`} />
       </div>
 

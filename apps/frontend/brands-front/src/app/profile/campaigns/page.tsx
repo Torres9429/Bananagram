@@ -7,11 +7,10 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { selectUser } from '@repo/ui';
+import { selectUser, PrimaryButton } from '@repo/ui';
 import { CreateCampaignDialog } from '../../../components/CreateCampaignDialog';
 import {
   MOCK_CAMPAIGNS,
@@ -44,13 +43,9 @@ export default function ProfileCampaignsPage() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Campañas — {profile.name}</Typography>
-          <Button
-            variant="contained"
-            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-            onClick={() => setCreateOpen(true)}
-          >
+          <PrimaryButton onClick={() => setCreateOpen(true)}>
             + Nueva campaña
-          </Button>
+          </PrimaryButton>
         </Stack>
         <Stack gap={1.5}>
           {campaigns.map((c) => {

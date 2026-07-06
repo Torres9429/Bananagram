@@ -1,19 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
-import { DataTable, type DataTableColumn, StatusChip, ProtectedAction } from '@repo/ui';
-import { MOCK_POSTS, getPostNetworkInfo, type MockPost, type PostStatus } from '../../lib/mock-data';
+import { DataTable, type DataTableColumn, StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui';
+import { MOCK_POSTS, MOCK_CAMPAIGNS, getPostNetworkInfo, type MockPost, type PostStatus } from '../../lib/mock-data';
 import { NetworkAvatar } from '../../components/NetworkAvatar';
 import { CampaignDot } from '../../components/CampaignDot';
 import { PostsTabs } from '../../components/PostsTabs';
@@ -28,10 +29,40 @@ const FILTERS: { key: 'all' | PostStatus; label: string }[] = [
 
 export default function PostsListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [filter, setFilter] = useState<'all' | PostStatus>('all');
+  // Sembrado desde ?campaign=<id> (llegada desde "Ver publicaciones" en el
+  // detalle de campaña de brands-front) — mismo patrón ya usado por
+  // auth-front/ActivateForm para leer un param una sola vez al montar.
+  // Después de eso vive solo en estado local; limpiar el filtro no navega.
+  const [campaignFilter, setCampaignFilter] = useState<string | null>(() => searchParams.get('campaign'));
 
-  const posts = filter === 'all' ? MOCK_POSTS : MOCK_POSTS.filter((p) => p.status === filter);
+  const campaignName = campaignFilter
+    ? MOCK_POSTS.find((p) => p.campaign?.id === campaignFilter)?.campaign?.name ?? campaignFilter
+    : null;
+
+  // Puede llegar un campaignId que no esté en el catálogo local de campañas
+  // de posts-front (cada microfrontend tiene su propio mock) — se agrega como
+  // opción extra para que el select nunca quede en blanco.
+  const campaignOptions =
+    campaignFilter && !MOCK_CAMPAIGNS.some((c) => c.id === campaignFilter)
+      ? [...MOCK_CAMPAIGNS, { id: campaignFilter, name: campaignName ?? campaignFilter, color: '#6B6B6B', brand: '' }]
+      : MOCK_CAMPAIGNS;
+
+  const posts = MOCK_POSTS
+    .filter((p) => filter === 'all' || p.status === filter)
+    .filter((p) => !campaignFilter || p.campaign?.id === campaignFilter);
   const rejectedCount = MOCK_POSTS.filter((p) => p.status === 'rechazado').length;
+
+  function handleClearCampaignFilter() {
+    setCampaignFilter(null);
+    router.replace('/posts');
+  }
+
+  function handleCampaignSelectChange(value: string) {
+    setCampaignFilter(value || null);
+    router.replace(value ? `/posts?campaign=${value}` : '/posts');
+  }
 
   const columns: DataTableColumn<MockPost>[] = [
     {
@@ -117,8 +148,35 @@ export default function PostsListPage() {
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh' }}>
       <PostsTabs />
       <Box sx={{ p: 3 }}>
+      {/* Contexto — solo cuando llega con una campaña preseleccionada (§3):
+          no es breadcrumb ni tab, solo un chip removible sobre la tabla. */}
+      {campaignName && (
+        <Stack direction="row" alignItems="center" gap={1} mb={2}>
+          <Typography variant="body2" color="text.secondary">Mostrando publicaciones de:</Typography>
+          <Chip
+            label={campaignName}
+            onDelete={handleClearCampaignFilter}
+            size="small"
+            sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }}
+          />
+        </Stack>
+      )}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-        <Stack direction="row" gap={1} flexWrap="wrap">
+        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center">
+          {/* Select de Campaña, siempre visible — no solo cuando llega
+              preseleccionada desde el detalle de campaña. */}
+          <Select
+            size="small"
+            displayEmpty
+            value={campaignFilter ?? ''}
+            onChange={(e) => handleCampaignSelectChange(e.target.value)}
+            sx={{ minWidth: 180, bgcolor: '#fff', borderRadius: 1 }}
+          >
+            <MenuItem value="">Todas las campañas</MenuItem>
+            {campaignOptions.map((c) => (
+              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+            ))}
+          </Select>
           {FILTERS.map((f) => {
             const active = filter === f.key;
             return (
@@ -139,13 +197,9 @@ export default function PostsListPage() {
           })}
         </Stack>
         <ProtectedAction module="post" action="create">
-          <Button
-            variant="contained"
-            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-            onClick={() => router.push('/posts/new')}
-          >
+          <PrimaryButton onClick={() => router.push('/posts/new')}>
             + Nueva publicación
-          </Button>
+          </PrimaryButton>
         </ProtectedAction>
       </Stack>
 

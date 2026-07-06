@@ -30,8 +30,14 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.
   { key: 'brands', label: 'Marcas', href: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: 'brands', action: 'manage' }] },
-  { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', icon: <CampaignIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
-  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
+  // activeMatchPrefixes: el detalle/equipo/publicaciones de una campaña vive
+  // en /profile/campaigns/*, que no tiene su propio ítem de nav — sin esto,
+  // ningún ítem quedaba activo al entrar al detalle de una campaña.
+  { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', activeMatchPrefixes: ['/profile/campaigns'], icon: <CampaignIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
+  // Cliente no tiene ítem "Mis Campañas" propio (no tiene campaigns:view-own)
+  // — sus campañas se navegan desde /profile, así que activeMatchPrefixes
+  // cubre /profile/campaigns/* aquí para que "Mi perfil" quede activo ahí.
+  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, activeMatchPrefixes: ['/profile/campaigns'], icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
   // Calendario (fase UX): mismo par de permisos ya usado por "Mi perfil"/"Team"
   // — Cliente (campaigns:create) o CM/Diseñador (campaigns:view-own). No es un
   // permiso nuevo. Admin queda excluido igual que el resto vía isAdmin, abajo.

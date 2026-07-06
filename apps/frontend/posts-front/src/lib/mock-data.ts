@@ -212,6 +212,14 @@ export const MOCK_STATUS_HISTORY: Record<string, StatusHistoryItem[]> = {
   ],
 };
 
+// Agrega una entrada al historial de una publicación — mismo patrón que
+// assignTeamToCampaign en brands-front (mutación directa del mock compartido,
+// sin backend real). Se usa desde /posts/[id] y /posts/approvals para que el
+// motivo de rechazo quede visible sin importar desde dónde se rechazó.
+export function addStatusHistoryEntry(postId: string, entry: StatusHistoryItem) {
+  MOCK_STATUS_HISTORY[postId] = [entry, ...(MOCK_STATUS_HISTORY[postId] ?? [])];
+}
+
 export const CHAR_LIMITS: Record<string, number> = {
   IG: 2200,
   TK: 2200,

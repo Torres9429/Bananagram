@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
+import { PrimaryButton } from '@repo/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { CreateCampaignDialog } from '../../../../components/CreateCampaignDialog';
 import {
@@ -30,13 +30,9 @@ export default function CampaignsPage() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Campañas — {brand.name}</Typography>
-          <Button
-            variant="contained"
-            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-            onClick={() => setCreateOpen(true)}
-          >
+          <PrimaryButton onClick={() => setCreateOpen(true)}>
             + Nueva campaña
-          </Button>
+          </PrimaryButton>
         </Stack>
         <Stack gap={1.5}>
           {campaigns.map((c) => {

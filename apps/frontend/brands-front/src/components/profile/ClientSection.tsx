@@ -18,7 +18,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { EmptyState, FormDialog, LabeledField, LabeledSelect, ScoreGauge, selectUser } from '@repo/ui';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, ScoreGauge, selectUser, PrimaryButton } from '@repo/ui';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CampaignCard } from '../campaigns/CampaignCard';
 import {
@@ -203,28 +203,22 @@ export function ClientSection() {
       <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="subtitle1" fontWeight={700}>Campañas</Typography>
-          <Button
+          <PrimaryButton
             size="small"
-            variant="contained"
             startIcon={<AddCircleOutlineIcon />}
             onClick={() => setCreateCampaignOpen(true)}
-            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
           >
             Crear nueva campaña
-          </Button>
+          </PrimaryButton>
         </Stack>
         {campaigns.length === 0 ? (
           <EmptyState
             title="Aún no tienes campañas"
             description="Crea tu primera campaña para empezar a coordinar contenido con tu equipo."
             action={
-              <Button
-                variant="contained"
-                onClick={() => setCreateCampaignOpen(true)}
-                sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-              >
+              <PrimaryButton onClick={() => setCreateCampaignOpen(true)}>
                 Crear primera campaña
-              </Button>
+              </PrimaryButton>
             }
           />
         ) : (

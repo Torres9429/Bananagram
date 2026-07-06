@@ -20,7 +20,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { LabeledSelect, LabeledField, STATUS_LABELS } from '@repo/ui';
+import { LabeledSelect, LabeledField, STATUS_LABELS, PrimaryButton } from '@repo/ui';
 import {
   clearAllFilters,
   selectCampaign,
@@ -274,9 +274,9 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
           <Button fullWidth variant="outlined" onClick={() => dispatch(clearAllFilters())} sx={{ color: '#7A5C00', borderColor: '#E8E8E8' }}>
             Limpiar filtros
           </Button>
-          <Button fullWidth variant="contained" onClick={onClose} sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+          <PrimaryButton fullWidth onClick={onClose}>
             Ver resultados
-          </Button>
+          </PrimaryButton>
         </Stack>
       </Box>
     </Drawer>

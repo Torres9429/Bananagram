@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSelector } from 'react-redux';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -13,8 +14,9 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { StatusChip, ProtectedAction } from '@repo/ui';
-import { MOCK_POSTS, MOCK_STATUS_HISTORY, getPostNetworkInfo } from '../../../lib/mock-data';
+import { StatusChip, ProtectedAction, PrimaryButton, selectUser, findUserByEmail } from '@repo/ui';
+import { MOCK_POSTS, MOCK_STATUS_HISTORY, addStatusHistoryEntry, getPostNetworkInfo, type StatusHistoryItem } from '../../../lib/mock-data';
+import { RejectPostDialog } from '../../../components/RejectPostDialog';
 
 const NETWORK_NAMES: Record<string, string> = {
   IG: 'Instagram',
@@ -31,15 +33,32 @@ export default function PostDetailPage() {
   // Mock: estado local, sin persistencia — mismo patrón ya usado en
   // /posts/approvals y en ClientSection.tsx (brands-front).
   const [post, setPost] = useState(() => MOCK_POSTS.find((p) => p.id === params.id) ?? MOCK_POSTS.find((p) => p.id === 'p2')!);
-  const history = MOCK_STATUS_HISTORY[post.id] ?? [];
+  const [history, setHistory] = useState<StatusHistoryItem[]>(() => MOCK_STATUS_HISTORY[post.id] ?? []);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const user = useSelector(selectUser);
   const { network, networkBg, networkColor } = getPostNetworkInfo(post);
 
   function handleApprove() {
     setPost((prev) => ({ ...prev, status: 'aprobado' }));
   }
 
-  function handleReject() {
-    setPost((prev) => ({ ...prev, status: 'rechazado' }));
+  // Rechazar pide motivo en un modal (§3) — el estado y el historial solo se
+  // actualizan al confirmar, nunca al abrir el modal.
+  function handleConfirmReject(reason: string) {
+    const actor = findUserByEmail(user?.email ?? '')?.name ?? user?.email ?? 'Cliente';
+    const entry: StatusHistoryItem = {
+      status: 'rechazado',
+      label: 'Rechazado',
+      color: '#C62828',
+      actor,
+      role: 'Cliente',
+      date: new Date().toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+      comment: reason,
+    };
+    addStatusHistoryEntry(post.id, entry);
+    setHistory((prev) => [entry, ...prev]);
+    setPost((prev) => ({ ...prev, status: 'rechazado', rejectionReason: reason }));
+    setRejectOpen(false);
   }
 
   return (
@@ -127,13 +146,9 @@ export default function PostDetailPage() {
                 </Button>
               </ProtectedAction>
               <ProtectedAction module="post" action="create">
-                <Button
-                  variant="contained"
-                  sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-                  onClick={() => router.push('/posts/new')}
-                >
+                <PrimaryButton onClick={() => router.push('/posts/new')}>
                   Enviar a revisión →
-                </Button>
+                </PrimaryButton>
               </ProtectedAction>
               <ProtectedAction module="post" action="schedule">
                 <Button variant="contained" sx={{ bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}>
@@ -141,7 +156,7 @@ export default function PostDetailPage() {
                 </Button>
               </ProtectedAction>
               <ProtectedAction module="post" action="reject">
-                <Button variant="outlined" onClick={handleReject} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
                   Rechazar
                 </Button>
               </ProtectedAction>
@@ -165,7 +180,7 @@ export default function PostDetailPage() {
               Historial de estados
             </Typography>
             <Box sx={{ position: 'relative', pl: 2.5 }}>
-              <Box sx={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 1, bgcolor: '#E8E8E8' }} />
+              <Box sx={{ position: 'absolute', left: 7, top: 0, bottom: 0, width: 1, borderLeft: '1px solid #E8E8E8' }} />
               {history.map((item, i) => (
                 <Box key={i} sx={{ position: 'relative', mb: 2.5 }}>
                   <Box
@@ -240,6 +255,8 @@ export default function PostDetailPage() {
           </Paper>
         </Grid>
       </Grid>
+
+      <RejectPostDialog open={rejectOpen} onClose={() => setRejectOpen(false)} onConfirm={handleConfirmReject} />
     </Box>
   );
 }

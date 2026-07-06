@@ -21,7 +21,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
-import { EmptyState, ConfirmDialog, WidgetCard, usePermissions } from '@repo/ui';
+import { EmptyState, ConfirmDialog, WidgetCard, usePermissions, PrimaryButton } from '@repo/ui';
 import { AdminTabs } from '../../components/AdminTabs';
 
 // Privilegios reales del sistema (AppModule × AppAction).
@@ -181,13 +181,9 @@ export default function RolesPage() {
             >
               Restaurar rol
             </Button>
-            <Button
-              variant="contained"
-              onClick={handleSave}
-              sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-            >
+            <PrimaryButton onClick={handleSave}>
               Guardar cambios
-            </Button>
+            </PrimaryButton>
           </Stack>
         </Stack>
 

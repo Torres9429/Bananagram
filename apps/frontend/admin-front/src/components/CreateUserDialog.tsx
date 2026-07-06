@@ -11,13 +11,12 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
-import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import CloseIcon from '@mui/icons-material/Close';
-import { FormDialog, LabeledField, LabeledSelect } from '@repo/ui';
+import { FormDialog, LabeledField, LabeledSelect, PrimaryButton } from '@repo/ui';
 import type { MockUser } from '../lib/mock-data';
 
 // El Admin solo crea cuentas operativas (CM y Diseñador).
@@ -137,13 +136,9 @@ export function CreateUserDialog({ open, onClose, onCreate }: Props) {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            variant="contained"
-            onClick={handleClose}
-            sx={{ bgcolor: '#E0A800', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-          >
+          <PrimaryButton onClick={handleClose}>
             Listo
-          </Button>
+          </PrimaryButton>
         </DialogActions>
       </Dialog>
     );

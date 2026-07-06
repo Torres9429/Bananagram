@@ -27,6 +27,12 @@ export interface SidebarNavItem {
   // exactMatch evita que ese ítem se marque activo por coincidencia de
   // prefijo — solo se activa en una coincidencia exacta de ruta.
   exactMatch?: boolean;
+  // Prefijos adicionales que también activan este ítem, siempre por
+  // coincidencia de prefijo (independiente de exactMatch) — para sub-rutas
+  // que no tienen su propio ítem de navegación pero pertenecen a este (ej.
+  // "Mis Campañas" también activo en /profile/campaigns/*, aunque su href
+  // sea /my-campaigns).
+  activeMatchPrefixes?: string[];
 }
 
 interface SidebarNavProps {
@@ -110,9 +116,13 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
         <List sx={{ px: collapsed ? 1 : 1.5, pt: 0, flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {items.map((item) => {
             const matchHref = item.activeMatch ?? item.href;
-            const active = item.exactMatch
+            const primaryActive = item.exactMatch
               ? activeHref === matchHref
               : activeHref === matchHref || activeHref.startsWith(`${matchHref}/`);
+            const prefixActive = (item.activeMatchPrefixes ?? []).some(
+              (p) => activeHref === p || activeHref.startsWith(`${p}/`),
+            );
+            const active = primaryActive || prefixActive;
             const button = (
               <ListItemButton
                 key={item.key}
