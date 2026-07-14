@@ -10,7 +10,8 @@ import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
-import { ScoreGauge, StatusChip, WidgetCard, PrimaryButton } from '@repo/ui';
+import { ScoreGauge, StatusChip, WidgetCard, PrimaryButton } from '@repo/ui/ui';
+import { getInitials } from '@repo/ui/utils';
 import { MOCK_CLIENTE_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -86,7 +87,7 @@ export function DashboardCliente() {
               {team.map((member) => (
                 <Stack key={member.id} direction="row" gap={1.5} alignItems="center" sx={{ minWidth: 200 }}>
                   <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 36, height: 36, fontSize: 13, fontWeight: 700 }}>
-                    {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                    {getInitials(member.name)}
                   </Avatar>
                   <Box>
                     <Typography variant="body2" fontWeight={600}>{member.name}</Typography>

@@ -1,4 +1,4 @@
-import type { BrandScore } from '@repo/ui';
+import type { BrandScore } from '@repo/ui/types';
 
 export interface MockEngagementPoint {
   day: string;

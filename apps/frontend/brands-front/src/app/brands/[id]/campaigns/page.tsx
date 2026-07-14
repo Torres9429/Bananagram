@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import { PrimaryButton } from '@repo/ui';
+import { PrimaryButton } from '@repo/ui/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { CreateCampaignDialog } from '../../../../components/CreateCampaignDialog';
 import {

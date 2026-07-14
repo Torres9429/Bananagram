@@ -8,7 +8,7 @@ import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { StatusChip } from '@repo/ui';
+import { StatusChip } from '@repo/ui/ui';
 import { selectPost } from '../../store/analyticsFilters.slice';
 import { selectSelectedPostDetail } from '../../store/analytics.selectors';
 import { NETWORK_DISPLAY, NETWORK_METRIC_FIELDS } from '../../lib/analytics/network-config';
@@ -29,7 +29,7 @@ export function SelectedPostDetail() {
   const specificEntries = fieldLabels.filter((field) => field.key in specific);
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Stack direction="row" alignItems="center" gap={1.5} mb={2}>
         <Button size="small" startIcon={<ArrowBackIcon fontSize="small" />} onClick={() => dispatch(selectPost(null))} sx={{ color: 'secondary.main' }}>
           Volver

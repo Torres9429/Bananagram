@@ -19,7 +19,8 @@ import { Calendar, dateFnsLocalizer, type EventProps, type Messages } from 'reac
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { LabeledField, LabeledSelect, PostPreviewDialog, WidgetCard, STATUS_LABELS, STATUS_COLORS, usePermissions, selectUser } from '@repo/ui';
+import { LabeledField, LabeledSelect, PostPreviewDialog, WidgetCard, STATUS_LABELS, STATUS_COLORS, usePermissions } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
 import {
   MOCK_CAMPAIGNS,
   MOCK_CALENDAR_EVENTS,
@@ -213,12 +214,12 @@ export default function ProfileCalendarPage() {
             <WidgetCard icon={<ShareOutlinedIcon />} label="Redes usadas" value={networksUsedCount} iconBg="#E3F2FD" iconColor="#1565C0" />
           </Grid>
           <Grid item xs={12} sm={6} lg={3}>
-            <WidgetCard icon={<UpcomingOutlinedIcon />} label="Próxima publicación" value={nextEventLabel} iconBg="#FFF8E1" iconColor="#7A5C00" />
+            <WidgetCard icon={<UpcomingOutlinedIcon />} label="Próxima publicación" value={nextEventLabel} iconBg="primary.light" iconColor="#7A5C00" />
           </Grid>
         </Grid>
 
         {/* Filtros — toolbar */}
-        <Paper elevation={0} sx={{ p: 2.5, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+        <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} mb={2}>
             <Stack direction="row" alignItems="center" gap={1}>
               <FilterAltOutlinedIcon fontSize="small" sx={{ color: 'secondary.main' }} />
@@ -298,7 +299,8 @@ export default function ProfileCalendarPage() {
         <Paper
           elevation={0}
           sx={{
-            border: '1px solid #E8E8E8',
+            border: '1px solid',
+            borderColor: 'divider',
             borderRadius: 3,
             p: 2,
             height: 640,
@@ -307,19 +309,20 @@ export default function ProfileCalendarPage() {
             '& .rbc-toolbar': { flexWrap: 'wrap', gap: 1, mb: 2 },
             '& .rbc-toolbar button': {
               borderRadius: 2,
-              border: '1px solid #E8E8E8',
+              border: '1px solid',
+              borderColor: 'divider',
               color: '#1A1A1A',
               textTransform: 'none',
               fontWeight: 600,
             },
-            '& .rbc-toolbar button:hover': { bgcolor: '#FFF8E1', borderColor: '#E0A800' },
-            '& .rbc-toolbar button.rbc-active': { bgcolor: '#E0A800', color: '#7A5C00', borderColor: '#E0A800' },
+            '& .rbc-toolbar button:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' },
+            '& .rbc-toolbar button.rbc-active': { bgcolor: 'primary.main', color: '#7A5C00', borderColor: 'primary.main' },
             '& .rbc-toolbar-label': { fontWeight: 700, fontSize: 16 },
-            '& .rbc-header': { py: 1, fontWeight: 700, fontSize: 12, borderColor: '#E8E8E8' },
-            '& .rbc-month-view, & .rbc-time-view': { borderColor: '#E8E8E8', borderRadius: 2, overflow: 'hidden' },
+            '& .rbc-header': { py: 1, fontWeight: 700, fontSize: 12, borderColor: 'divider' },
+            '& .rbc-month-view, & .rbc-time-view': { borderColor: 'divider', borderRadius: 2, overflow: 'hidden' },
             '& .rbc-day-bg + .rbc-day-bg, & .rbc-header + .rbc-header': { borderColor: '#F0F0F0' },
             '& .rbc-off-range-bg': { bgcolor: '#FAFAFA' },
-            '& .rbc-today': { bgcolor: '#FFF8E1' },
+            '& .rbc-today': { bgcolor: 'primary.light' },
             '& .rbc-event': {
               border: 'none',
               borderRadius: 1.5,

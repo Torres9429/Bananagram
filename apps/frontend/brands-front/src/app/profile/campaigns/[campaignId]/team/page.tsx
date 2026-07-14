@@ -15,7 +15,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction, PrimaryButton } from '@repo/ui';
+import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
+import { getInitials } from '@repo/ui/utils';
 import {
   MOCK_CAMPAIGNS,
   MOCK_TEAM_BY_CAMPAIGN,
@@ -79,7 +80,7 @@ export default function ProfileCampaignTeamPage() {
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
-      <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', px: 1 }}>
+      <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#fff', px: 1 }}>
         <Stack direction="row" alignItems="center">
           <Tooltip title="Volver a la campaña">
             <IconButton onClick={() => router.push(`/profile/campaigns/${campaign.id}`)} sx={{ color: 'secondary.main', ml: 1, my: 0.5 }}>
@@ -118,16 +119,16 @@ export default function ProfileCampaignTeamPage() {
             <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: 'block', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Community Manager
             </Typography>
-            <Paper elevation={0} sx={{ p: 2, border: '1px solid #E8E8E8', borderRadius: 3 }}>
+            <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
               <Stack direction="row" gap={2} alignItems="center">
                 <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, fontWeight: 700 }}>
-                  {cm.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  {getInitials(cm.name)}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" fontWeight={700}>{cm.name}</Typography>
                   <Typography variant="caption" color="text.secondary">Coordinador de la campaña</Typography>
                 </Box>
-                <Chip size="small" label="CM" sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 700 }} />
+                <Chip size="small" label="CM" sx={{ bgcolor: 'primary.light', color: '#7A5C00', fontWeight: 700 }} />
               </Stack>
             </Paper>
           </Box>
@@ -145,10 +146,10 @@ export default function ProfileCampaignTeamPage() {
           ) : (
             <Stack gap={1.5}>
               {designers.map((member) => (
-                <Paper key={member.id} elevation={0} sx={{ p: 2, border: '1px solid #E8E8E8', borderRadius: 3 }}>
+                <Paper key={member.id} elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
                   <Stack direction="row" gap={2} alignItems="center">
                     <Avatar sx={{ bgcolor: member.avatarBg, color: member.avatarColor, fontWeight: 700 }}>
-                      {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                      {getInitials(member.name)}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" fontWeight={700}>{member.name}</Typography>
@@ -201,16 +202,18 @@ export default function ProfileCampaignTeamPage() {
                   onClick={() => setSelectedDesignerId(isSelected ? null : d.id)}
                   sx={{
                     p: 2,
-                    border: `2px solid ${isSelected ? '#E0A800' : '#E8E8E8'}`,
+                    borderWidth: 2,
+                    borderStyle: 'solid',
+                    borderColor: isSelected ? 'primary.main' : 'divider',
                     borderRadius: 3,
-                    bgcolor: isSelected ? '#FFF8E1' : '#fff',
+                    bgcolor: isSelected ? 'primary.light' : '#fff',
                     cursor: 'pointer',
-                    '&:hover': { borderColor: '#E0A800' },
+                    '&:hover': { borderColor: 'primary.main' },
                   }}
                 >
                   <Stack direction="row" gap={1.5} alignItems="center">
                     <Avatar sx={{ bgcolor: d.avatarBg, color: d.avatarColor, width: 40, height: 40, fontWeight: 700 }}>
-                      {d.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
+                      {getInitials(d.name)}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" fontWeight={700}>{d.name}</Typography>
@@ -220,7 +223,7 @@ export default function ProfileCampaignTeamPage() {
                         ))}
                       </Stack>
                     </Box>
-                    {isSelected && <CheckCircleOutlineIcon sx={{ color: '#E0A800' }} />}
+                    {isSelected && <CheckCircleOutlineIcon sx={{ color: 'primary.main' }} />}
                   </Stack>
                 </Paper>
               );

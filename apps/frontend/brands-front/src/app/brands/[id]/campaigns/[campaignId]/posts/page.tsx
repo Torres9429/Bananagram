@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { DataTable, type DataTableColumn, StatusChip } from '@repo/ui';
+import { DataTable, type DataTableColumn, StatusChip } from '@repo/ui/ui';
 import { CampaignTabs } from '../../../../../../components/CampaignTabs';
 import {
   MOCK_PROFILES,
@@ -39,7 +39,7 @@ export default function CampaignPostsPage() {
       <CampaignTabs brandId={brand.id} campaignId={campaign.id} backHref="/my-campaigns" />
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" fontWeight={700} mb={3}>Publicaciones — {campaign.name}</Typography>
-        <DataTable columns={columns} rows={posts} getRowKey={(p) => p.id} pagination initialPageSize={10} />
+        <DataTable columns={columns} rows={posts} getRowKey={(p) => p.id} pagination initialPageSize={10} emptyMessage="No hay publicaciones registradas para esta campaña." />
       </Box>
     </Box>
   );

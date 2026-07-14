@@ -10,7 +10,7 @@ import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
-import { MetricCard } from '@repo/ui';
+import { MetricCard } from '@repo/ui/ui';
 import { selectNetworkDashboard } from '../../store/analytics.selectors';
 
 /** Elige un ícono razonable según el nombre de la métrica — sin lógica de negocio, solo presentación. */
@@ -34,7 +34,7 @@ export function NetworkMetricCards() {
   if (!dashboard) return null;
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Métricas de la red</Typography>
       <Grid container spacing={2}>
         {dashboard.metrics.map((metric) => (

@@ -18,7 +18,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { PrimaryButton } from '@repo/ui';
+import { PrimaryButton } from '@repo/ui/ui';
 import {
   CHAR_LIMITS,
   MOCK_CAMPAIGNS,

@@ -17,14 +17,14 @@ import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import BrushOutlinedIcon from '@mui/icons-material/BrushOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
-import { LabeledField, LabeledSelect } from '@repo/ui';
+import { LabeledField, LabeledSelect } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
-import { setCredentials, findUserByEmail, buildTokenFromUser, setCookieToken } from '@repo/ui';
+import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
 import { MOCK_CATEGORIES, type ProfileType } from '../lib/mock-data';
 
 // Los 5 valores de ProfileType (§A.1 del análisis de dominio) — solo cambia cómo
-// se representa el perfil, nunca el flujo ni las capacidades (mismo principio ya
-// documentado para BrandType en brands-front/StepBrand.tsx).
+// se representa el perfil, nunca el flujo ni las capacidades.
 const PROFILE_TYPE_OPTIONS: { value: ProfileType; icon: typeof BusinessOutlinedIcon; label: string; example: string }[] = [
   { value: 'brand', icon: BusinessOutlinedIcon, label: 'Marca', example: 'Nike, Zara, Starbucks…' },
   { value: 'company', icon: ApartmentOutlinedIcon, label: 'Empresa', example: 'Consultora, estudio, agencia…' },

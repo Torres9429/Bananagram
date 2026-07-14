@@ -7,7 +7,7 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MenuItem from '@mui/material/MenuItem';
-import { EmptyState, LabeledSelect } from '@repo/ui';
+import { EmptyState, LabeledSelect } from '@repo/ui/ui';
 import { selectCampaignOptions, selectFactsForNetworkTabs } from '../../store/analytics.selectors';
 import { compareCampaigns } from '../../lib/analytics/engine';
 
@@ -33,14 +33,14 @@ export function CampaignComparison() {
 
   if (campaignOptions.length < 2) {
     return (
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
         <EmptyState title="Se necesitan al menos 2 campañas" description="Ajusta los filtros de perfil activos." />
       </Paper>
     );
   }
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparación entre campañas</Typography>
 
       <Grid container spacing={2} mb={2}>

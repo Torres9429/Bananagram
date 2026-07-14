@@ -1,2 +1,16 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-export default function Home() { redirect('http://localhost:3012/login'); }
+import { LandingTemplate } from '../components/landing/templates/LandingTemplate';
+
+const SESSION_COOKIE = 'bananagram_token';
+
+export default async function Home() {
+  const cookieStore = await cookies();
+  const hasSession = Boolean(cookieStore.get(SESSION_COOKIE)?.value);
+
+  if (hasSession) {
+    redirect('/dashboard');
+  }
+
+  return <LandingTemplate />;
+}

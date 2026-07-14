@@ -17,7 +17,7 @@ export function EngagementChart() {
   const engagementSeries = useSelector(selectEngagementTimeSeries);
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Engagement en el periodo filtrado</Typography>
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={engagementSeries}>

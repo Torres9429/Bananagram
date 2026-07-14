@@ -27,7 +27,7 @@ export function CampaignBreakdown() {
   const data = campaigns.map((c) => ({ campaignId: c.campaignId, campaignName: c.campaignName, reach: c.kpis.totalReach }));
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Rendimiento por campaña</Typography>
       <Typography variant="caption" color="text.secondary" mb={2} display="block">
         Clic en una barra para filtrar por esa campaña.

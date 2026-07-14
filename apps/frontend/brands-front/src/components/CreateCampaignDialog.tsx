@@ -11,7 +11,10 @@ import Avatar from '@mui/material/Avatar';
 import Checkbox from '@mui/material/Checkbox';
 import Divider from '@mui/material/Divider';
 import Alert from '@mui/material/Alert';
-import { selectUser, findUserByEmail, FormDialog, LabeledField, LabeledSelect } from '@repo/ui';
+import { FormDialog, LabeledField, LabeledSelect } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { getInitials } from '@repo/ui/utils';
+import { findUserByEmail } from '@repo/ui';
 import type { MockCampaign, CampaignStatus, MockTeamMember } from '../lib/mock-data';
 import { getAvailableCMsForCategory, getSocialAccountsByProfile, AVAILABLE_SOCIAL_NETWORKS } from '../lib/mock-data';
 
@@ -193,7 +196,7 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
                 }}
               >
                 <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 600 }}>
-                  {cm.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  {getInitials(cm.name)}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" fontWeight={600}>{cm.name}</Typography>
@@ -226,7 +229,7 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
               >
                 <Checkbox size="small" checked={designerIds.includes(d.id)} sx={{ p: 0.5 }} />
                 <Avatar sx={{ bgcolor: d.avatarBg, color: d.avatarColor, width: 28, height: 28, fontSize: 11, fontWeight: 600 }}>
-                  {d.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  {getInitials(d.name)}
                 </Avatar>
                 <Typography variant="body2">{d.name}</Typography>
               </Stack>

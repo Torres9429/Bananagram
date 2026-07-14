@@ -1,8 +1,8 @@
 'use client';
 
 import Box from '@mui/material/Box';
+import { TopBar } from '@repo/ui/ui';
 import { Sidebar } from './layout/Sidebar';
-import { TopBar } from './layout/TopBar';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (

@@ -1,4 +1,4 @@
-import type { PostStatus } from '@repo/ui';
+import type { PostStatus } from '@repo/ui/types';
 
 export interface MockCampaignSummary {
   id: string;

@@ -1,6 +1,6 @@
 'use client';
+import { TopBar } from '@repo/ui/ui';
 import { Sidebar } from '../../components/layout/Sidebar';
-import { TopBar } from '../../components/layout/TopBar';
 import Box from '@mui/material/Box';
 // RoleSwitcher desactivado: el login real (LoginForm + MOCK_USERS) es ahora
 // la única fuente de verdad de la sesión. El switcher escribía su propio

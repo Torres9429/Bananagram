@@ -1,8 +1,8 @@
 'use client';
 
 import { useSelector } from 'react-redux';
-import { selectUser } from '@repo/ui';
-import { AppRole } from '@repo/ui';
+import { selectUser } from '@repo/ui/state';
+import { AppRole } from '@repo/ui/types';
 import { DashboardAdmin } from '../../../components/dashboard/DashboardAdmin';
 import { DashboardCM } from '../../../components/dashboard/DashboardCM';
 import { DashboardCliente } from '../../../components/dashboard/DashboardCliente';

@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { authReducer, authApi } from '@repo/ui';
+import { authReducer, authApi } from '@repo/ui/state';
 import { analyticsFiltersReducer } from './analyticsFilters.slice';
 
 export const store = configureStore({

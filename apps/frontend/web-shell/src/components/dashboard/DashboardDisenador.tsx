@@ -10,7 +10,7 @@ import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import PublishedWithChangesOutlinedIcon from '@mui/icons-material/PublishedWithChangesOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import { StatusChip, WidgetCard, EmptyState, PrimaryButton } from '@repo/ui';
+import { StatusChip, WidgetCard, EmptyState, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_DISENADOR_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';

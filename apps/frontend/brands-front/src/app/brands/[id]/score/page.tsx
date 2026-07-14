@@ -7,7 +7,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
-import { ScoreGauge } from '@repo/ui';
+import { ScoreGauge } from '@repo/ui/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { MOCK_PROFILES } from '../../../../lib/mock-data';
 

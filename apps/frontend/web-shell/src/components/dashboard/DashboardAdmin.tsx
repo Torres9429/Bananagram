@@ -12,7 +12,7 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
-import { WidgetCard, PrimaryButton } from '@repo/ui';
+import { WidgetCard, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_ADMIN_DASHBOARD } from '../../lib/mock-dashboard';
 
 const ADMIN_FRONT_URL = 'http://localhost:3010';

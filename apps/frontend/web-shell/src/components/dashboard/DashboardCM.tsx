@@ -14,7 +14,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, PieChart, Pie, Cell,
 } from 'recharts';
-import { StatusChip, WidgetCard, PrimaryButton } from '@repo/ui';
+import { StatusChip, WidgetCard, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, MOCK_POSTS_BY_NETWORK, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';

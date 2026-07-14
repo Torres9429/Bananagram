@@ -6,7 +6,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
-import { DataTable, type DataTableColumn, FormDialog, LabeledField } from '@repo/ui';
+import { DataTable, type DataTableColumn, FormDialog, LabeledField } from '@repo/ui/ui';
 import { AdminTabs } from './AdminTabs';
 import type { MockCatalogItem } from '../lib/mock-data';
 
@@ -47,7 +47,7 @@ export function CatalogList({ title, items }: Props) {
             + Agregar
           </Button>
         </Stack>
-        <DataTable columns={columns} rows={list} getRowKey={(item) => item.id} />
+        <DataTable columns={columns} rows={list} getRowKey={(item) => item.id} emptyMessage={`Sin elementos en ${title.toLowerCase()}.`} />
       </Box>
 
       <FormDialog

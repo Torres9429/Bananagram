@@ -7,9 +7,10 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
-import { LabeledField } from '@repo/ui';
+import { LabeledField } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
-import { setCredentials, findUserByCredentials, buildTokenFromUser, setCookieToken } from '@repo/ui';
+import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { findUserByCredentials, buildTokenFromUser } from '@repo/ui';
 
 const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
 

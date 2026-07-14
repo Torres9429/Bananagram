@@ -12,7 +12,8 @@ import Chip from '@mui/material/Chip';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
 import { PasswordField } from './PasswordField';
-import { setCredentials, findUserByEmail, buildTokenFromUser, setCookieToken } from '@repo/ui';
+import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
 
 // useSearchParams se usa SOLO para leer el email del enlace de activación
 // (no para sesión). La sesión se establece mediante la cookie.

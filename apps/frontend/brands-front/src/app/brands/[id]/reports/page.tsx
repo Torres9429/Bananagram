@@ -9,7 +9,8 @@ import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Alert from '@mui/material/Alert';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import { downloadBlob, ProtectedAction } from '@repo/ui';
+import { ProtectedAction } from '@repo/ui/ui';
+import { downloadBlob } from '@repo/ui/utils';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { MOCK_PROFILES } from '../../../../lib/mock-data';
 

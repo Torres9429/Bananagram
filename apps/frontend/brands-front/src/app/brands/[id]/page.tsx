@@ -8,7 +8,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
-import { ScoreGauge } from '@repo/ui';
+import { ScoreGauge } from '@repo/ui/ui';
 import { BrandTabs } from '../../../components/BrandTabs';
 import { MOCK_PROFILES, MOCK_CAMPAIGNS, CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
 

@@ -5,6 +5,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
+import { getInitials } from '@repo/ui/utils';
 import { getTeamAggregate } from '../../lib/mock-data';
 
 export default function TeamPage() {
@@ -26,7 +27,7 @@ export default function TeamPage() {
             sx={{ p: 2, bgcolor: '#fff', border: '1px solid #E8E8E8', borderRadius: 3 }}
           >
             <Avatar sx={{ bgcolor: member.avatarBg, color: member.avatarColor, fontWeight: 600 }}>
-              {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+              {getInitials(member.name)}
             </Avatar>
             <Box sx={{ flex: 1 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>

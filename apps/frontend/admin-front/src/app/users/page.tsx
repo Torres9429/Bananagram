@@ -9,7 +9,8 @@ import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton } from '@repo/ui';
+import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
+import { getInitials } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
 import { CreateUserDialog } from '../../components/CreateUserDialog';
 import { MOCK_USERS, type MockUser } from '../../lib/mock-data';
@@ -30,7 +31,7 @@ export default function UsersPage() {
       render: (u) => (
         <Stack direction="row" gap={1.5} alignItems="center">
           <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 36, height: 36, fontSize: 13, fontWeight: 600 }}>
-            {u.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+            {getInitials(u.name)}
           </Avatar>
           <Box>
             <Typography variant="body2" fontWeight={600}>{u.name}</Typography>
@@ -78,7 +79,7 @@ export default function UsersPage() {
             </PrimaryButton>
           </ProtectedAction>
         </Stack>
-        <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} pagination initialPageSize={10} />
+        <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} pagination initialPageSize={10} emptyMessage="No hay usuarios para mostrar." />
       </Box>
       <CreateUserDialog
         open={createOpen}

@@ -11,7 +11,9 @@ import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import { SidebarNav, type SidebarNavItem, usePermissions, selectUser, AppRole } from '@repo/ui';
+import { SidebarNav, type SidebarNavItem, usePermissions } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { AppRole } from '@repo/ui/types';
 import { useSelector } from 'react-redux';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';

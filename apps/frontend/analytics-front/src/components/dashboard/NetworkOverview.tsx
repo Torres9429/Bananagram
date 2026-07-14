@@ -9,7 +9,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
-import { TrendCard } from '@repo/ui';
+import { TrendCard } from '@repo/ui/ui';
 import { selectAnalyticsKpiComparison } from '../../store/analytics.selectors';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import type { SocialNetworkCode } from '../../lib/analytics/types';

@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';

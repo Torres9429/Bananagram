@@ -7,7 +7,7 @@ import Tab from '@mui/material/Tab';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import { useDispatch, useSelector } from 'react-redux';
-import { EmptyState, usePermissions } from '@repo/ui';
+import { EmptyState, usePermissions } from '@repo/ui/ui';
 import { AnalyticsFilterBar } from '../../components/dashboard/AnalyticsFilterBar';
 import { AnalyticsBreadcrumb } from '../../components/dashboard/AnalyticsBreadcrumb';
 import { NetworkOverview } from '../../components/dashboard/NetworkOverview';
@@ -23,7 +23,6 @@ import { NetworkComparison } from '../../components/dashboard/NetworkComparison'
 import { CampaignComparison } from '../../components/dashboard/CampaignComparison';
 import { TrendAnalysis } from '../../components/dashboard/TrendAnalysis';
 import { PostingHeatMap } from '../../components/dashboard/PostingHeatMap';
-import { ActivityTimeline } from '../../components/dashboard/ActivityTimeline';
 import { AudienceOverview } from '../../components/dashboard/AudienceOverview';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectSelectedNetwork } from '../../store/analytics.selectors';
@@ -76,17 +75,16 @@ export default function MetricsPage() {
           sx={{ minHeight: 40, flex: 1, minWidth: 0, '& .MuiTab-root': { minHeight: 40, py: 1 } }}
         >
           {TABS.map((tab) => (
-            <Tab key={tab.value} value={tab.value} label={tab.label} sx={{ textTransform: 'none', fontWeight: 600, '&.Mui-selected': { color: '#E0A800' }  }} />
+            <Tab key={tab.value} value={tab.value} label={tab.label} sx={{ textTransform: 'none', fontWeight: 600, '&.Mui-selected': { color: 'primary.main' }  }} />
           ))}
         </Tabs>
 
         {/* Exportación pendiente (§B.5): debe serializar exactamente la vista ya
             renderizada de la pestaña activa, nunca recalcular ni pedir configuración
-            — ReportExporter.tsx existente apunta a un backend inexistente (POST
-            /api/reports) y no sigue ese contrato, por eso no se conecta aquí todavía. */}
+            — sin backend real de reportes todavía, por eso no se conecta aquí. */}
         <Tooltip title="Exportación pendiente — próxima fase">
           <span>
-            <Button variant="outlined" size="small" disabled sx={{ borderColor: '#E8E8E8', color: '#9E9E9E', flexShrink: 0 }}>
+            <Button variant="outlined" size="small" disabled sx={{ borderColor: 'divider', color: '#9E9E9E', flexShrink: 0 }}>
               Exportar
             </Button>
           </span>
@@ -122,7 +120,6 @@ export default function MetricsPage() {
           <CampaignComparison />
           <TrendAnalysis />
           <PostingHeatMap />
-          {/* <ActivityTimeline /> */}
           <AudienceOverview />
         </>
       )}

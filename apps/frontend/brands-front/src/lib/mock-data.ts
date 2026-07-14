@@ -1,7 +1,7 @@
 // TODO(dominio-v3): BrandScore vive en @repo/ui y lo consume analytics-front
 // (analytics.selectors.ts) — no renombrar a ProfileScore hasta tocar analytics
 // en una fase dedicada, para no romper ese contrato compartido.
-import type { BrandScore } from '@repo/ui';
+import type { BrandScore } from '@repo/ui/types';
 
 export type CampaignStatus = 'active' | 'paused' | 'finished';
 

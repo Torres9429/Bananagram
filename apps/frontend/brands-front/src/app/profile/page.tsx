@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { selectUser } from '@repo/ui';
+import { selectUser } from '@repo/ui/state';
 import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { ClientSection } from '../../components/profile/ClientSection';
 import { StaffProfileSection } from '../../components/profile/StaffProfileSection';

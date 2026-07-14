@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { EmptyState, InsightCard } from '@repo/ui';
+import { EmptyState, InsightCard } from '@repo/ui/ui';
 import { selectInsights } from '../../store/analytics.selectors';
 
 /**
@@ -16,7 +16,7 @@ export function InsightsPanel() {
   const insights = useSelector(selectInsights);
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Insights automáticos</Typography>
       {insights.length === 0 ? (
         <EmptyState title="Sin insights por ahora" description="No se detectaron patrones relevantes con los filtros activos." />

@@ -21,7 +21,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
-import { EmptyState, ConfirmDialog, WidgetCard, usePermissions, PrimaryButton } from '@repo/ui';
+import { EmptyState, ConfirmDialog, WidgetCard, usePermissions, PrimaryButton } from '@repo/ui/ui';
 import { AdminTabs } from '../../components/AdminTabs';
 
 // Privilegios reales del sistema (AppModule × AppAction).
@@ -177,7 +177,7 @@ export default function RolesPage() {
               variant="outlined"
               startIcon={<RestartAltIcon />}
               onClick={() => setRestoreOpen(true)}
-              sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
             >
               Restaurar rol
             </Button>
@@ -194,13 +194,13 @@ export default function RolesPage() {
         )}
 
         {/* Selector de rol */}
-        <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', borderRadius: '12px 12px 0 0', px: 1 }}>
+        <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#fff', borderRadius: '12px 12px 0 0', px: 1 }}>
           <Tabs
             value={selectedRole}
             onChange={(_, value) => setSelectedRole(value)}
             variant="scrollable"
             scrollButtons="auto"
-            TabIndicatorProps={{ sx: { bgcolor: '#E0A800', height: 3 } }}
+            TabIndicatorProps={{ sx: { bgcolor: 'primary.main', height: 3 } }}
             sx={{ '& .Mui-selected': { color: '#7A5C00 !important', fontWeight: 700 } }}
           >
             {ROLE_ORDER.map((roleKey) => (
@@ -209,7 +209,7 @@ export default function RolesPage() {
           </Tabs>
         </Box>
 
-        <Box sx={{ bgcolor: '#fff', border: '1px solid #E8E8E8', borderTop: 'none', borderRadius: '0 0 12px 12px', p: 3, mb: 3 }}>
+        <Box sx={{ bgcolor: '#fff', border: '1px solid', borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 12px 12px', p: 3, mb: 3 }}>
           {/* Resumen del rol seleccionado */}
           <Grid container spacing={2} mb={3}>
             <Grid item xs={12} sm={4}>
@@ -251,7 +251,8 @@ export default function RolesPage() {
                   disableGutters
                   elevation={0}
                   sx={{
-                    border: '1px solid #E8E8E8',
+                    border: '1px solid',
+                    borderColor: 'divider',
                     borderRadius: '10px !important',
                     '&:before': { display: 'none' },
                     overflow: 'hidden',
@@ -267,7 +268,7 @@ export default function RolesPage() {
                         size="small"
                         label={`${granted.length} de ${moduleActions.length} activos`}
                         sx={{
-                          bgcolor: granted.length > 0 ? '#FFF8E1' : '#F5F5F5',
+                          bgcolor: granted.length > 0 ? 'primary.light' : '#F5F5F5',
                           color: granted.length > 0 ? '#7A5C00' : '#9E9E9E',
                           fontWeight: 600,
                         }}
@@ -288,10 +289,12 @@ export default function RolesPage() {
                             sx={{
                               cursor: 'pointer',
                               px: 1, py: 0.25,
-                              border: `1px solid ${active ? '#E0A800' : '#E8E8E8'}`,
+                              borderWidth: 1,
+                              borderStyle: 'solid',
+                              borderColor: active ? 'primary.main' : 'divider',
                               borderRadius: 1.5,
-                              bgcolor: active ? '#FFF8E1' : 'transparent',
-                              '&:hover': { borderColor: '#E0A800' },
+                              bgcolor: active ? 'primary.light' : 'transparent',
+                              '&:hover': { borderColor: 'primary.main' },
                             }}
                           >
                             <Switch
@@ -300,8 +303,8 @@ export default function RolesPage() {
                               onChange={() => {}}
                               sx={{
                                 width: 32, height: 20, p: 0,
-                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#E0A800', transform: 'translateX(12px)' },
-                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#E0A800' },
+                                '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.main', transform: 'translateX(12px)' },
+                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: 'primary.main' },
                                 '& .MuiSwitch-thumb': { width: 14, height: 14 },
                                 '& .MuiSwitch-track': { borderRadius: 10 },
                               }}
