@@ -114,7 +114,7 @@ export default function CampaignTeamPage() {
                   <Typography variant="body2" fontWeight={700}>{cm.name}</Typography>
                   <Typography variant="caption" color="text.secondary">Coordinador de la campaña</Typography>
                 </Box>
-                <Chip size="small" label="CM" sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 700 }} />
+                <Chip size="small" label="CM" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 700 }} />
               </Stack>
             </Paper>
           </Box>

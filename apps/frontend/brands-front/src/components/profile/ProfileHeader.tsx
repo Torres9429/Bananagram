@@ -21,7 +21,7 @@ export function ProfileHeader({ name, subtitle }: ProfileHeaderProps) {
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Stack direction="row" alignItems="center" gap={2}>
-        <Avatar sx={{ width: 64, height: 64, bgcolor: 'primary.light', color: '#7A5C00', fontSize: 24, fontWeight: 700 }}>
+        <Avatar sx={{ width: 64, height: 64, bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontSize: 24, fontWeight: 700 }}>
           {initials || '—'}
         </Avatar>
         <Box>

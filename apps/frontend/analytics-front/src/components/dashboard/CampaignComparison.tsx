@@ -64,7 +64,7 @@ export function CampaignComparison() {
             {ROWS.map((row) => (
               <Grid container spacing={2} key={row.key} alignItems="center">
                 <Grid item xs={4}>
-                  <Typography variant="body2" fontWeight={700} sx={{ color: '#7A5C00' }}>
+                  <Typography variant="body2" fontWeight={700} sx={{ color: 'primary.contrastTextMuted' }}>
                     {result.campaignA!.kpis[row.key]}{row.unit ?? ''}
                   </Typography>
                 </Grid>

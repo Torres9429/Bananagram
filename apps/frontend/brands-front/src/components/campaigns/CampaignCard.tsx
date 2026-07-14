@@ -56,7 +56,7 @@ export function CampaignCard({ campaign, onClick, profileName }: CampaignCardPro
           })
         )}
       </Stack>
-      <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5} mt="auto" sx={{ color: '#7A5C00' }}>
+      <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5} mt="auto" sx={{ color: 'primary.contrastTextMuted' }}>
         <Typography variant="caption" fontWeight={700}>Ver detalle</Typography>
         <ArrowForwardIcon sx={{ fontSize: 16 }} />
       </Stack>

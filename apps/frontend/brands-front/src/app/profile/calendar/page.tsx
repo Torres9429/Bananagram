@@ -214,7 +214,7 @@ export default function ProfileCalendarPage() {
             <WidgetCard icon={<ShareOutlinedIcon />} label="Redes usadas" value={networksUsedCount} iconBg="#E3F2FD" iconColor="#1565C0" />
           </Grid>
           <Grid item xs={12} sm={6} lg={3}>
-            <WidgetCard icon={<UpcomingOutlinedIcon />} label="Próxima publicación" value={nextEventLabel} iconBg="primary.light" iconColor="#7A5C00" />
+            <WidgetCard icon={<UpcomingOutlinedIcon />} label="Próxima publicación" value={nextEventLabel} iconBg="primary.light" iconColor="primary.contrastTextMuted" />
           </Grid>
         </Grid>
 
@@ -226,7 +226,7 @@ export default function ProfileCalendarPage() {
               <Typography variant="subtitle2" fontWeight={700}>Filtros</Typography>
             </Stack>
             {hasActiveFilters && (
-              <Button size="small" onClick={handleClearFilters} sx={{ color: '#7A5C00' }}>
+              <Button size="small" onClick={handleClearFilters} sx={{ color: 'primary.contrastTextMuted' }}>
                 Limpiar filtros
               </Button>
             )}
@@ -316,7 +316,7 @@ export default function ProfileCalendarPage() {
               fontWeight: 600,
             },
             '& .rbc-toolbar button:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' },
-            '& .rbc-toolbar button.rbc-active': { bgcolor: 'primary.main', color: '#7A5C00', borderColor: 'primary.main' },
+            '& .rbc-toolbar button.rbc-active': { bgcolor: 'primary.main', color: 'primary.contrastTextMuted', borderColor: 'primary.main' },
             '& .rbc-toolbar-label': { fontWeight: 700, fontSize: 16 },
             '& .rbc-header': { py: 1, fontWeight: 700, fontSize: 12, borderColor: 'divider' },
             '& .rbc-month-view, & .rbc-time-view': { borderColor: 'divider', borderRadius: 2, overflow: 'hidden' },
@@ -330,7 +330,7 @@ export default function ProfileCalendarPage() {
               transition: 'transform 0.1s ease, box-shadow 0.1s ease',
             },
             '& .rbc-event:hover': { transform: 'scale(1.02)', boxShadow: '0 2px 6px rgba(0,0,0,0.2)', cursor: 'pointer' },
-            '& .rbc-show-more': { color: '#7A5C00', fontWeight: 600 },
+            '& .rbc-show-more': { color: 'primary.contrastTextMuted', fontWeight: 600 },
           }}
         >
           {calendarEvents.length === 0 ? (

@@ -113,7 +113,7 @@ export function StaffProfileSection({ mockProfile, name, onNameChange }: StaffPr
                       sx={{
                         cursor: 'pointer',
                         bgcolor: selected ? 'primary.light' : 'transparent',
-                        color: selected ? '#7A5C00' : '#6B6B6B',
+                        color: selected ? 'primary.contrastTextMuted' : '#6B6B6B',
                         borderWidth: 1,
                         borderStyle: 'solid',
                         borderColor: selected ? 'primary.main' : 'divider',
@@ -140,7 +140,7 @@ export function StaffProfileSection({ mockProfile, name, onNameChange }: StaffPr
                       sx={{
                         cursor: 'pointer',
                         bgcolor: selected ? 'primary.light' : 'transparent',
-                        color: selected ? '#7A5C00' : '#6B6B6B',
+                        color: selected ? 'primary.contrastTextMuted' : '#6B6B6B',
                         borderWidth: 1,
                         borderStyle: 'solid',
                         borderColor: selected ? 'primary.main' : 'divider',

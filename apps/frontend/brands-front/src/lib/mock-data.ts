@@ -301,21 +301,21 @@ export const MOCK_AVAILABLE_DESIGNERS: MockAvailableDesigner[] = [
 // Solo aparecen CMs con perfil_completo = true y disponibilidad = disponible.
 export const MOCK_AVAILABLE_CMS: MockAvailableCM[] = [
   {
-    id: 'u1', name: 'Ana García', avatarBg: '#FFF8E1', avatarColor: '#7A5C00',
+    id: 'u1', name: 'Ana García', avatarBg: '#FFF8E1', avatarColor: 'primary.contrastTextMuted',
     categories: ['Moda', 'Entretenimiento'], specialties: ['Copywriting', 'Diseño gráfico'],
     availability: 'disponible', perfilCompleto: true,
     bio: 'CM con 5 años en moda y entretenimiento. Especialista en Instagram y TikTok.',
     designers: MOCK_AVAILABLE_DESIGNERS.filter((d) => ['u3', 'u2'].includes(d.id)),
   },
   {
-    id: 'u6', name: 'Diego Ferman', avatarBg: '#FFF8E1', avatarColor: '#7A5C00',
+    id: 'u6', name: 'Diego Ferman', avatarBg: '#FFF8E1', avatarColor: 'primary.contrastTextMuted',
     categories: ['Deportes', 'Tecnología'], specialties: ['Paid media', 'SEO/SEM'],
     availability: 'disponible', perfilCompleto: true,
     bio: 'CM enfocado en marcas deportivas y tech. Especialista en campañas de performance.',
     designers: MOCK_AVAILABLE_DESIGNERS.filter((d) => d.id === 'u7'),
   },
   {
-    id: 'u8', name: 'Valeria Cruz', avatarBg: '#FFF8E1', avatarColor: '#7A5C00',
+    id: 'u8', name: 'Valeria Cruz', avatarBg: '#FFF8E1', avatarColor: 'primary.contrastTextMuted',
     categories: ['Moda'], specialties: ['Video y edición', 'Fotografía'],
     availability: 'no_disponible', perfilCompleto: true,
     bio: 'CM creativa para marcas de lujo y moda. Actualmente sin disponibilidad.',
@@ -343,12 +343,12 @@ export function assignTeamToCampaign(campaignId: string, members: MockTeamMember
 
 export const MOCK_TEAM_BY_CAMPAIGN: Record<string, MockTeamMember[]> = {
   c1: [
-    { id: 'u1', name: 'Ana García', role: 'Community Manager', avatarBg: '#FFF8E1', avatarColor: '#7A5C00' },
+    { id: 'u1', name: 'Ana García', role: 'Community Manager', avatarBg: '#FFF8E1', avatarColor: 'primary.contrastTextMuted' },
     { id: 'u3', name: 'Elías Bailón', role: 'Diseñador', avatarBg: '#E3F2FD', avatarColor: '#1565C0' },
     { id: 'u4', name: 'Rocío Rodríguez', role: 'Cliente', avatarBg: '#E8F5E9', avatarColor: '#2E7D32' },
   ],
   c2: [
-    { id: 'u1', name: 'Ana García', role: 'Community Manager', avatarBg: '#FFF8E1', avatarColor: '#7A5C00' },
+    { id: 'u1', name: 'Ana García', role: 'Community Manager', avatarBg: '#FFF8E1', avatarColor: 'primary.contrastTextMuted' },
     { id: 'u2', name: 'Alexa Delgado', role: 'Diseñador', avatarBg: '#E3F2FD', avatarColor: '#1565C0' },
   ],
   c5: [

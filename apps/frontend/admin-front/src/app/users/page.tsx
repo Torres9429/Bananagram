@@ -30,7 +30,7 @@ export default function UsersPage() {
       header: 'Usuario',
       render: (u) => (
         <Stack direction="row" gap={1.5} alignItems="center">
-          <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 36, height: 36, fontSize: 13, fontWeight: 600 }}>
+          <Avatar sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', width: 36, height: 36, fontSize: 13, fontWeight: 600 }}>
             {getInitials(u.name)}
           </Avatar>
           <Box>
@@ -40,7 +40,7 @@ export default function UsersPage() {
         </Stack>
       ),
     },
-    { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={u.role} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} /> },
+    { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={u.role} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} /> },
     { key: 'brand', header: 'Perfil', render: (u) => <Typography variant="body2">{u.brand ?? '—'}</Typography> },
     {
       key: 'status',

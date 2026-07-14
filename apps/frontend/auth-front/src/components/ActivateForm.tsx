@@ -77,12 +77,12 @@ export function ActivateForm() {
       ) : (
         <>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-            <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 40, height: 40 }}>
+            <Avatar sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', width: 40, height: 40 }}>
               <KeyOutlinedIcon />
             </Avatar>
             <Box>
               <Typography variant="h5" fontWeight={700} color="text.secondary">Activa tu cuenta</Typography>
-              <Chip label={roleLabel} size="small" sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 700 }} />
+              <Chip label={roleLabel} size="small" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 700 }} />
             </Box>
           </Box>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>

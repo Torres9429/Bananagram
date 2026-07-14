@@ -139,7 +139,7 @@ export function AnalyticsFilterBar() {
             <Chip size="small" label={filters.specialty} onDelete={() => dispatch(setSpecialty(null))} />
           )}
 
-          <Button size="small" onClick={() => dispatch(clearAllFilters())} sx={{ color: '#7A5C00' }}>
+          <Button size="small" onClick={() => dispatch(clearAllFilters())} sx={{ color: 'primary.contrastTextMuted' }}>
             Limpiar filtros
           </Button>
         </Stack>

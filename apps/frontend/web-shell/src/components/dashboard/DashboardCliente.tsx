@@ -52,7 +52,7 @@ export function DashboardCliente() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight={700}>Esperan tu aprobación</Typography>
               <Typography variant="body2" onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/approvals`; }}
-                sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
+                sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
             </Stack>
             {postsToApprove.length === 0 ? (
               <Typography variant="body2" color="text.secondary">No hay publicaciones pendientes. 🎉</Typography>
@@ -86,7 +86,7 @@ export function DashboardCliente() {
             <Stack direction="row" gap={2} flexWrap="wrap">
               {team.map((member) => (
                 <Stack key={member.id} direction="row" gap={1.5} alignItems="center" sx={{ minWidth: 200 }}>
-                  <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 36, height: 36, fontSize: 13, fontWeight: 700 }}>
+                  <Avatar sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', width: 36, height: 36, fontSize: 13, fontWeight: 700 }}>
                     {getInitials(member.name)}
                   </Avatar>
                   <Box>

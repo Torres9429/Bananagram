@@ -44,7 +44,7 @@ export default function BrandMetricsPage() {
         </Grid>
         <Typography variant="body2" color="text.secondary" mt={3}>
           Para el detalle de engagement por publicación y comparativos entre marcas, ve a{' '}
-          <Box component="a" href="http://localhost:3011/metrics" sx={{ color: '#7A5C00', fontWeight: 600 }}>
+          <Box component="a" href="http://localhost:3011/metrics" sx={{ color: 'primary.contrastTextMuted', fontWeight: 600 }}>
             Métricas globales
           </Box>.
         </Typography>

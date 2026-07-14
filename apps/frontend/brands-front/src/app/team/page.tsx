@@ -32,7 +32,7 @@ export default function TeamPage() {
             <Box sx={{ flex: 1 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
                 <Typography variant="body2" fontWeight={600}>{member.name}</Typography>
-                <Chip size="small" label={member.role} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} />
+                <Chip size="small" label={member.role} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
               </Stack>
               <Stack direction="row" gap={0.75} flexWrap="wrap">
                 {member.campaigns.map((c) => (

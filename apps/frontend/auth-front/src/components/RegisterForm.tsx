@@ -110,7 +110,7 @@ export function RegisterForm() {
         <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.secondary' }}>
           Crea tu cuenta
         </Typography>
-        <Chip label="Cliente" size="small" sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 700 }} />
+        <Chip label="Cliente" size="small" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 700 }} />
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
         Registra tu perfil y comienza a gestionar contenido
@@ -194,7 +194,7 @@ export function RegisterForm() {
                     borderRadius: '10px !important',
                     flexDirection: 'column',
                     gap: 0.25,
-                    '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#E0A800 !important', color: '#7A5C00' },
+                    '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#E0A800 !important', color: 'primary.contrastTextMuted' },
                   }}
                 >
                   <Icon sx={{ fontSize: 18 }} />

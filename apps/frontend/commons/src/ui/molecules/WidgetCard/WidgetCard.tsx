@@ -20,7 +20,7 @@ export function WidgetCard({
   label,
   value,
   iconBg = '#FFF8E1',
-  iconColor = '#7A5C00',
+  iconColor = 'primary.contrastTextMuted',
   addon,
 }: WidgetCardProps) {
   return (

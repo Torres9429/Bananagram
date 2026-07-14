@@ -168,7 +168,7 @@ function PostsListContent() {
             label={campaignName}
             onDelete={handleClearCampaignFilter}
             size="small"
-            sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }}
+            sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }}
           />
         </Stack>
       )}
@@ -199,7 +199,7 @@ function PostsListContent() {
                 sx={{
                   cursor: 'pointer',
                   bgcolor: active ? '#E0A800' : 'transparent',
-                  color: active ? '#7A5C00' : '#1A1A1A',
+                  color: active ? 'primary.contrastTextMuted' : '#1A1A1A',
                   borderColor: active ? '#D4AC40' : '#E8E8E8',
                   fontWeight: active ? 600 : 400,
                 }}

@@ -201,7 +201,7 @@ export default function RolesPage() {
             variant="scrollable"
             scrollButtons="auto"
             TabIndicatorProps={{ sx: { bgcolor: 'primary.main', height: 3 } }}
-            sx={{ '& .Mui-selected': { color: '#7A5C00 !important', fontWeight: 700 } }}
+            sx={(theme) => ({ '& .Mui-selected': { color: `${theme.palette.primary.contrastTextMuted} !important`, fontWeight: 700 } })}
           >
             {ROLE_ORDER.map((roleKey) => (
               <Tab key={roleKey} value={roleKey} label={ROLE_LABELS[roleKey]} sx={{ textTransform: 'none', fontWeight: 600 }} />
@@ -269,7 +269,7 @@ export default function RolesPage() {
                         label={`${granted.length} de ${moduleActions.length} activos`}
                         sx={{
                           bgcolor: granted.length > 0 ? 'primary.light' : '#F5F5F5',
-                          color: granted.length > 0 ? '#7A5C00' : '#9E9E9E',
+                          color: granted.length > 0 ? 'primary.contrastTextMuted' : '#9E9E9E',
                           fontWeight: 600,
                         }}
                       />
@@ -309,7 +309,7 @@ export default function RolesPage() {
                                 '& .MuiSwitch-track': { borderRadius: 10 },
                               }}
                             />
-                            <Typography variant="caption" sx={{ color: active ? '#7A5C00' : '#6B6B6B', fontWeight: active ? 700 : 400, fontSize: 11 }}>
+                            <Typography variant="caption" sx={{ color: active ? 'primary.contrastTextMuted' : '#6B6B6B', fontWeight: active ? 700 : 400, fontSize: 11 }}>
                               {ACTION_LABELS[action]}
                             </Typography>
                           </Stack>

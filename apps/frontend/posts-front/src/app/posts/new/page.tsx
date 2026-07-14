@@ -123,7 +123,7 @@ export default function NewPostPage() {
                         height: 32,
                         border: `1px solid ${active ? '#E0A800' : '#E8E8E8'}`,
                         bgcolor: active ? '#FFF8E1' : 'transparent',
-                        color: active ? '#7A5C00' : '#1A1A1A',
+                        color: active ? 'primary.contrastTextMuted' : '#1A1A1A',
                       }}
                     />
                   );
@@ -174,7 +174,7 @@ export default function NewPostPage() {
 
             {/* Panel IA mock */}
             <Box sx={{ border: '1.5px solid #E0A800', borderRadius: 2, bgcolor: '#FFFDE7', p: 2, mb: 3 }}>
-              <Chip label="IA · Análisis pre-publicación" size="small" sx={{ bgcolor: '#E0A800', color: '#7A5C00', fontWeight: 700, mb: 1.5 }} />
+              <Chip label="IA · Análisis pre-publicación" size="small" sx={{ bgcolor: '#E0A800', color: 'primary.contrastTextMuted', fontWeight: 700, mb: 1.5 }} />
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
                 <Box>
                   <Typography variant="caption" color="text.secondary">Engagement estimado</Typography>
@@ -187,8 +187,8 @@ export default function NewPostPage() {
                   </Typography>
                 </Box>
                 <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: '#E0A800', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography fontWeight={700} sx={{ color: '#7A5C00' }}>84</Typography>
-                  <Typography variant="caption" sx={{ color: '#7A5C00', fontSize: 9 }}>Score</Typography>
+                  <Typography fontWeight={700} sx={{ color: 'primary.contrastTextMuted' }}>84</Typography>
+                  <Typography variant="caption" sx={{ color: 'primary.contrastTextMuted', fontSize: 9 }}>Score</Typography>
                 </Box>
               </Stack>
               <Typography variant="caption" fontWeight={600} color="text.secondary" mb={0.5} display="block">Sugerencias</Typography>
@@ -202,7 +202,7 @@ export default function NewPostPage() {
               </Stack>
               <Stack direction="row" gap={1} mt={1.5} flexWrap="wrap">
                 {TIME_SLOTS.map((slot) => (
-                  <Chip key={slot} label={slot} onClick={() => {}} sx={{ cursor: 'pointer', bgcolor: '#FFF8E1', color: '#7A5C00', border: '1px solid #D4AC40' }} />
+                  <Chip key={slot} label={slot} onClick={() => {}} sx={{ cursor: 'pointer', bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', border: '1px solid #D4AC40' }} />
                 ))}
               </Stack>
               <Typography variant="caption" color="text.secondary" fontStyle="italic" mt={1} display="block" fontSize={10}>
@@ -236,7 +236,7 @@ export default function NewPostPage() {
               {selectedProfile ? (
                 <>
                   <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
-                    <Avatar sx={{ bgcolor: '#E0A800', color: '#7A5C00', width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
+                    <Avatar sx={{ bgcolor: '#E0A800', color: 'primary.contrastTextMuted', width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
                       {selectedProfile.handle.replace('@', '').slice(0, 2).toUpperCase()}
                     </Avatar>
                     <Box>
@@ -254,7 +254,7 @@ export default function NewPostPage() {
                   </Typography>
                   <Stack direction="row" gap={0.75} mt={0.5} flexWrap="wrap">
                     {hashtags.map((tag, i) => (
-                      <Chip key={i} size="small" label={tag} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontSize: 10, height: 20 }} />
+                      <Chip key={i} size="small" label={tag} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontSize: 10, height: 20 }} />
                     ))}
                   </Stack>
                   <Chip size="small" label="BORRADOR" sx={{ bgcolor: '#F5F5F5', color: '#616161', fontWeight: 600, mt: 1.5 }} />

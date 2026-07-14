@@ -271,7 +271,7 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
         <Divider sx={{ my: 2 }} />
 
         <Stack direction="row" gap={1.5}>
-          <Button fullWidth variant="outlined" onClick={() => dispatch(clearAllFilters())} sx={{ color: '#7A5C00', borderColor: 'divider' }}>
+          <Button fullWidth variant="outlined" onClick={() => dispatch(clearAllFilters())} sx={{ color: 'primary.contrastTextMuted', borderColor: 'divider' }}>
             Limpiar filtros
           </Button>
           <PrimaryButton fullWidth onClick={onClose}>

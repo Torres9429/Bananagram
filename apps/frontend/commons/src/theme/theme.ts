@@ -1,8 +1,21 @@
 import { createTheme } from '@mui/material/styles';
 
+// contrastTextMuted: texto oscuro (o contenido secundario) sobre superficies
+// claras derivadas de primary (chips, avatares y fondos en primary.light) —
+// se nombra por su función, no por su apariencia, porque no es un color de
+// marca independiente sino una variante de contraste de primary.
+declare module '@mui/material/styles' {
+  interface PaletteColor {
+    contrastTextMuted?: string;
+  }
+  interface SimplePaletteColorOptions {
+    contrastTextMuted?: string;
+  }
+}
+
 export const theme = createTheme({
   palette: {
-    primary: { main: '#E0A800', dark: '#D4AC40', light: '#FFF8E1', contrastText: '#FFFFFF' },
+    primary: { main: '#E0A800', dark: '#D4AC40', light: '#FFF8E1', contrastText: '#FFFFFF', contrastTextMuted: '#7A5C00' },
     secondary: { main: '#C08E06', contrastText: '#FFFFFF' },
     success: { main: '#2E7D32', dark: '#1B5E20', light: '#E8F5E9', contrastText: '#FFFFFF' },
     error: { main: '#C62828', light: '#FFEBEE', contrastText: '#FFFFFF' },

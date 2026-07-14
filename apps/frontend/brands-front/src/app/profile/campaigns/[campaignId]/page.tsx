@@ -189,7 +189,7 @@ export default function ProfileCampaignDetailPage() {
               <Typography
                 variant="caption"
                 onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts?campaign=${campaign.id}`; }}
-                sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}
+                sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}
               >
                 Ver todas →
               </Typography>

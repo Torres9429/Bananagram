@@ -3,6 +3,7 @@
 import { useDispatch, useSelector } from 'react-redux';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
 import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { selectCampaign } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectGeneralCampaignBreakdown, selectNetworkDashboard, selectSelectedNetwork } from '../../store/analytics.selectors';
@@ -16,6 +17,7 @@ import { selectAnalyticsFilters, selectGeneralCampaignBreakdown, selectNetworkDa
  * la misma función del engine (computeCampaignBreakdown), sin lógica duplicada.
  */
 export function CampaignBreakdown() {
+  const theme = useTheme();
   const dispatch = useDispatch();
   const filters = useSelector(selectAnalyticsFilters);
   const selectedNetwork = useSelector(selectSelectedNetwork);
@@ -47,7 +49,7 @@ export function CampaignBreakdown() {
             {data.map((entry) => (
               <Cell
                 key={entry.campaignId}
-                fill={filters.campaignId === entry.campaignId ? '#7A5C00' : '#E0A800'}
+                fill={filters.campaignId === entry.campaignId ? theme.palette.primary.contrastTextMuted! : '#E0A800'}
                 opacity={filters.campaignId && filters.campaignId !== entry.campaignId ? 0.35 : 1}
                 style={{ transition: 'opacity 0.15s ease, fill 0.15s ease' }}
               />

@@ -10,6 +10,7 @@ import Alert from '@mui/material/Alert';
 import { LabeledField } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
 import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { theme } from '@repo/ui/theme';
 import { findUserByCredentials, buildTokenFromUser } from '@repo/ui';
 
 const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
@@ -23,7 +24,7 @@ export function LoginForm() {
   useEffect(() => {
     console.info(
       '%cCuentas de prueba (solo desarrollo)',
-      'font-weight:bold; color:#7A5C00',
+      `font-weight:bold; color:${theme.palette.primary.contrastTextMuted}`,
       '\n  admin@bananagram.mx / admin123',
       '\n  cm@bananagram.mx / cm123456',
       '\n  disenador@bananagram.mx / diseno123',

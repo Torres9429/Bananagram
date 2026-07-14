@@ -122,7 +122,7 @@ export function ClientSection() {
             <Box>
               <Typography variant="h5" fontWeight={700}>{profile.name}</Typography>
               <Stack direction="row" gap={1} flexWrap="wrap" mt={0.75}>
-                <Chip size="small" label={PROFILE_TYPE_LABELS[profile.type]} sx={{ bgcolor: 'primary.light', color: '#7A5C00', fontWeight: 600 }} />
+                <Chip size="small" label={PROFILE_TYPE_LABELS[profile.type]} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
                 <Chip size="small" label={profile.category} variant="outlined" />
               </Stack>
             </Box>

@@ -10,17 +10,20 @@ import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
+import { useTheme } from '@mui/material/styles';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, PieChart, Pie, Cell,
 } from 'recharts';
 import { StatusChip, WidgetCard, PrimaryButton } from '@repo/ui/ui';
-import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, MOCK_POSTS_BY_NETWORK, getSocialAccount } from '../../lib/mock-dashboard';
+import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, getMockPostsByNetwork, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
 
 export function DashboardCM() {
+  const theme = useTheme();
   const { kpis, campaigns, recentPosts } = MOCK_DASHBOARD;
+  const postsByNetwork = getMockPostsByNetwork(theme);
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
@@ -66,7 +69,7 @@ export function DashboardCM() {
           <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight={700}>Publicaciones recientes</Typography>
-              <Typography variant="body2" onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts`; }} sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
+              <Typography variant="body2" onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts`; }} sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
             </Stack>
             <Stack gap={1.5}>
               {recentPosts.map((post) => (
@@ -101,8 +104,8 @@ export function DashboardCM() {
           <Typography variant="subtitle1" fontWeight={700} mb={2}>Distribución por red social</Typography>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={MOCK_POSTS_BY_NETWORK} dataKey="count" nameKey="network" innerRadius={60} outerRadius={90} paddingAngle={2}>
-                {MOCK_POSTS_BY_NETWORK.map((entry) => (<Cell key={entry.network} fill={entry.color} />))}
+              <Pie data={postsByNetwork} dataKey="count" nameKey="network" innerRadius={60} outerRadius={90} paddingAngle={2}>
+                {postsByNetwork.map((entry) => (<Cell key={entry.network} fill={entry.color} />))}
               </Pie>
               <RechartsTooltip />
             </PieChart>

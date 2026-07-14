@@ -68,14 +68,14 @@ export function PostingHeatMap() {
                   >
                     <Box
                       onClick={() => handleCellClick(day, hourBucket)}
-                      sx={{
+                      sx={(theme) => ({
                         height: 28,
                         borderRadius: 1,
                         cursor: cell ? 'pointer' : 'default',
                         bgcolor: cell ? `rgba(224, 168, 0, ${0.15 + intensity * 0.85})` : '#F5F5F5',
                         transition: 'transform 0.1s ease, box-shadow 0.1s ease',
-                        '&:hover': cell ? { transform: 'scale(1.08)', boxShadow: '0 0 0 2px #7A5C00' } : undefined,
-                      }}
+                        '&:hover': cell ? { transform: 'scale(1.08)', boxShadow: `0 0 0 2px ${theme.palette.primary.contrastTextMuted}` } : undefined,
+                      })}
                     />
                   </Tooltip>
                 );

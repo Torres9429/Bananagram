@@ -38,7 +38,7 @@ export function ActivityTimeline() {
       <Stack sx={{ position: 'relative', pl: 3, borderLeft: '2px solid', borderLeftColor: 'divider' }} gap={2}>
         {events.map((event) => {
           const isSelected = event.type === 'post' ? filters.postId === event.postId : filters.campaignId === event.campaignId;
-          const color = event.networkCode ? NETWORK_DISPLAY[event.networkCode].color : '#7A5C00';
+          const color = event.networkCode ? NETWORK_DISPLAY[event.networkCode].color : 'primary.contrastTextMuted';
           return (
             <Box
               key={event.id}
@@ -66,7 +66,7 @@ export function ActivityTimeline() {
               <Stack direction="row" alignItems="center" gap={1}>
                 {event.type === 'campaign' ? <CampaignOutlinedIcon fontSize="small" sx={{ color }} /> : <ArticleOutlinedIcon fontSize="small" sx={{ color }} />}
                 <Typography variant="body2" fontWeight={600}>{event.label}</Typography>
-                {event.networkCode && <Chip size="small" label={event.networkCode} sx={{ bgcolor: 'primary.light', color: '#7A5C00', fontWeight: 600 }} />}
+                {event.networkCode && <Chip size="small" label={event.networkCode} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />}
               </Stack>
               <Typography variant="caption" color="text.secondary">{event.date}</Typography>
             </Box>

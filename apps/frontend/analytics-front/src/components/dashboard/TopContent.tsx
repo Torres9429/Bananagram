@@ -55,7 +55,7 @@ export function TopContent() {
       {activeProfiles > 0 && (
         <Chip
           size="small"
-          sx={{ mt: 2, bgcolor: 'primary.light', color: '#7A5C00', fontWeight: 600 }}
+          sx={{ mt: 2, bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }}
           label={`${activeProfiles} perfil${activeProfiles > 1 ? 'es' : ''} activo${activeProfiles > 1 ? 's' : ''}`}
         />
       )}
