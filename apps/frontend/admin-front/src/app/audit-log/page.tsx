@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
-import { DataTable, type DataTableColumn } from '@repo/ui';
+import { DataTable, type DataTableColumn } from '@repo/ui/ui';
 import { AdminTabs } from '../../components/AdminTabs';
 import { MOCK_AUDIT_LOG, type MockAuditEntry } from '../../lib/mock-data';
 
@@ -26,7 +26,7 @@ export default function AuditLogPage() {
         <Alert severity="info" sx={{ mb: 2 }}>
           Este registro es inmutable: ningún evento puede editarse ni borrarse, solo consultarse.
         </Alert>
-        <DataTable columns={columns} rows={MOCK_AUDIT_LOG} getRowKey={(e) => e.id} pagination initialPageSize={10} />
+        <DataTable columns={columns} rows={MOCK_AUDIT_LOG} getRowKey={(e) => e.id} pagination initialPageSize={10} emptyMessage="No hay eventos registrados." />
       </Box>
     </Box>
   );

@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import { DataTable, type DataTableColumn } from '@repo/ui';
+import { DataTable, type DataTableColumn } from '@repo/ui/ui';
 import { selectPost } from '../../store/analyticsFilters.slice';
 import { selectNetworkDashboard, selectSelectedNetwork, selectTopPosts } from '../../store/analytics.selectors';
 import type { SocialMetricFact } from '../../lib/analytics/types';
@@ -39,7 +39,7 @@ export function TopContent() {
   if (topContent.length === 0) return null;
 
   return (
-    <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, p: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={0.5}>{topContentLabel}</Typography>
       <Typography variant="caption" color="text.secondary" mb={2} display="block">
         Clic en una fila para ver el detalle de esa publicación.
@@ -55,7 +55,7 @@ export function TopContent() {
       {activeProfiles > 0 && (
         <Chip
           size="small"
-          sx={{ mt: 2, bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }}
+          sx={{ mt: 2, bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }}
           label={`${activeProfiles} perfil${activeProfiles > 1 ? 'es' : ''} activo${activeProfiles > 1 ? 's' : ''}`}
         />
       )}

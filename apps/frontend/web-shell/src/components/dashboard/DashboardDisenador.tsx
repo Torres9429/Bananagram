@@ -10,7 +10,7 @@ import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import PublishedWithChangesOutlinedIcon from '@mui/icons-material/PublishedWithChangesOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import { StatusChip, WidgetCard, EmptyState, PrimaryButton } from '@repo/ui';
+import { StatusChip, WidgetCard, EmptyState, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_DISENADOR_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -47,7 +47,7 @@ export function DashboardDisenador() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight={700}>Mis campañas</Typography>
               <Typography variant="body2" onClick={() => { window.location.href = `${BRANDS_FRONT_URL}/my-campaigns`; }}
-                sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
+                sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
             </Stack>
             {hasCampaigns ? (
               <Stack gap={1.5}>
@@ -74,7 +74,7 @@ export function DashboardDisenador() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight={700}>Mis publicaciones recientes</Typography>
               <Typography variant="body2" onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts`; }}
-                sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
+                sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
             </Stack>
             {recentPosts.length === 0 ? (
               <EmptyState title="Aún no tienes publicaciones" description="Crea tu primer borrador." />

@@ -18,7 +18,9 @@ import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { StatusChip, usePermissions, selectUser, PrimaryButton } from '@repo/ui';
+import { StatusChip, usePermissions, PrimaryButton } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { getInitials } from '@repo/ui/utils';
 import {
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
@@ -64,7 +66,7 @@ export default function ProfileCampaignDetailPage() {
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
-      <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', px: 1 }}>
+      <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#fff', px: 1 }}>
         <Stack direction="row" alignItems="center">
           <Tooltip title={backLabel}>
             <IconButton onClick={() => router.push(backHref)} sx={{ color: 'secondary.main', ml: 1, my: 0.5 }}>
@@ -89,7 +91,7 @@ export default function ProfileCampaignDetailPage() {
             variant="outlined"
             startIcon={<ArticleOutlinedIcon />}
             onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts?campaign=${campaign.id}`; }}
-            sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
+            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
           >
             Ver todas las publicaciones
           </Button>
@@ -98,7 +100,7 @@ export default function ProfileCampaignDetailPage() {
               variant="outlined"
               startIcon={<GroupOutlinedIcon />}
               onClick={() => router.push(`/profile/campaigns/${campaign.id}/team`)}
-              sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
             >
               Ver equipo
             </Button>
@@ -108,7 +110,7 @@ export default function ProfileCampaignDetailPage() {
               variant="outlined"
               startIcon={<RateReviewOutlinedIcon />}
               onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/approvals`; }}
-              sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
             >
               Ver aprobaciones
             </Button>
@@ -126,14 +128,14 @@ export default function ProfileCampaignDetailPage() {
         <Grid container spacing={2} mb={3}>
           {/* Resumen de campaña */}
           <Grid item xs={12} md={isDesigner ? 12 : 6}>
-            <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
+            <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, height: '100%' }}>
               <Typography variant="subtitle2" color="text.secondary" mb={1}>Publicaciones</Typography>
               <Typography variant="h4" fontWeight={700} mb={1}>{campaign.postsCount}</Typography>
               <Typography variant="caption" color="text.secondary">{published} publicadas de {posts.length} registradas</Typography>
               <LinearProgress
                 variant="determinate"
                 value={progress}
-                sx={{ mt: 1.5, height: 8, borderRadius: 4, bgcolor: '#F5F5F5', '& .MuiLinearProgress-bar': { backgroundColor: '#E0A800' } }}
+                sx={{ mt: 1.5, height: 8, borderRadius: 4, bgcolor: '#F5F5F5', '& .MuiLinearProgress-bar': { backgroundColor: 'primary.main' } }}
               />
             </Paper>
           </Grid>
@@ -141,7 +143,7 @@ export default function ProfileCampaignDetailPage() {
           {/* Equipo asignado — resumen inline, oculto para Diseñador */}
           {!isDesigner && (
             <Grid item xs={12} md={6}>
-              <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
+              <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, height: '100%' }}>
                 <Typography variant="subtitle2" color="text.secondary" mb={1.5}>Equipo asignado</Typography>
                 {team.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">Sin equipo asignado todavía.</Typography>
@@ -150,7 +152,7 @@ export default function ProfileCampaignDetailPage() {
                     {cm && (
                       <Stack direction="row" gap={1.5} alignItems="center">
                         <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>
-                          {cm.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                          {getInitials(cm.name)}
                         </Avatar>
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="body2" fontWeight={600}>{cm.name}</Typography>
@@ -161,7 +163,7 @@ export default function ProfileCampaignDetailPage() {
                     {designers.slice(0, 2).map((d) => (
                       <Stack key={d.id} direction="row" gap={1.5} alignItems="center">
                         <Avatar sx={{ bgcolor: d.avatarBg, color: d.avatarColor, width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>
-                          {d.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                          {getInitials(d.name)}
                         </Avatar>
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="body2" fontWeight={600}>{d.name}</Typography>
@@ -180,14 +182,14 @@ export default function ProfileCampaignDetailPage() {
         </Grid>
 
         {/* Publicaciones recientes — resumen inline */}
-        <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
             <Typography variant="subtitle2" color="text.secondary">Publicaciones recientes</Typography>
             {posts.length > 3 && (
               <Typography
                 variant="caption"
                 onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts?campaign=${campaign.id}`; }}
-                sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}
+                sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}
               >
                 Ver todas →
               </Typography>

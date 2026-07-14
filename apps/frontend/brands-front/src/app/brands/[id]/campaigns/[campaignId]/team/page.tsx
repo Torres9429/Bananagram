@@ -14,7 +14,8 @@ import Alert from '@mui/material/Alert';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction, PrimaryButton } from '@repo/ui';
+import { ConfirmDialog, EmptyState, FormDialog, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
+import { getInitials } from '@repo/ui/utils';
 import { CampaignTabs } from '../../../../../../components/CampaignTabs';
 import {
   MOCK_PROFILES,
@@ -23,7 +24,6 @@ import {
   getAvailableDesigners,
   assignTeamToCampaign,
   type MockTeamMember,
-  type MockAvailableDesigner,
 } from '../../../../../../lib/mock-data';
 
 export default function CampaignTeamPage() {
@@ -108,13 +108,13 @@ export default function CampaignTeamPage() {
             <Paper elevation={0} sx={{ p: 2, border: '1px solid #E8E8E8', borderRadius: 3 }}>
               <Stack direction="row" gap={2} alignItems="center">
                 <Avatar sx={{ bgcolor: cm.avatarBg, color: cm.avatarColor, fontWeight: 700 }}>
-                  {cm.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  {getInitials(cm.name)}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" fontWeight={700}>{cm.name}</Typography>
                   <Typography variant="caption" color="text.secondary">Coordinador de la campaña</Typography>
                 </Box>
-                <Chip size="small" label="CM" sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 700 }} />
+                <Chip size="small" label="CM" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 700 }} />
               </Stack>
             </Paper>
           </Box>
@@ -136,7 +136,7 @@ export default function CampaignTeamPage() {
                 <Paper key={member.id} elevation={0} sx={{ p: 2, border: '1px solid #E8E8E8', borderRadius: 3 }}>
                   <Stack direction="row" gap={2} alignItems="center">
                     <Avatar sx={{ bgcolor: member.avatarBg, color: member.avatarColor, fontWeight: 700 }}>
-                      {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                      {getInitials(member.name)}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" fontWeight={700}>{member.name}</Typography>
@@ -199,7 +199,7 @@ export default function CampaignTeamPage() {
                 >
                   <Stack direction="row" gap={1.5} alignItems="center">
                     <Avatar sx={{ bgcolor: d.avatarBg, color: d.avatarColor, width: 40, height: 40, fontWeight: 700 }}>
-                      {d.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
+                      {getInitials(d.name)}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" fontWeight={700}>{d.name}</Typography>

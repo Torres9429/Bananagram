@@ -42,7 +42,7 @@ export default function BrandsPage() {
                   </Box>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Chip size="small" label={`${brand.activeCampaigns} campañas activas`} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} />
+                  <Chip size="small" label={`${brand.activeCampaigns} campañas activas`} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
                   <Chip size="small" label={`Score ${brand.score.score}`} sx={{ bgcolor: cls.bg, color: cls.color, fontWeight: 700 }} />
                 </Stack>
               </Paper>

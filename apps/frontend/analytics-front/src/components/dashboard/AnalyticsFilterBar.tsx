@@ -9,7 +9,7 @@ import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
 import Badge from '@mui/material/Badge';
 import TuneIcon from '@mui/icons-material/Tune';
-import { STATUS_LABELS } from '@repo/ui';
+import { STATUS_LABELS } from '@repo/ui/ui';
 import {
   clearAllFilters,
   selectCampaign,
@@ -81,7 +81,7 @@ export function AnalyticsFilterBar() {
             variant="outlined"
             startIcon={<TuneIcon fontSize="small" />}
             onClick={() => setDrawerOpen(true)}
-            sx={{ borderColor: '#E8E8E8', color: '#1A1A1A' }}
+            sx={{ borderColor: 'divider', color: '#1A1A1A' }}
           >
             Filtros
           </Button>
@@ -139,7 +139,7 @@ export function AnalyticsFilterBar() {
             <Chip size="small" label={filters.specialty} onDelete={() => dispatch(setSpecialty(null))} />
           )}
 
-          <Button size="small" onClick={() => dispatch(clearAllFilters())} sx={{ color: '#7A5C00' }}>
+          <Button size="small" onClick={() => dispatch(clearAllFilters())} sx={{ color: 'primary.contrastTextMuted' }}>
             Limpiar filtros
           </Button>
         </Stack>

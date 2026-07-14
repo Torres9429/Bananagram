@@ -7,11 +7,12 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
-import { LabeledField } from '@repo/ui';
+import { LabeledField } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
-import { setCredentials, findUserByCredentials, buildTokenFromUser, setCookieToken } from '@repo/ui';
-
-const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
+import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { theme } from '@repo/ui/theme';
+import { getPostAuthDestination } from '@repo/ui/utils';
+import { findUserByCredentials, buildTokenFromUser } from '@repo/ui';
 
 export function LoginForm() {
   const dispatch = useDispatch();
@@ -22,7 +23,7 @@ export function LoginForm() {
   useEffect(() => {
     console.info(
       '%cCuentas de prueba (solo desarrollo)',
-      'font-weight:bold; color:#7A5C00',
+      `font-weight:bold; color:${theme.palette.primary.contrastTextMuted}`,
       '\n  admin@bananagram.mx / admin123',
       '\n  cm@bananagram.mx / cm123456',
       '\n  disenador@bananagram.mx / diseno123',
@@ -43,7 +44,7 @@ export function LoginForm() {
     // La cookie es accesible desde todos los microfronts (mismo host, distintos puertos).
     setCookieToken(token);
     dispatch(setCredentials({ accessToken: token }));
-    window.location.href = WEB_SHELL_DASHBOARD_URL;
+    window.location.href = getPostAuthDestination(user.role);
   }
 
   return (

@@ -7,7 +7,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
-import { EmptyState, ScoreGauge } from '@repo/ui';
+import { EmptyState, ScoreGauge } from '@repo/ui/ui';
 import { selectScoreExplanation } from '../../store/analytics.selectors';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 
@@ -20,7 +20,7 @@ export function ScoreExplanationPanel() {
   const explanation = useSelector(selectScoreExplanation);
   if (!explanation) {
     return (
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
         <EmptyState title="Sin score disponible" description="Selecciona un perfil para ver su explicación de score." />
       </Paper>
     );
@@ -29,7 +29,7 @@ export function ScoreExplanationPanel() {
   const { score, positiveFactors, negativeFactors, topNetwork, topCampaign, bestPosts, worstPosts } = explanation;
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Score explicado</Typography>
 
       <Grid container spacing={3} mb={3}>

@@ -10,7 +10,7 @@ import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
 import EventRepeatOutlinedIcon from '@mui/icons-material/EventRepeatOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import { MetricCard } from '@repo/ui';
+import { MetricCard } from '@repo/ui/ui';
 import { selectAudienceOverview } from '../../store/analytics.selectors';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 
@@ -23,7 +23,7 @@ export function AudienceOverview() {
   const maxFollowers = Math.max(1, ...data.followersByNetwork.map((n) => n.followersGained));
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Audiencia</Typography>
 
       <Grid container spacing={2} mb={3}>

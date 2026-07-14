@@ -5,7 +5,7 @@ import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
-import { EmptyState } from '@repo/ui';
+import { EmptyState } from '@repo/ui/ui';
 import { selectNetwork, selectPost } from '../../store/analyticsFilters.slice';
 import { selectHeatMap } from '../../store/analytics.selectors';
 import { HOUR_BUCKET_LABELS, WEEKDAY_LABELS } from '../../lib/analytics/engine';
@@ -22,7 +22,7 @@ export function PostingHeatMap() {
 
   if (cells.length === 0) {
     return (
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
         <EmptyState title="Sin datos de horarios" description="Ajusta los filtros activos." />
       </Paper>
     );
@@ -42,7 +42,7 @@ export function PostingHeatMap() {
   }
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Horarios de mayor interacción</Typography>
       <Typography variant="caption" color="text.secondary" mb={2} display="block">
         Clic en una celda para filtrar por esa publicación o red.
@@ -68,14 +68,14 @@ export function PostingHeatMap() {
                   >
                     <Box
                       onClick={() => handleCellClick(day, hourBucket)}
-                      sx={{
+                      sx={(theme) => ({
                         height: 28,
                         borderRadius: 1,
                         cursor: cell ? 'pointer' : 'default',
                         bgcolor: cell ? `rgba(224, 168, 0, ${0.15 + intensity * 0.85})` : '#F5F5F5',
                         transition: 'transform 0.1s ease, box-shadow 0.1s ease',
-                        '&:hover': cell ? { transform: 'scale(1.08)', boxShadow: '0 0 0 2px #7A5C00' } : undefined,
-                      }}
+                        '&:hover': cell ? { transform: 'scale(1.08)', boxShadow: `0 0 0 2px ${theme.palette.primary.contrastTextMuted}` } : undefined,
+                      })}
                     />
                   </Tooltip>
                 );

@@ -12,15 +12,14 @@
     "react-dom": "19.0.0",
     "@mui/material": "^5.0.0",
     "@mui/icons-material": "^5.0.0",
-    "@mui/x-data-grid": "^6.0.0",
     "@emotion/react": "^11.0.0",
     "@emotion/styled": "^11.0.0",
     "@emotion/cache": "^11.0.0",
     "@reduxjs/toolkit": "^2.0.0",
     "react-redux": "^9.0.0",
-    "react-big-calendar": "^1.8.0",
     "@repo/ui": "workspace:*",
-    "recharts": "^2.0.0"
+    "recharts": "^2.0.0",
+    "framer-motion": "^11.15.0"
   },
   "devDependencies": {
     "typescript": "^5",

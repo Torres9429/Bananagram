@@ -20,7 +20,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { LabeledSelect, LabeledField, STATUS_LABELS, PrimaryButton } from '@repo/ui';
+import { LabeledSelect, LabeledField, STATUS_LABELS, PrimaryButton } from '@repo/ui/ui';
 import {
   clearAllFilters,
   selectCampaign,
@@ -172,7 +172,7 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
           disableGutters
           elevation={0}
           defaultExpanded={false}
-          sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mt: 1, '&:before': { display: 'none' }, overflow: 'hidden' }}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mt: 1, '&:before': { display: 'none' }, overflow: 'hidden' }}
         >
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle2" fontWeight={700}>Filtros avanzados</Typography>
@@ -271,7 +271,7 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
         <Divider sx={{ my: 2 }} />
 
         <Stack direction="row" gap={1.5}>
-          <Button fullWidth variant="outlined" onClick={() => dispatch(clearAllFilters())} sx={{ color: '#7A5C00', borderColor: '#E8E8E8' }}>
+          <Button fullWidth variant="outlined" onClick={() => dispatch(clearAllFilters())} sx={{ color: 'primary.contrastTextMuted', borderColor: 'divider' }}>
             Limpiar filtros
           </Button>
           <PrimaryButton fullWidth onClick={onClose}>

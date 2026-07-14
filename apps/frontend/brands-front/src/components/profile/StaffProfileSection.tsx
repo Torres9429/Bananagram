@@ -9,7 +9,7 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Alert from '@mui/material/Alert';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { LabeledField, ProfileCompletenessBadge, AvailabilityToggle, PrimaryButton } from '@repo/ui';
+import { LabeledField, ProfileCompletenessBadge, AvailabilityToggle, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_CATEGORIES, MOCK_SPECIALTIES } from '../../lib/mock-data';
 import type { Availability, MockAvailableCM, MockAvailableDesigner } from '../../lib/mock-data';
 
@@ -59,7 +59,7 @@ export function StaffProfileSection({ mockProfile, name, onNameChange }: StaffPr
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Disponibilidad + estado de completitud */}
         <div className="lg:col-span-4">
-          <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
+          <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
             <Stack alignItems="center" gap={2}>
               <AvailabilityToggle value={availability} onChange={setAvailability} />
 
@@ -79,7 +79,7 @@ export function StaffProfileSection({ mockProfile, name, onNameChange }: StaffPr
 
         {/* Formulario */}
         <div className="lg:col-span-8">
-          <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
+          <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
             <Stack gap={0.5}>
               <LabeledField
                 label="Nombre completo:"
@@ -112,11 +112,13 @@ export function StaffProfileSection({ mockProfile, name, onNameChange }: StaffPr
                       onClick={() => toggleChip(selectedCategories, cat, setSelectedCategories)}
                       sx={{
                         cursor: 'pointer',
-                        bgcolor: selected ? '#FFF8E1' : 'transparent',
-                        color: selected ? '#7A5C00' : '#6B6B6B',
-                        border: `1px solid ${selected ? '#E0A800' : '#E8E8E8'}`,
+                        bgcolor: selected ? 'primary.light' : 'transparent',
+                        color: selected ? 'primary.contrastTextMuted' : '#6B6B6B',
+                        borderWidth: 1,
+                        borderStyle: 'solid',
+                        borderColor: selected ? 'primary.main' : 'divider',
                         fontWeight: selected ? 700 : 400,
-                        '&:hover': { borderColor: '#E0A800' },
+                        '&:hover': { borderColor: 'primary.main' },
                       }}
                     />
                   );
@@ -137,11 +139,13 @@ export function StaffProfileSection({ mockProfile, name, onNameChange }: StaffPr
                       onClick={() => toggleChip(selectedSpecialties, sp, setSelectedSpecialties)}
                       sx={{
                         cursor: 'pointer',
-                        bgcolor: selected ? '#FFF8E1' : 'transparent',
-                        color: selected ? '#7A5C00' : '#6B6B6B',
-                        border: `1px solid ${selected ? '#E0A800' : '#E8E8E8'}`,
+                        bgcolor: selected ? 'primary.light' : 'transparent',
+                        color: selected ? 'primary.contrastTextMuted' : '#6B6B6B',
+                        borderWidth: 1,
+                        borderStyle: 'solid',
+                        borderColor: selected ? 'primary.main' : 'divider',
                         fontWeight: selected ? 700 : 400,
-                        '&:hover': { borderColor: '#E0A800' },
+                        '&:hover': { borderColor: 'primary.main' },
                       }}
                     />
                   );

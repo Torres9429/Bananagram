@@ -6,7 +6,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import type { TextFieldProps } from '@mui/material/TextField';
-import { LabeledField } from '@repo/ui';
+import { LabeledField } from '@repo/ui/ui';
 
 interface PasswordFieldProps extends Omit<TextFieldProps, 'type' | 'label'> {
   label?: string;

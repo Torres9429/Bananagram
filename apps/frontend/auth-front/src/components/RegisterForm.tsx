@@ -17,14 +17,15 @@ import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import BrushOutlinedIcon from '@mui/icons-material/BrushOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
-import { LabeledField, LabeledSelect } from '@repo/ui';
+import { LabeledField, LabeledSelect } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
-import { setCredentials, findUserByEmail, buildTokenFromUser, setCookieToken } from '@repo/ui';
+import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { getPostAuthDestination } from '@repo/ui/utils';
+import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
 import { MOCK_CATEGORIES, type ProfileType } from '../lib/mock-data';
 
 // Los 5 valores de ProfileType (§A.1 del análisis de dominio) — solo cambia cómo
-// se representa el perfil, nunca el flujo ni las capacidades (mismo principio ya
-// documentado para BrandType en brands-front/StepBrand.tsx).
+// se representa el perfil, nunca el flujo ni las capacidades.
 const PROFILE_TYPE_OPTIONS: { value: ProfileType; icon: typeof BusinessOutlinedIcon; label: string; example: string }[] = [
   { value: 'brand', icon: BusinessOutlinedIcon, label: 'Marca', example: 'Nike, Zara, Starbucks…' },
   { value: 'company', icon: ApartmentOutlinedIcon, label: 'Empresa', example: 'Consultora, estudio, agencia…' },
@@ -38,7 +39,6 @@ const STEPS = ['Tu cuenta', 'Tu perfil'];
 // Mock: el registro usa la cuenta demo de Cliente.
 // Backend: POST /auth/register { name, email, password, type, profileName, category } → JWT real + Perfil creado.
 const MOCK_CLIENT_EMAIL = 'cliente@bananagram.mx';
-const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
 
 export function RegisterForm() {
   const dispatch = useDispatch();
@@ -101,7 +101,7 @@ export function RegisterForm() {
     // El Perfil nace en el mismo instante que el Usuario (§A.2) — no hay un paso
     // posterior de onboarding obligatorio. La persistencia real de profileType/
     // profileName/category queda pendiente de backend (ver nota arriba).
-    window.location.href = WEB_SHELL_DASHBOARD_URL;
+    window.location.href = getPostAuthDestination(mockUser.role);
   }
 
   return (
@@ -110,7 +110,7 @@ export function RegisterForm() {
         <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.secondary' }}>
           Crea tu cuenta
         </Typography>
-        <Chip label="Cliente" size="small" sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 700 }} />
+        <Chip label="Cliente" size="small" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 700 }} />
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
         Registra tu perfil y comienza a gestionar contenido
@@ -194,7 +194,7 @@ export function RegisterForm() {
                     borderRadius: '10px !important',
                     flexDirection: 'column',
                     gap: 0.25,
-                    '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#E0A800 !important', color: '#7A5C00' },
+                    '&.Mui-selected': { bgcolor: '#FFF8E1', borderColor: '#E0A800 !important', color: 'primary.contrastTextMuted' },
                   }}
                 >
                   <Icon sx={{ fontSize: 18 }} />

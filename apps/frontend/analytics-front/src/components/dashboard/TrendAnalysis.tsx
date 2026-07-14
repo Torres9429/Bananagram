@@ -25,14 +25,14 @@ export function TrendAnalysis() {
   const windows = useSelector(selectTrendWindows);
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Tendencias</Typography>
       <Grid container spacing={2}>
         {windows.map((w) => {
           const Icon = DIRECTION_ICON[w.direction];
           return (
             <Grid item xs={12} sm={4} key={w.days}>
-              <Box sx={{ p: 2, border: '1px solid #E8E8E8', borderRadius: 3, opacity: w.hasData ? 1 : 0.5, transition: 'opacity 0.15s ease' }}>
+              <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, opacity: w.hasData ? 1 : 0.5, transition: 'opacity 0.15s ease' }}>
                 <Typography variant="caption" color="text.secondary">Últimos {w.days} días</Typography>
                 {w.hasData ? (
                   <>

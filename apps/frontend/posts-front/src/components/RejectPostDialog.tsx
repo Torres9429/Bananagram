@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FormDialog, LabeledField } from '@repo/ui';
+import { FormDialog, LabeledField } from '@repo/ui/ui';
 
 interface RejectPostDialogProps {
   open: boolean;

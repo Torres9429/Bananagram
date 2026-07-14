@@ -1,4 +1,5 @@
-import type { BrandScore } from '@repo/ui';
+import type { BrandScore } from '@repo/ui/types';
+import type { Theme } from '@mui/material/styles';
 
 export interface MockEngagementPoint {
   day: string;
@@ -80,12 +81,17 @@ export const MOCK_BRAND_METRICS: MockBrandMetric[] = [
   },
 ];
 
-export const MOCK_REACH_BY_NETWORK = [
-  { network: 'Instagram', reach: 38000, color: '#E0A800' },
-  { network: 'TikTok', reach: 24000, color: '#D4AC40' },
-  { network: 'Facebook', reach: 15000, color: '#8F8F8F' },
-  { network: 'X', reach: 9400, color: '#7A5C00' },
-];
+// Función en vez de arreglo estático: el color de 'X' es un token del theme
+// (contrastTextMuted); si esto llega a alimentar un `fill` de Recharts,
+// necesita el valor real, no una ruta de string.
+export function getMockReachByNetwork(theme: Theme) {
+  return [
+    { network: 'Instagram', reach: 38000, color: '#E0A800' },
+    { network: 'TikTok', reach: 24000, color: '#D4AC40' },
+    { network: 'Facebook', reach: 15000, color: '#8F8F8F' },
+    { network: 'X', reach: 9400, color: theme.palette.primary.contrastTextMuted! },
+  ];
+}
 
 export const MOCK_TOP_POSTS: MockTopPost[] = [
   { id: 'p5', title: 'Reels sustentabilidad', brandProfileId: 'bp1', likes: 1240, comments: 87, shares: 34, engagementRate: 5.4 },

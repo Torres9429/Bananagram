@@ -18,7 +18,9 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { EmptyState, FormDialog, LabeledField, LabeledSelect, ScoreGauge, selectUser, PrimaryButton } from '@repo/ui';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, ScoreGauge, PrimaryButton } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { getInitials } from '@repo/ui/utils';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CampaignCard } from '../campaigns/CampaignCard';
 import {
@@ -106,12 +108,12 @@ export function ClientSection() {
     setEditProfileOpen(false);
   }
 
-  const initials = profile.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+  const initials = getInitials(profile.name).toUpperCase();
 
   return (
     <Stack gap={3}>
       {/* Hero del perfil — identidad + score + acciones principales */}
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, background: 'linear-gradient(135deg, #FFFDF5 0%, #FFFFFF 60%)' }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, background: 'linear-gradient(135deg, #FFFDF5 0%, #FFFFFF 60%)' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={3}>
           <Stack direction="row" gap={2} alignItems="center">
             <Avatar sx={{ width: 72, height: 72, bgcolor: profile.color, color: '#fff', fontSize: 26, fontWeight: 700 }}>
@@ -120,7 +122,7 @@ export function ClientSection() {
             <Box>
               <Typography variant="h5" fontWeight={700}>{profile.name}</Typography>
               <Stack direction="row" gap={1} flexWrap="wrap" mt={0.75}>
-                <Chip size="small" label={PROFILE_TYPE_LABELS[profile.type]} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} />
+                <Chip size="small" label={PROFILE_TYPE_LABELS[profile.type]} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
                 <Chip size="small" label={profile.category} variant="outlined" />
               </Stack>
             </Box>
@@ -134,22 +136,22 @@ export function ClientSection() {
 
         <Stack direction="row" gap={1.5} flexWrap="wrap">
           <Button size="small" variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEditProfile}
-            sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}>
+            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
             Editar perfil
           </Button>
           <Button size="small" variant="outlined" startIcon={<CalendarMonthOutlinedIcon />} onClick={() => router.push('/profile/calendar')}
-            sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}>
+            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
             Ver calendario
           </Button>
           <Button size="small" variant="outlined" startIcon={<RateReviewOutlinedIcon />} onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/approvals`; }}
-            sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}>
+            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
             Ver aprobaciones
           </Button>
         </Stack>
       </Paper>
 
       {/* Redes conectadas — cards */}
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="subtitle1" fontWeight={700}>Redes conectadas</Typography>
           <Button
@@ -157,7 +159,7 @@ export function ClientSection() {
             variant="outlined"
             onClick={() => setAddNetworkOpen(true)}
             disabled={availableNetworksToAdd.length === 0}
-            sx={{ borderColor: '#E8E8E8', color: 'secondary.main', '&:hover': { borderColor: '#E0A800' } }}
+            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
           >
             + Agregar red social
           </Button>
@@ -171,7 +173,7 @@ export function ClientSection() {
               const netColor = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === a.socialNetwork)?.color ?? '#6B6B6B';
               return (
                 <Grid item xs={12} sm={6} md={4} key={a.id}>
-                  <Paper elevation={0} sx={{ p: 2, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
+                  <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, height: '100%' }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
                       <Chip size="small" label={a.socialNetwork} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700 }} />
                       {locked && (
@@ -200,7 +202,7 @@ export function ClientSection() {
       </Paper>
 
       {/* Campañas — cards clickeables */}
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="subtitle1" fontWeight={700}>Campañas</Typography>
           <PrimaryButton

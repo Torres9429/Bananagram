@@ -28,10 +28,10 @@ export function CampaignCard({ campaign, onClick, profileName }: CampaignCardPro
       elevation={0}
       onClick={onClick}
       sx={{
-        p: 2.5, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%',
+        p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 3, height: '100%',
         cursor: 'pointer', transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
         display: 'flex', flexDirection: 'column',
-        '&:hover': { borderColor: '#E0A800', boxShadow: '0 2px 10px rgba(224,168,0,0.15)' },
+        '&:hover': { borderColor: 'primary.main', boxShadow: '0 2px 10px rgba(224,168,0,0.15)' },
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1}>
@@ -56,7 +56,7 @@ export function CampaignCard({ campaign, onClick, profileName }: CampaignCardPro
           })
         )}
       </Stack>
-      <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5} mt="auto" sx={{ color: '#7A5C00' }}>
+      <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5} mt="auto" sx={{ color: 'primary.contrastTextMuted' }}>
         <Typography variant="caption" fontWeight={700}>Ver detalle</Typography>
         <ArrowForwardIcon sx={{ fontSize: 16 }} />
       </Stack>

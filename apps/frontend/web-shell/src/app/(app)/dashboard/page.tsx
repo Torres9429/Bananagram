@@ -1,26 +1,27 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { selectUser } from '@repo/ui';
-import { AppRole } from '@repo/ui';
+import { selectUser } from '@repo/ui/state';
+import { AppRole } from '@repo/ui/types';
+import { getPostAuthDestination } from '@repo/ui/utils';
 import { DashboardAdmin } from '../../../components/dashboard/DashboardAdmin';
-import { DashboardCM } from '../../../components/dashboard/DashboardCM';
-import { DashboardCliente } from '../../../components/dashboard/DashboardCliente';
-import { DashboardDisenador } from '../../../components/dashboard/DashboardDisenador';
 
 export default function DashboardPage() {
   const user = useSelector(selectUser);
 
-  switch (user?.role) {
-    case AppRole.ADMINISTRADOR:
-      return <DashboardAdmin />;
-    case AppRole.CLIENTE:
-      return <DashboardCliente />;
-    case AppRole.DISENADOR:
-      return <DashboardDisenador />;
-    case AppRole.COMMUNITY_MANAGER:
-    default:
-      // Fallback a CM también para cuando la sesión está cargando.
-      return <DashboardCM />;
+  // Dashboard es exclusivo de Administrador. Mientras la sesión de Redux
+  // aún no hidrata, `user` es undefined un instante — no se renderiza nada
+  // (nunca un dashboard de negocio como fallback) hasta saber el rol real.
+  useEffect(() => {
+    if (user && user.role !== AppRole.ADMINISTRADOR) {
+      window.location.href = getPostAuthDestination(user.role);
+    }
+  }, [user]);
+
+  if (user?.role === AppRole.ADMINISTRADOR) {
+    return <DashboardAdmin />;
   }
+
+  return null;
 }

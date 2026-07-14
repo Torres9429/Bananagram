@@ -10,7 +10,8 @@ import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
-import { ScoreGauge, StatusChip, WidgetCard, PrimaryButton } from '@repo/ui';
+import { ScoreGauge, StatusChip, WidgetCard, PrimaryButton } from '@repo/ui/ui';
+import { getInitials } from '@repo/ui/utils';
 import { MOCK_CLIENTE_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
 
 const POSTS_FRONT_URL = 'http://localhost:3014';
@@ -51,7 +52,7 @@ export function DashboardCliente() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight={700}>Esperan tu aprobación</Typography>
               <Typography variant="body2" onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/approvals`; }}
-                sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
+                sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}>Ver todas →</Typography>
             </Stack>
             {postsToApprove.length === 0 ? (
               <Typography variant="body2" color="text.secondary">No hay publicaciones pendientes. 🎉</Typography>
@@ -85,8 +86,8 @@ export function DashboardCliente() {
             <Stack direction="row" gap={2} flexWrap="wrap">
               {team.map((member) => (
                 <Stack key={member.id} direction="row" gap={1.5} alignItems="center" sx={{ minWidth: 200 }}>
-                  <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 36, height: 36, fontSize: 13, fontWeight: 700 }}>
-                    {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  <Avatar sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', width: 36, height: 36, fontSize: 13, fontWeight: 700 }}>
+                    {getInitials(member.name)}
                   </Avatar>
                   <Box>
                     <Typography variant="body2" fontWeight={600}>{member.name}</Typography>

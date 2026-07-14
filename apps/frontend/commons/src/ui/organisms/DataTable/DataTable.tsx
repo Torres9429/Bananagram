@@ -8,6 +8,7 @@ import TableBody from '@mui/material/TableBody';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import TablePagination from '@mui/material/TablePagination';
+import Typography from '@mui/material/Typography';
 
 export interface DataTableColumn<T> {
   key: string;
@@ -27,6 +28,11 @@ interface DataTableProps<T> {
   pagination?: boolean;
   initialPageSize?: number;
   pageSizeOptions?: number[];
+  // Estado vacío (opcional, retrocompatible) — mensaje mostrado dentro de la
+  // tabla cuando rows.length === 0. No reutiliza el molecule EmptyState: ese
+  // está pensado para vaciar una pantalla completa (título h6 + py:8), demasiado
+  // grande para una fila de tabla — este es un estado compacto propio de DataTable.
+  emptyMessage?: string;
 }
 
 export function DataTable<T>({
@@ -37,6 +43,7 @@ export function DataTable<T>({
   pagination = false,
   initialPageSize = 10,
   pageSizeOptions = [10, 25, 50],
+  emptyMessage = 'No hay registros para mostrar.',
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(initialPageSize);
@@ -77,29 +84,37 @@ export function DataTable<T>({
           </TableRow>
         </TableHead>
         <TableBody>
-          {visibleRows.map((row, i) => (
-            <TableRow
-              key={getRowKey(row)}
-              hover
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              sx={{
-                cursor: onRowClick ? 'pointer' : 'default',
-                bgcolor: i % 2 === 0 ? 'background.paper' : 'background.default',
-                '&:hover': { bgcolor: '#FFF8E1' },
-                '& td': { borderBottom: '1px solid', borderColor: 'divider' },
-                '&:last-child td': { borderBottom: 0 },
-              }}
-            >
-              {columns.map((col) => (
-                <TableCell key={col.key} align={col.align} sx={{ width: col.width }}>
-                  {col.render(row)}
-                </TableCell>
-              ))}
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={columns.length} align="center" sx={{ py: 5, borderBottom: 0 }}>
+                <Typography variant="body2" color="text.secondary">{emptyMessage}</Typography>
+              </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            visibleRows.map((row, i) => (
+              <TableRow
+                key={getRowKey(row)}
+                hover
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                sx={{
+                  cursor: onRowClick ? 'pointer' : 'default',
+                  bgcolor: i % 2 === 0 ? 'background.paper' : 'background.default',
+                  '&:hover': { bgcolor: 'primary.light' },
+                  '& td': { borderBottom: '1px solid', borderColor: 'divider' },
+                  '&:last-child td': { borderBottom: 0 },
+                }}
+              >
+                {columns.map((col) => (
+                  <TableCell key={col.key} align={col.align} sx={{ width: col.width }}>
+                    {col.render(row)}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
-      {pagination && (
+      {pagination && rows.length > 0 && (
         <TablePagination
           component="div"
           count={rows.length}

@@ -12,13 +12,13 @@ import Chip from '@mui/material/Chip';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
 import { PasswordField } from './PasswordField';
-import { setCredentials, findUserByEmail, buildTokenFromUser, setCookieToken } from '@repo/ui';
+import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { getPostAuthDestination } from '@repo/ui/utils';
+import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
 
 // useSearchParams se usa SOLO para leer el email del enlace de activación
 // (no para sesión). La sesión se establece mediante la cookie.
 // En producción, este parámetro será un JWT firmado de un solo uso.
-
-const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
 
 const ROLE_LABEL: Record<string, string> = {
   community_manager: 'Community Manager',
@@ -58,7 +58,7 @@ export function ActivateForm() {
     setCookieToken(token);
     dispatch(setCredentials({ accessToken: token }));
     setDone(true);
-    setTimeout(() => { window.location.href = WEB_SHELL_DASHBOARD_URL; }, 1400);
+    setTimeout(() => { window.location.href = getPostAuthDestination(user!.role); }, 1400);
   }
 
   const roleLabel = ROLE_LABEL[user.role] ?? user.role;
@@ -76,12 +76,12 @@ export function ActivateForm() {
       ) : (
         <>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-            <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 40, height: 40 }}>
+            <Avatar sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', width: 40, height: 40 }}>
               <KeyOutlinedIcon />
             </Avatar>
             <Box>
               <Typography variant="h5" fontWeight={700} color="text.secondary">Activa tu cuenta</Typography>
-              <Chip label={roleLabel} size="small" sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 700 }} />
+              <Chip label={roleLabel} size="small" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 700 }} />
             </Box>
           </Box>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>

@@ -12,7 +12,7 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
-import { WidgetCard, PrimaryButton } from '@repo/ui';
+import { WidgetCard, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_ADMIN_DASHBOARD } from '../../lib/mock-dashboard';
 
 const ADMIN_FRONT_URL = 'http://localhost:3010';
@@ -53,7 +53,7 @@ export function DashboardAdmin() {
           <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight={700}>Usuarios por rol</Typography>
-              <Typography variant="body2" onClick={() => nav('/users')} sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}>
+              <Typography variant="body2" onClick={() => nav('/users')} sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}>
                 Ver todos →
               </Typography>
             </Stack>
@@ -61,7 +61,7 @@ export function DashboardAdmin() {
               {users.byRole.map((r) => (
                 <Stack key={r.role} direction="row" justifyContent="space-between" alignItems="center">
                   <Stack direction="row" gap={1} alignItems="center">
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#FFF8E1', color: '#7A5C00', fontSize: 11, fontWeight: 700 }}>
+                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontSize: 11, fontWeight: 700 }}>
                       {r.role[0]}
                     </Avatar>
                     <Typography variant="body2">{r.role}</Typography>
@@ -89,7 +89,7 @@ export function DashboardAdmin() {
                     variant="outlined"
                     startIcon={item.icon}
                     onClick={() => nav(item.path)}
-                    sx={{ justifyContent: 'flex-start', borderColor: '#E8E8E8', color: '#3D3D3D', '&:hover': { borderColor: '#E0A800', color: '#7A5C00' } }}
+                    sx={{ justifyContent: 'flex-start', borderColor: '#E8E8E8', color: '#3D3D3D', '&:hover': { borderColor: '#E0A800', color: 'primary.contrastTextMuted' } }}
                   >
                     {item.label}
                   </Button>
@@ -100,7 +100,7 @@ export function DashboardAdmin() {
             <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="subtitle1" fontWeight={700}>Actividad reciente</Typography>
-                <Typography variant="body2" onClick={() => nav('/audit-log')} sx={{ color: '#7A5C00', fontWeight: 600, cursor: 'pointer' }}>
+                <Typography variant="body2" onClick={() => nav('/audit-log')} sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}>
                   Ver log completo →
                 </Typography>
               </Stack>

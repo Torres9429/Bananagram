@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -13,7 +13,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
-import { DataTable, type DataTableColumn, StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui';
+import { DataTable, type DataTableColumn, StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_POSTS, MOCK_CAMPAIGNS, getPostNetworkInfo, type MockPost, type PostStatus } from '../../lib/mock-data';
 import { NetworkAvatar } from '../../components/NetworkAvatar';
 import { CampaignDot } from '../../components/CampaignDot';
@@ -27,7 +27,18 @@ const FILTERS: { key: 'all' | PostStatus; label: string }[] = [
   { key: 'publicado', label: 'Publicado' },
 ];
 
+// useSearchParams requiere un límite de Suspense en el App Router (si no,
+// Next.js no puede prerenderizar la ruta en el build) — el propio hook solo
+// vive en PostsListContent, este wrapper es el único cambio necesario.
 export default function PostsListPage() {
+  return (
+    <Suspense fallback={null}>
+      <PostsListContent />
+    </Suspense>
+  );
+}
+
+function PostsListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filter, setFilter] = useState<'all' | PostStatus>('all');
@@ -157,7 +168,7 @@ export default function PostsListPage() {
             label={campaignName}
             onDelete={handleClearCampaignFilter}
             size="small"
-            sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }}
+            sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }}
           />
         </Stack>
       )}
@@ -188,7 +199,7 @@ export default function PostsListPage() {
                 sx={{
                   cursor: 'pointer',
                   bgcolor: active ? '#E0A800' : 'transparent',
-                  color: active ? '#7A5C00' : '#1A1A1A',
+                  color: active ? 'primary.contrastTextMuted' : '#1A1A1A',
                   borderColor: active ? '#D4AC40' : '#E8E8E8',
                   fontWeight: active ? 600 : 400,
                 }}
@@ -216,6 +227,7 @@ export default function PostsListPage() {
         onRowClick={(post) => router.push(`/posts/${post.id}`)}
         pagination
         initialPageSize={10}
+        emptyMessage="No hay publicaciones para estos filtros."
       />
       </Box>
     </Box>

@@ -6,7 +6,7 @@ import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
-import { MetricCard } from '@repo/ui';
+import { MetricCard } from '@repo/ui/ui';
 import { selectAnalyticsKpiComparison } from '../../store/analytics.selectors';
 
 /**
@@ -22,7 +22,7 @@ export function GeneralMetricCards() {
   const { current } = useSelector(selectAnalyticsKpiComparison);
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Métricas agregadas</Typography>
       <Grid container spacing={2}>
         <Grid item xs={6} sm={3}>

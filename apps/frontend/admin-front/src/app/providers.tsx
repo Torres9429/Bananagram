@@ -3,7 +3,8 @@
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Provider as ReduxProvider } from 'react-redux';
-import { theme, EmotionCacheProvider, useSessionBootstrap } from '@repo/ui';
+import { theme, EmotionCacheProvider } from '@repo/ui/theme';
+import { useSessionBootstrap } from '@repo/ui/ui';
 import { store } from '../store';
 import { AppShell } from '../components/AppShell';
 

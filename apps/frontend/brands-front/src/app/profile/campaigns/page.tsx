@@ -10,7 +10,8 @@ import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { selectUser, PrimaryButton } from '@repo/ui';
+import { PrimaryButton } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
 import { CreateCampaignDialog } from '../../../components/CreateCampaignDialog';
 import {
   MOCK_CAMPAIGNS,
@@ -31,7 +32,7 @@ export default function ProfileCampaignsPage() {
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
-      <Box sx={{ borderBottom: '1px solid #E8E8E8', bgcolor: '#fff', px: 1 }}>
+      <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: '#fff', px: 1 }}>
         <Stack direction="row" alignItems="center">
           <Tooltip title="Volver a mi perfil">
             <IconButton onClick={() => router.push('/profile')} sx={{ color: 'secondary.main', ml: 1, my: 0.5 }}>
@@ -57,7 +58,7 @@ export default function ProfileCampaignsPage() {
                 justifyContent="space-between"
                 alignItems="center"
                 onClick={() => router.push(`/profile/campaigns/${c.id}`)}
-                sx={{ p: 2, bgcolor: '#fff', border: '1px solid #E8E8E8', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
+                sx={{ p: 2, bgcolor: '#fff', border: '1px solid', borderColor: 'divider', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
               >
                 <Box>
                   <Typography variant="body1" fontWeight={600}>{c.name}</Typography>

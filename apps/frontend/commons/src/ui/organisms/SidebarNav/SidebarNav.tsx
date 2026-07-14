@@ -1,18 +1,20 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Tooltip from '@mui/material/Tooltip';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const WIDTH_EXPANDED = 220;
 const WIDTH_COLLAPSED = 76;
+// Debe coincidir con la duración de `transition: 'width 0.2s ease'` del
+// contenedor: el label de cada ítem solo aparece una vez que el ancho
+// terminó de animar, para no montarse mientras el sidebar aún está angosto
+// (eso provocaba texto/columna desbordando y "saltando" a su lugar).
+const WIDTH_TRANSITION_MS = 200;
 
 export interface SidebarNavItem {
   key: string;
@@ -45,7 +47,48 @@ interface SidebarNavProps {
 
 export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHeader }: SidebarNavProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [labelsVisible, setLabelsVisible] = useState(true);
+  const labelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const width = collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED;
+
+  useEffect(() => () => {
+    if (labelTimeoutRef.current) clearTimeout(labelTimeoutRef.current);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prevCollapsed) => {
+      const next = !prevCollapsed;
+      if (labelTimeoutRef.current) clearTimeout(labelTimeoutRef.current);
+      if (next) {
+        // Al contraer, el label se oculta de inmediato (no hay nada que
+        // desbordar: el ancho solo se reduce).
+        setLabelsVisible(false);
+      } else {
+        // Al expandir, se espera a que termine la transición de ancho antes
+        // de montar el label.
+        labelTimeoutRef.current = setTimeout(() => setLabelsVisible(true), WIDTH_TRANSITION_MS);
+      }
+      return next;
+    });
+  }
+
+  // Clic en cualquier zona libre del sidebar (fondo, padding, espacio debajo
+  // de los ítems) alterna collapsed. Se ignora si el clic se originó en un
+  // elemento interactivo (link, botón, tooltip, etc.) — closest() en vez de
+  // una lista de clases CSS, para no depender de la estructura interna de
+  // cada ítem.
+  function handleBackgroundClick(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (target.closest('button, a, [role="button"]')) return;
+    toggleCollapsed();
+  }
+
+  function handleToggleControlKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleCollapsed();
+    }
+  }
 
   return (
     <>
@@ -60,6 +103,7 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
           garantizar en 5 apps distintas. fixed se ancla directo al viewport,
           sin importar el alto de la página ni el árbol de contenedores. */}
       <Box
+        onClick={handleBackgroundClick}
         sx={{
           position: 'fixed',
           top: 0,
@@ -73,31 +117,52 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
           display: 'flex',
           flexDirection: 'column',
           py: 2,
+          cursor: 'pointer',
           transition: 'width 0.2s ease',
         }}
       >
-        <IconButton
-          size="small"
-          onClick={() => setCollapsed((c) => !c)}
+        {/* Control accesible por teclado para alternar collapsed sin
+            reintroducir un botón visible: permanece invisible salvo cuando
+            recibe foco por teclado (patrón sr-only-focusable). No envuelve
+            los links de navegación, así que nunca es un botón inválido. */}
+        <Box
+          role="button"
+          tabIndex={0}
+          aria-label={collapsed ? 'Expandir navegación' : 'Contraer navegación'}
+          onClick={toggleCollapsed}
+          onKeyDown={handleToggleControlKeyDown}
           sx={{
             position: 'absolute',
-            top: 24,
-            right: -14,
-            // Alto y por encima del contenido: nunca debe quedar tapado por el
-            // header/TopBar del área principal ni cortado por el propio sidebar.
-            zIndex: 10,
-            width: 28,
-            height: 28,
-            bgcolor: 'background.paper',
-            border: '1px solid',
-            borderColor: 'divider',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-            color: 'primary.dark',
-            '&:hover': { bgcolor: 'background.paper' },
+            width: 1,
+            height: 1,
+            overflow: 'hidden',
+            clipPath: 'inset(50%)',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            '&:focus-visible': {
+              position: 'static',
+              width: 'auto',
+              height: 'auto',
+              overflow: 'visible',
+              clipPath: 'none',
+              whiteSpace: 'normal',
+              display: 'block',
+              mx: collapsed ? 1 : 2,
+              mb: 1,
+              px: 1,
+              py: 0.5,
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'primary.main',
+              color: 'primary.dark',
+              fontSize: 12,
+              fontWeight: 600,
+              bgcolor: 'background.paper',
+            },
           }}
         >
-          {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
-        </IconButton>
+          {collapsed ? 'Expandir navegación' : 'Contraer navegación'}
+        </Box>
 
         <Box
           sx={{
@@ -136,6 +201,7 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
                   display: 'flex',
                   alignItems: 'center',
                   px: collapsed ? 1 : 2,
+                  overflow: 'hidden',
                   color: active ? 'primary.contrastText' : 'primary.dark',
                   bgcolor: active ? 'primary.main' : 'transparent',
                   '&:hover': { bgcolor: active ? 'primary.main' : 'rgba(224, 168, 0, 0.12)' },
@@ -145,8 +211,8 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
                 <ListItemIcon sx={{ color: 'inherit', minWidth: collapsed ? 0 : 36, justifyContent: 'center' }}>
                   {item.icon}
                 </ListItemIcon>
-                {!collapsed && (
-                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 700 : 600, fontSize: 14 }} />
+                {labelsVisible && !collapsed && (
+                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 700 : 600, fontSize: 14, noWrap: true }} />
                 )}
               </ListItemButton>
             );

@@ -8,7 +8,7 @@ import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
-import { EmptyState } from '@repo/ui';
+import { EmptyState } from '@repo/ui/ui';
 import { selectCampaign, selectPost } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectTimeline } from '../../store/analytics.selectors';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
@@ -26,19 +26,19 @@ export function ActivityTimeline() {
 
   if (events.length === 0) {
     return (
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
         <EmptyState title="Sin actividad para mostrar" description="Ajusta los filtros activos." />
       </Paper>
     );
   }
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Línea de tiempo</Typography>
-      <Stack sx={{ position: 'relative', pl: 3, borderLeft: '2px solid #E8E8E8' }} gap={2}>
+      <Stack sx={{ position: 'relative', pl: 3, borderLeft: '2px solid', borderLeftColor: 'divider' }} gap={2}>
         {events.map((event) => {
           const isSelected = event.type === 'post' ? filters.postId === event.postId : filters.campaignId === event.campaignId;
-          const color = event.networkCode ? NETWORK_DISPLAY[event.networkCode].color : '#7A5C00';
+          const color = event.networkCode ? NETWORK_DISPLAY[event.networkCode].color : 'primary.contrastTextMuted';
           return (
             <Box
               key={event.id}
@@ -48,7 +48,7 @@ export function ActivityTimeline() {
                 cursor: 'pointer',
                 p: 1.25,
                 borderRadius: 2,
-                bgcolor: isSelected ? '#FFF8E1' : 'transparent',
+                bgcolor: isSelected ? 'primary.light' : 'transparent',
                 transition: 'background-color 0.15s ease',
                 '&:hover': { bgcolor: '#FAFAFA' },
                 '&::before': {
@@ -66,7 +66,7 @@ export function ActivityTimeline() {
               <Stack direction="row" alignItems="center" gap={1}>
                 {event.type === 'campaign' ? <CampaignOutlinedIcon fontSize="small" sx={{ color }} /> : <ArticleOutlinedIcon fontSize="small" sx={{ color }} />}
                 <Typography variant="body2" fontWeight={600}>{event.label}</Typography>
-                {event.networkCode && <Chip size="small" label={event.networkCode} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} />}
+                {event.networkCode && <Chip size="small" label={event.networkCode} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />}
               </Stack>
               <Typography variant="caption" color="text.secondary">{event.date}</Typography>
             </Box>

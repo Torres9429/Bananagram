@@ -354,7 +354,7 @@ export function computeInsights(facts: SocialMetricFact[], hourByFactId: Record<
     });
   }
 
-  for (const { networkCode, kpis } of networkKpis) {
+  for (const { networkCode } of networkKpis) {
     const previous = computeKpis(byNetwork[networkCode]?.filter((f) => f.publishedAt < CURRENT_WEEK_START) ?? []);
     const current = computeKpis(byNetwork[networkCode]?.filter((f) => f.publishedAt >= CURRENT_WEEK_START) ?? []);
     if (previous.totalReach === 0 || current.totalReach === 0) continue;

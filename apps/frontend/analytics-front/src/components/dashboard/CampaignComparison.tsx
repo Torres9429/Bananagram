@@ -7,7 +7,7 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MenuItem from '@mui/material/MenuItem';
-import { EmptyState, LabeledSelect } from '@repo/ui';
+import { EmptyState, LabeledSelect } from '@repo/ui/ui';
 import { selectCampaignOptions, selectFactsForNetworkTabs } from '../../store/analytics.selectors';
 import { compareCampaigns } from '../../lib/analytics/engine';
 
@@ -33,14 +33,14 @@ export function CampaignComparison() {
 
   if (campaignOptions.length < 2) {
     return (
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
         <EmptyState title="Se necesitan al menos 2 campañas" description="Ajusta los filtros de perfil activos." />
       </Paper>
     );
   }
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparación entre campañas</Typography>
 
       <Grid container spacing={2} mb={2}>
@@ -64,7 +64,7 @@ export function CampaignComparison() {
             {ROWS.map((row) => (
               <Grid container spacing={2} key={row.key} alignItems="center">
                 <Grid item xs={4}>
-                  <Typography variant="body2" fontWeight={700} sx={{ color: '#7A5C00' }}>
+                  <Typography variant="body2" fontWeight={700} sx={{ color: 'primary.contrastTextMuted' }}>
                     {result.campaignA!.kpis[row.key]}{row.unit ?? ''}
                   </Typography>
                 </Grid>

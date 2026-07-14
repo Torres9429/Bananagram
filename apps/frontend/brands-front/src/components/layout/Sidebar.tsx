@@ -11,7 +11,9 @@ import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import { SidebarNav, type SidebarNavItem, usePermissions, selectUser, AppRole } from '@repo/ui';
+import { SidebarNav, type SidebarNavItem, usePermissions } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { AppRole } from '@repo/ui/types';
 import { useSelector } from 'react-redux';
 
 const WEB_SHELL_URL = 'http://localhost:3000';
@@ -63,7 +65,7 @@ export function Sidebar() {
   // (que ya contiene Usuarios/Roles/Catálogos/Auditoría vía AdminTabs).
   const visibleItems = isAdmin
     ? permissionVisible.filter((item) => item.key === 'dashboard' || item.key === 'admin')
-    : permissionVisible;
+    : permissionVisible.filter((item) => item.key !== 'dashboard');
 
   function handleNavigate(href: string) {
     if (href.startsWith('http')) {

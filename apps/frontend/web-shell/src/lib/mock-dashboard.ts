@@ -1,4 +1,5 @@
-import type { PostStatus } from '@repo/ui';
+import type { PostStatus } from '@repo/ui/types';
+import type { Theme } from '@mui/material/styles';
 
 export interface MockCampaignSummary {
   id: string;
@@ -57,12 +58,17 @@ export const MOCK_POSTS_BY_STATUS = [
   { status: 'Publicado', count: 12 },
 ];
 
-export const MOCK_POSTS_BY_NETWORK = [
-  { network: 'Instagram', count: 14, color: '#E0A800' },
-  { network: 'TikTok', count: 8, color: '#D4AC40' },
-  { network: 'Facebook', count: 5, color: '#8F8F8F' },
-  { network: 'X', count: 3, color: '#7A5C00' },
-];
+// Función en vez de arreglo estático: el color de 'X' es un token del theme
+// (contrastTextMuted) y este arreglo alimenta el `fill` de un <Cell> de
+// Recharts, que necesita el valor real, no una ruta de string como 'primary.main'.
+export function getMockPostsByNetwork(theme: Theme) {
+  return [
+    { network: 'Instagram', count: 14, color: '#E0A800' },
+    { network: 'TikTok', count: 8, color: '#D4AC40' },
+    { network: 'Facebook', count: 5, color: '#8F8F8F' },
+    { network: 'X', count: 3, color: theme.palette.primary.contrastTextMuted! },
+  ];
+}
 
 // ── Dashboard Administrador ───────────────────────────────────────
 export const MOCK_ADMIN_DASHBOARD = {

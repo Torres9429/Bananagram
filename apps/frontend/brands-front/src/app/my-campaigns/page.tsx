@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { EmptyState } from '@repo/ui';
+import { EmptyState } from '@repo/ui/ui';
 import { CampaignCard } from '../../components/campaigns/CampaignCard';
 import { getMyCampaigns } from '../../lib/mock-data';
 

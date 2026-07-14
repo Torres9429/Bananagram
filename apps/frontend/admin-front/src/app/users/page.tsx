@@ -9,7 +9,8 @@ import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton } from '@repo/ui';
+import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
+import { getInitials } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
 import { CreateUserDialog } from '../../components/CreateUserDialog';
 import { MOCK_USERS, type MockUser } from '../../lib/mock-data';
@@ -29,8 +30,8 @@ export default function UsersPage() {
       header: 'Usuario',
       render: (u) => (
         <Stack direction="row" gap={1.5} alignItems="center">
-          <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 36, height: 36, fontSize: 13, fontWeight: 600 }}>
-            {u.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+          <Avatar sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', width: 36, height: 36, fontSize: 13, fontWeight: 600 }}>
+            {getInitials(u.name)}
           </Avatar>
           <Box>
             <Typography variant="body2" fontWeight={600}>{u.name}</Typography>
@@ -39,7 +40,7 @@ export default function UsersPage() {
         </Stack>
       ),
     },
-    { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={u.role} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} /> },
+    { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={u.role} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} /> },
     { key: 'brand', header: 'Perfil', render: (u) => <Typography variant="body2">{u.brand ?? '—'}</Typography> },
     {
       key: 'status',
@@ -78,7 +79,7 @@ export default function UsersPage() {
             </PrimaryButton>
           </ProtectedAction>
         </Stack>
-        <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} pagination initialPageSize={10} />
+        <DataTable columns={columns} rows={users} getRowKey={(u) => u.id} pagination initialPageSize={10} emptyMessage="No hay usuarios para mostrar." />
       </Box>
       <CreateUserDialog
         open={createOpen}

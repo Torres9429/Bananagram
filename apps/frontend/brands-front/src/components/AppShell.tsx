@@ -2,8 +2,8 @@
 
 import Box from '@mui/material/Box';
 import { usePathname } from 'next/navigation';
+import { TopBar } from '@repo/ui/ui';
 import { Sidebar } from './layout/Sidebar';
-import { TopBar } from './layout/TopBar';
 import { getTopBarTitle } from '../lib/topbar-titles';
 
 export function AppShell({ children }: { children: React.ReactNode }) {

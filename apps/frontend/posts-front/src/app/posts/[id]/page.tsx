@@ -14,7 +14,9 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { StatusChip, ProtectedAction, PrimaryButton, selectUser, findUserByEmail } from '@repo/ui';
+import { StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { findUserByEmail } from '@repo/ui';
 import { MOCK_POSTS, MOCK_STATUS_HISTORY, addStatusHistoryEntry, getPostNetworkInfo, type StatusHistoryItem } from '../../../lib/mock-data';
 import { RejectPostDialog } from '../../../components/RejectPostDialog';
 
