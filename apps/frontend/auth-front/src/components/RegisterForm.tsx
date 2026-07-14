@@ -20,6 +20,7 @@ import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined
 import { LabeledField, LabeledSelect } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
 import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { getPostAuthDestination } from '@repo/ui/utils';
 import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
 import { MOCK_CATEGORIES, type ProfileType } from '../lib/mock-data';
 
@@ -38,7 +39,6 @@ const STEPS = ['Tu cuenta', 'Tu perfil'];
 // Mock: el registro usa la cuenta demo de Cliente.
 // Backend: POST /auth/register { name, email, password, type, profileName, category } → JWT real + Perfil creado.
 const MOCK_CLIENT_EMAIL = 'cliente@bananagram.mx';
-const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
 
 export function RegisterForm() {
   const dispatch = useDispatch();
@@ -101,7 +101,7 @@ export function RegisterForm() {
     // El Perfil nace en el mismo instante que el Usuario (§A.2) — no hay un paso
     // posterior de onboarding obligatorio. La persistencia real de profileType/
     // profileName/category queda pendiente de backend (ver nota arriba).
-    window.location.href = WEB_SHELL_DASHBOARD_URL;
+    window.location.href = getPostAuthDestination(mockUser.role);
   }
 
   return (

@@ -11,9 +11,8 @@ import { LabeledField } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
 import { setCredentials, setCookieToken } from '@repo/ui/state';
 import { theme } from '@repo/ui/theme';
+import { getPostAuthDestination } from '@repo/ui/utils';
 import { findUserByCredentials, buildTokenFromUser } from '@repo/ui';
-
-const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
 
 export function LoginForm() {
   const dispatch = useDispatch();
@@ -45,7 +44,7 @@ export function LoginForm() {
     // La cookie es accesible desde todos los microfronts (mismo host, distintos puertos).
     setCookieToken(token);
     dispatch(setCredentials({ accessToken: token }));
-    window.location.href = WEB_SHELL_DASHBOARD_URL;
+    window.location.href = getPostAuthDestination(user.role);
   }
 
   return (

@@ -13,13 +13,12 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
 import { PasswordField } from './PasswordField';
 import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { getPostAuthDestination } from '@repo/ui/utils';
 import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
 
 // useSearchParams se usa SOLO para leer el email del enlace de activación
 // (no para sesión). La sesión se establece mediante la cookie.
 // En producción, este parámetro será un JWT firmado de un solo uso.
-
-const WEB_SHELL_DASHBOARD_URL = 'http://localhost:3000/dashboard';
 
 const ROLE_LABEL: Record<string, string> = {
   community_manager: 'Community Manager',
@@ -59,7 +58,7 @@ export function ActivateForm() {
     setCookieToken(token);
     dispatch(setCredentials({ accessToken: token }));
     setDone(true);
-    setTimeout(() => { window.location.href = WEB_SHELL_DASHBOARD_URL; }, 1400);
+    setTimeout(() => { window.location.href = getPostAuthDestination(user!.role); }, 1400);
   }
 
   const roleLabel = ROLE_LABEL[user.role] ?? user.role;

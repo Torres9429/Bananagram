@@ -65,7 +65,7 @@ export function Sidebar() {
   // (que ya contiene Usuarios/Roles/Catálogos/Auditoría vía AdminTabs).
   const visibleItems = isAdmin
     ? permissionVisible.filter((item) => item.key === 'dashboard' || item.key === 'admin')
-    : permissionVisible;
+    : permissionVisible.filter((item) => item.key !== 'dashboard');
 
   function handleNavigate(href: string) {
     if (href.startsWith('http')) {

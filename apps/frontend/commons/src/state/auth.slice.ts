@@ -14,7 +14,7 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
-interface JwtPayload {
+export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
@@ -24,7 +24,7 @@ interface JwtPayload {
 
 type AuthRootState = { auth: AuthState };
 
-function decodeJwt(token: string): JwtPayload | null {
+export function decodeJwt(token: string): JwtPayload | null {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
     const json = decodeURIComponent(

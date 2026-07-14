@@ -1,15 +1,18 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { decodeJwt } from '@repo/ui/state';
+import { getPostAuthDestination } from '@repo/ui/utils';
 import { LandingTemplate } from '../components/landing/templates/LandingTemplate';
 
 const SESSION_COOKIE = 'bananagram_token';
 
 export default async function Home() {
   const cookieStore = await cookies();
-  const hasSession = Boolean(cookieStore.get(SESSION_COOKIE)?.value);
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const payload = token ? decodeJwt(token) : null;
 
-  if (hasSession) {
-    redirect('/dashboard');
+  if (payload) {
+    redirect(getPostAuthDestination(payload.role));
   }
 
   return <LandingTemplate />;
