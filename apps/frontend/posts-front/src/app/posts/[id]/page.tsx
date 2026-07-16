@@ -17,17 +17,9 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { findUserByEmail } from '@repo/ui';
-import { MOCK_POSTS, MOCK_STATUS_HISTORY, addStatusHistoryEntry, getPostNetworkInfo, type StatusHistoryItem } from '../../../lib/mock-data';
+import { MOCK_POSTS, MOCK_STATUS_HISTORY, NETWORK_LABELS, addStatusHistoryEntry, getPostNetworkInfo } from '../../../lib/mock-data';
+import type { StatusHistoryItem } from '../../../interfaces/interface';
 import { RejectPostDialog } from '../../../components/RejectPostDialog';
-
-const NETWORK_NAMES: Record<string, string> = {
-  IG: 'Instagram',
-  TK: 'TikTok',
-  LI: 'LinkedIn',
-  FB: 'Facebook',
-  X: 'X',
-  YT: 'YouTube',
-};
 
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>();
@@ -89,7 +81,7 @@ export default function PostDetailPage() {
                   Red social
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {NETWORK_NAMES[network] ?? network}
+                  {NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network}
                 </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">

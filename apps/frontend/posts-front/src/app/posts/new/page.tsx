@@ -22,21 +22,12 @@ import { PrimaryButton } from '@repo/ui/ui';
 import {
   CHAR_LIMITS,
   MOCK_CAMPAIGNS,
+  NETWORK_LABELS,
+  MOCK_AI_SUGGESTIONS,
+  MOCK_TIME_SLOTS,
   getSocialAccountsForCampaign,
-  type SocialAccount,
 } from '../../../lib/mock-data';
-
-const NETWORK_LABEL: Record<string, string> = {
-  IG: 'Instagram', TK: 'TikTok', LI: 'LinkedIn', FB: 'Facebook', X: 'X', YT: 'YouTube',
-};
-
-const SUGGESTIONS = [
-  'Agrega una llamada a la acción clara al final del copy.',
-  'Reduce a 3-5 hashtags. Más de 7 reduce el alcance orgánico.',
-  'Mejor horario para tu audiencia: 18:00–20:00.',
-];
-
-const TIME_SLOTS = ['Hoy 18:00', 'Mañana 12:00', 'Jue 09:00'];
+import type { SocialAccount } from '../../../interfaces/interface';
 
 export default function NewPostPage() {
   const router = useRouter();
@@ -137,14 +128,14 @@ export default function NewPostPage() {
               multiline
               minRows={5}
               fullWidth
-              placeholder={`Escribe el copy para ${selectedProfile ? NETWORK_LABEL[selectedProfile.socialNetwork] ?? selectedProfile.socialNetwork : 'la red'}…`}
+              placeholder={`Escribe el copy para ${selectedProfile ? NETWORK_LABELS[selectedProfile.socialNetwork] ?? selectedProfile.socialNetwork : 'la red'}…`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5} mb={2}>
               <Typography variant="caption" color="text.secondary">
-                Límite {NETWORK_LABEL[network] ?? network}: {limit.toLocaleString()} caracteres
+                Límite {NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network}: {limit.toLocaleString()} caracteres
               </Typography>
               <Typography variant="caption" sx={{ color: nearLimit ? '#C62828' : '#6B6B6B', fontWeight: nearLimit ? 700 : 400 }}>
                 {charCount.toLocaleString()} / {limit.toLocaleString()}
@@ -183,7 +174,7 @@ export default function NewPostPage() {
                     <Chip size="small" label="Alto" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32' }} />
                   </Stack>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    vs benchmark {NETWORK_LABEL[network] ?? network} 3.5%
+                    vs benchmark {NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network} 3.5%
                   </Typography>
                 </Box>
                 <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: '#E0A800', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -193,15 +184,15 @@ export default function NewPostPage() {
               </Stack>
               <Typography variant="caption" fontWeight={600} color="text.secondary" mb={0.5} display="block">Sugerencias</Typography>
               <Stack gap={0.5}>
-                {SUGGESTIONS.map((s, i) => (
-                  <Stack key={i} direction="row" gap={1} alignItems="flex-start" sx={{ py: 0.75, borderBottom: i < SUGGESTIONS.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                {MOCK_AI_SUGGESTIONS.map((s, i) => (
+                  <Stack key={i} direction="row" gap={1} alignItems="flex-start" sx={{ py: 0.75, borderBottom: i < MOCK_AI_SUGGESTIONS.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
                     <Typography fontWeight={700} sx={{ color: '#D4AC40' }}>{i + 1}.</Typography>
                     <Typography variant="caption">{s}</Typography>
                   </Stack>
                 ))}
               </Stack>
               <Stack direction="row" gap={1} mt={1.5} flexWrap="wrap">
-                {TIME_SLOTS.map((slot) => (
+                {MOCK_TIME_SLOTS.map((slot) => (
                   <Chip key={slot} label={slot} onClick={() => {}} sx={{ cursor: 'pointer', bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', border: '1px solid #D4AC40' }} />
                 ))}
               </Stack>
@@ -242,7 +233,7 @@ export default function NewPostPage() {
                     <Box>
                       <Typography variant="body2" fontWeight={600}>{selectedProfile.handle}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {NETWORK_LABEL[selectedProfile.socialNetwork] ?? selectedProfile.socialNetwork} · Ahora
+                        {NETWORK_LABELS[selectedProfile.socialNetwork] ?? selectedProfile.socialNetwork} · Ahora
                       </Typography>
                     </Box>
                   </Stack>

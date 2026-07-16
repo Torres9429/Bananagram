@@ -2,12 +2,7 @@
 
 import { useState } from 'react';
 import { FormDialog, LabeledField } from '@repo/ui/ui';
-
-interface RejectPostDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (reason: string) => void;
-}
+import type { RejectPostDialogProps } from '../interfaces/interface';
 
 // Reutilizado entre /posts/[id] y /posts/approvals (§3 modal de rechazo) —
 // pedir motivo antes de rechazar, en vez de cambiar el estado directo.

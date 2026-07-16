@@ -1,21 +1,8 @@
-import type { PostStatus } from '@repo/ui/types';
-export type { PostStatus };
+import type { SocialAccount, MockCampaign, MockPost, StatusHistoryItem, SocialNetworkCode } from '../interfaces/interface';
 
-export type SocialNetworkCode = 'IG' | 'TK' | 'LI' | 'FB' | 'X' | 'YT';
-
-// Espejo del modelo de brands-front (Brand → SocialAccount): cada microfront
-// mantiene su propia copia de mocks porque no hay un servicio compartido,
-// pero el concepto y la forma son los mismos. Un Post pertenece a una
-// SocialAccount (una cuenta de una Marca en una red social específica),
-// nunca tiene un campo `network`/`brand` propio.
-export interface SocialAccount {
-  id: string;
-  brandName: string;
-  socialNetwork: SocialNetworkCode;
-  handle: string;
-  networkBg: string;
-  networkColor: string;
-}
+export const NETWORK_LABELS: Record<SocialNetworkCode, string> = {
+  IG: 'Instagram', TK: 'TikTok', LI: 'LinkedIn', FB: 'Facebook', X: 'X', YT: 'YouTube',
+};
 
 export const MOCK_SOCIAL_ACCOUNTS: SocialAccount[] = [
   { id: 'bp1', brandName: 'Zara MX', socialNetwork: 'IG', handle: '@zaramx', networkBg: '#FCE4EC', networkColor: '#880E4F' },
@@ -39,46 +26,6 @@ export function getPostNetworkInfo(post: Pick<MockPost, 'brandProfileId'>) {
     networkColor: profile?.networkColor ?? '#666666',
     brand: profile?.brandName ?? '—',
   };
-}
-
-export interface MockCampaign {
-  id: string;
-  name: string;
-  color: string;
-  brand: string;
-}
-
-export interface PostMetrics {
-  likes: number;
-  comments: number;
-  shares: number;
-  reach: number;
-  engagementRate: number;
-}
-
-export interface MockPost {
-  id: string;
-  title: string;
-  brandProfileId: string;
-  campaign: { id: string; name: string; color: string } | null;
-  designer: string;
-  status: PostStatus;
-  createdAt: string;
-  content: string;
-  hashtags: string[];
-  scheduledAt: string | null;
-  metrics: PostMetrics | null;
-  rejectionReason?: string;
-}
-
-export interface StatusHistoryItem {
-  status: PostStatus;
-  label: string;
-  color: string;
-  actor: string;
-  role: string;
-  date: string;
-  comment: string | null;
 }
 
 export const MOCK_USER = {
@@ -228,3 +175,13 @@ export const CHAR_LIMITS: Record<string, number> = {
   X: 280,
   YT: 5000,
 };
+
+// Panel IA mock (§ crear publicación) — sugerencias y horarios simulados,
+// sin backend real todavía.
+export const MOCK_AI_SUGGESTIONS = [
+  'Agrega una llamada a la acción clara al final del copy.',
+  'Reduce a 3-5 hashtags. Más de 7 reduce el alcance orgánico.',
+  'Mejor horario para tu audiencia: 18:00–20:00.',
+];
+
+export const MOCK_TIME_SLOTS = ['Hoy 18:00', 'Mañana 12:00', 'Jue 09:00'];
