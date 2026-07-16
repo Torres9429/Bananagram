@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { prisma } from '../../../../../commons/prisma/client';
+import { prisma } from '../../../../commons/prisma/client';
 import { simulateMetrics } from '../metrics/decay-simulator';
 
 @Injectable()

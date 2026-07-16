@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { prisma } from '../../../../../commons/prisma/client';
-import { PostStatus } from '../../../../../commons/types/post-status.enum';
+import { prisma } from '../../../../commons/prisma/client';
+import { PostStatus } from '../../../../commons/types/post-status.enum';
 
 @Injectable()
 export class PostSchedulerService {

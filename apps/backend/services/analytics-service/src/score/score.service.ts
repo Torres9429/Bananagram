@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { prisma } from '../../../../../commons/prisma/client';
+import { prisma } from '../../../../commons/prisma/client';
 
 @Injectable()
 export class ScoreService {
