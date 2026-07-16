@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { API_BASE_URL } from '../config/zone-urls';
 
 export interface LoginRequest {
   email: string;
@@ -19,7 +19,7 @@ export interface AuthResponse {
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({ baseUrl: BASE, credentials: 'include' }),
+  baseQuery: fetchBaseQuery({ baseUrl: API_BASE_URL, credentials: 'include' }),
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (body) => ({ url: 'auth/login', method: 'POST', body }),

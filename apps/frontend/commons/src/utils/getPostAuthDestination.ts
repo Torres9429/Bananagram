@@ -1,9 +1,5 @@
 import { AppRole } from '../types/roles.enum';
-
-// Único lugar con los puertos de destino post-auth — evita repetir estas
-// URLs en LoginForm/RegisterForm/ActivateForm/la landing/`/dashboard`.
-const WEB_SHELL_URL = 'http://localhost:3000';
-const BRANDS_FRONT_URL = 'http://localhost:3013';
+import { ZONE_URLS } from '../config/zone-urls';
 
 /**
  * Destino al que debe ir un usuario justo después de autenticarse (login,
@@ -14,12 +10,12 @@ const BRANDS_FRONT_URL = 'http://localhost:3013';
 export function getPostAuthDestination(role: string): string {
   switch (role) {
     case AppRole.ADMINISTRADOR:
-      return `${WEB_SHELL_URL}/dashboard`;
+      return `${ZONE_URLS.webShell}/dashboard`;
     case AppRole.CLIENTE:
-      return `${BRANDS_FRONT_URL}/profile`;
+      return `${ZONE_URLS.brandsFront}/profile`;
     case AppRole.COMMUNITY_MANAGER:
     case AppRole.DISENADOR:
     default:
-      return `${BRANDS_FRONT_URL}/my-campaigns`;
+      return `${ZONE_URLS.brandsFront}/my-campaigns`;
   }
 }

@@ -1,4 +1,4 @@
-import type { MockUser } from './mock-users';
+import type { MockUser } from '../types/auth.types';
 
 function encodeMockJwt(payload: object): string {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));

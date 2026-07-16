@@ -10,6 +10,7 @@
     "./theme": "./src/theme/index.ts",
     "./state": "./src/state/index.ts",
     "./types": "./src/types/index.ts",
+    "./config": "./src/config/index.ts",
     "./utils": "./src/utils/index.ts",
     "./package.json": "./package.json"
   },

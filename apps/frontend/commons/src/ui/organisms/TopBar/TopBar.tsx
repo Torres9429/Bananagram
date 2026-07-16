@@ -10,8 +10,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { NotificationBell } from '../../molecules/NotificationBell/NotificationBell';
 import { logout } from '../../../state/auth.slice';
 import { deleteCookieToken } from '../../../session/cookieSession';
-
-const AUTH_FRONT_LOGIN_URL = 'http://localhost:3012/login';
+import { ZONE_URLS } from '../../../config/zone-urls';
 
 interface TopBarProps {
   title?: string;
@@ -27,7 +26,7 @@ export function TopBar({ title = 'Gestor de Redes', color }: TopBarProps) {
   function handleLogout() {
     deleteCookieToken();
     dispatch(logout());
-    window.location.href = AUTH_FRONT_LOGIN_URL;
+    window.location.href = `${ZONE_URLS.authFront}/login`;
   }
 
   return (

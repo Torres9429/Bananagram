@@ -1,15 +1,7 @@
 import { AppModule } from '../types/modules.enum';
 import { AppAction } from '../types/actions.enum';
 import { AppRole } from '../types/roles.enum';
-
-export interface MockUser {
-  email: string;
-  password: string;
-  role: AppRole;
-  name: string;
-  brandIds: string[];
-  permissions: Record<string, string[]>;
-}
+import type { MockUser } from '../types/auth.types';
 
 export const MOCK_USERS: MockUser[] = [
   {

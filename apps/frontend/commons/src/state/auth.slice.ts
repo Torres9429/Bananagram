@@ -1,26 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { AuthUser, AuthState, JwtPayload } from '../types/auth.types';
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: string;
-}
-
-export interface AuthState {
-  user: AuthUser | null;
-  accessToken: string | null;
-  permissions: Record<string, string[]>;
-  brandIds: string[];
-  isAuthenticated: boolean;
-}
-
-export interface JwtPayload {
-  sub: string;
-  email: string;
-  role: string;
-  brandIds?: string[];
-  permissions?: Record<string, string[]>;
-}
+export type { AuthUser, AuthState, JwtPayload };
 
 type AuthRootState = { auth: AuthState };
 
