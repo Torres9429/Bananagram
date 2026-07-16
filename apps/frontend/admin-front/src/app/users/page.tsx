@@ -13,12 +13,8 @@ import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton } from 
 import { getInitials } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
 import { CreateUserDialog } from '../../components/CreateUserDialog';
-import { MOCK_USERS, type MockUser } from '../../lib/mock-data';
-
-const STATUS_STYLE: Record<MockUser['status'], { bg: string; color: string; label: string }> = {
-  activo: { bg: '#E8F5E9', color: '#2E7D32', label: 'Activo' },
-  inactivo: { bg: '#F5F5F5', color: '#616161', label: 'Inactivo' },
-};
+import { MOCK_USERS, USER_STATUS_STYLE } from '../../lib/mock-data';
+import type { MockUser } from '../../interfaces/interface';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<MockUser[]>(MOCK_USERS);
@@ -46,7 +42,7 @@ export default function UsersPage() {
       key: 'status',
       header: 'Estado',
       render: (u) => {
-        const s = STATUS_STYLE[u.status];
+        const s = USER_STATUS_STYLE[u.status];
         return <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />;
       },
     },

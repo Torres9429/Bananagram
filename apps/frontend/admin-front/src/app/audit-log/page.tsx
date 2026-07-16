@@ -6,7 +6,8 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import { DataTable, type DataTableColumn } from '@repo/ui/ui';
 import { AdminTabs } from '../../components/AdminTabs';
-import { MOCK_AUDIT_LOG, type MockAuditEntry } from '../../lib/mock-data';
+import { MOCK_AUDIT_LOG } from '../../lib/mock-data';
+import type { MockAuditEntry } from '../../interfaces/interface';
 
 export default function AuditLogPage() {
   const columns: DataTableColumn<MockAuditEntry>[] = [

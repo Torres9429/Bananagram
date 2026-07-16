@@ -17,23 +17,11 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import CloseIcon from '@mui/icons-material/Close';
 import { FormDialog, LabeledField, LabeledSelect, PrimaryButton } from '@repo/ui';
-import type { MockUser } from '../lib/mock-data';
+import { ZONE_URLS } from '@repo/ui/config';
+import type { MockUser, CreatedUser, CreateUserDialogProps } from '../interfaces/interface';
+import { CREATABLE_ROLES, generateMockId } from '../lib/mock-data';
 
-// El Admin solo crea cuentas operativas (CM y Diseñador).
-// El Cliente se auto-registra públicamente.
-const ROLES = ['CM', 'Diseñador'];
-
-const AUTH_FRONT_URL = 'http://localhost:3012';
-
-interface Props {
-  open: boolean;
-  onClose: () => void;
-  onCreate: (user: MockUser) => void;
-}
-
-interface CreatedUser { name: string; email: string; activationUrl: string }
-
-export function CreateUserDialog({ open, onClose, onCreate }: Props) {
+export function CreateUserDialog({ open, onClose, onCreate }: CreateUserDialogProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('CM');
@@ -45,7 +33,7 @@ export function CreateUserDialog({ open, onClose, onCreate }: Props) {
     if (!name.trim() || !email.trim()) return;
 
     const newUser: MockUser = {
-      id: `u${Date.now()}`,
+      id: generateMockId('u'),
       name: name.trim(),
       email: email.trim(),
       role,
@@ -56,7 +44,7 @@ export function CreateUserDialog({ open, onClose, onCreate }: Props) {
     onCreate(newUser);
 
     // Genera la URL de activación mock — en producción el backend enviará esto por correo.
-    const activationUrl = `${AUTH_FRONT_URL}/activate?email=${encodeURIComponent(email.trim())}`;
+    const activationUrl = `${ZONE_URLS.authFront}/activate?email=${encodeURIComponent(email.trim())}`;
     setConfirmed({ name: name.trim(), email: email.trim(), activationUrl });
 
     // Limpia el form para próximo uso.
@@ -171,7 +159,7 @@ export function CreateUserDialog({ open, onClose, onCreate }: Props) {
         required
       />
       <LabeledSelect label="Rol" value={role} onChange={(e) => setRole(e.target.value as string)}>
-        {ROLES.map((r) => (
+        {CREATABLE_ROLES.map((r) => (
           <MenuItem key={r} value={r}>{r}</MenuItem>
         ))}
       </LabeledSelect>

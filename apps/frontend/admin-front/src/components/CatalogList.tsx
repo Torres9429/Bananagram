@@ -8,21 +8,17 @@ import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import { DataTable, type DataTableColumn, FormDialog, LabeledField } from '@repo/ui/ui';
 import { AdminTabs } from './AdminTabs';
-import type { MockCatalogItem } from '../lib/mock-data';
+import type { MockCatalogItem, CatalogListProps } from '../interfaces/interface';
+import { generateMockId } from '../lib/mock-data';
 
-interface Props {
-  title: string;
-  items: MockCatalogItem[];
-}
-
-export function CatalogList({ title, items }: Props) {
+export function CatalogList({ title, items }: CatalogListProps) {
   const [list, setList] = useState<MockCatalogItem[]>(items);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
 
   function handleAdd() {
     if (!name.trim()) return;
-    setList((prev) => [{ id: `c${Date.now()}`, name: name.trim(), status: 'activo' }, ...prev]);
+    setList((prev) => [{ id: generateMockId('c'), name: name.trim(), status: 'activo' }, ...prev]);
     setName('');
     setOpen(false);
   }

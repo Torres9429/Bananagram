@@ -23,81 +23,8 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
 import { EmptyState, ConfirmDialog, WidgetCard, usePermissions, PrimaryButton } from '@repo/ui/ui';
 import { AdminTabs } from '../../components/AdminTabs';
-
-// Privilegios reales del sistema (AppModule × AppAction).
-// Fuente de verdad: commons/src/types/modules.enum.ts + actions.enum.ts.
-// El backend los persiste en role_permissions; aquí son solo mock de visualización/edición.
-const MODULES = ['users', 'brands', 'catalogs', 'post', 'campaigns', 'metrics', 'score', 'reports'] as const;
-const ACTIONS = ['manage', 'create', 'view', 'view-own', 'schedule', 'approve', 'reject', 'publish', 'export'] as const;
-
-type Module = typeof MODULES[number];
-type Action = typeof ACTIONS[number];
-type PrivilegeMap = Record<Module, Action[]>;
-
-const ROLE_LABELS: Record<string, string> = {
-  administrador: 'Administrador',
-  community_manager: 'Community Manager',
-  disenador: 'Diseñador',
-  cliente: 'Cliente',
-};
-const ROLE_ORDER = ['administrador', 'cliente', 'community_manager', 'disenador'];
-
-// Estado inicial de privilegios por rol (espeja mock-users.ts de commons).
-const DEFAULT_PRIVILEGES: Record<string, PrivilegeMap> = {
-  administrador: {
-    users: ['manage'], brands: ['manage'], catalogs: ['manage'],
-    post: ['create', 'schedule', 'approve', 'reject', 'publish'],
-    campaigns: ['manage'], metrics: ['view'], score: ['view'], reports: ['export'],
-  },
-  community_manager: {
-    users: [], brands: [], catalogs: [],
-    post: ['create', 'schedule', 'publish'],
-    campaigns: ['view-own'], metrics: ['view'], score: ['view'], reports: [],
-  },
-  disenador: {
-    users: [], brands: [], catalogs: [],
-    post: ['create'],
-    campaigns: ['view-own'], metrics: [], score: [], reports: [],
-  },
-  cliente: {
-    users: [], brands: [], catalogs: [],
-    post: ['approve', 'reject'],
-    campaigns: ['create'], metrics: ['view'], score: ['view'], reports: ['export'],
-  },
-};
-
-const ACTION_LABELS: Record<Action, string> = {
-  manage: 'Administrar', create: 'Crear', view: 'Ver', 'view-own': 'Ver propios',
-  schedule: 'Programar', approve: 'Aprobar', reject: 'Rechazar', publish: 'Publicar', export: 'Exportar',
-};
-
-// Solo se ofrecen como switches las acciones que realmente se usan en algún rol
-// para ese módulo (unión de DEFAULT_PRIVILEGES) — evita mostrar combinaciones
-// sin sentido de dominio (ej. "Programar" bajo "Usuarios") y es lo que más
-// reduce el amontonamiento de la pantalla anterior. No cambia qué puede
-// otorgarse hoy: ningún rol tiene, en los mocks reales, una acción fuera de
-// este conjunto.
-const MODULE_ACTIONS: Record<Module, Action[]> = {
-  users: ['manage'],
-  brands: ['manage'],
-  catalogs: ['manage'],
-  post: ['create', 'schedule', 'approve', 'reject', 'publish'],
-  campaigns: ['manage', 'create', 'view-own'],
-  metrics: ['view'],
-  score: ['view'],
-  reports: ['export'],
-};
-
-const MODULE_META: Record<Module, { label: string; description: string }> = {
-  users: { label: 'Usuarios', description: 'Alta, edición y activación de cuentas del sistema.' },
-  brands: { label: 'Marcas', description: 'Catálogo de marcas/perfiles de cliente (legacy, ver /brands).' },
-  catalogs: { label: 'Catálogos', description: 'Categorías, redes sociales y especialidades disponibles.' },
-  post: { label: 'Publicaciones', description: 'Ciclo de vida de un post: crear, programar, aprobar, rechazar, publicar.' },
-  campaigns: { label: 'Campañas', description: 'Creación y administración de campañas de contenido.' },
-  metrics: { label: 'Métricas', description: 'Acceso a los paneles de analítica de redes sociales.' },
-  score: { label: 'Score', description: 'Visualización del score digital de cada marca.' },
-  reports: { label: 'Reportes', description: 'Exportación de reportes de desempeño.' },
-};
+import { MODULES, ACTIONS, type PrivilegeMap, type Module, type Action } from '../../interfaces/interface';
+import { ROLE_LABELS, ROLE_ORDER, DEFAULT_PRIVILEGES, ACTION_LABELS, MODULE_ACTIONS, MODULE_META } from '../../lib/mock-data';
 
 function countActive(privs: PrivilegeMap): number {
   return MODULES.reduce((sum, m) => sum + privs[m].length, 0);

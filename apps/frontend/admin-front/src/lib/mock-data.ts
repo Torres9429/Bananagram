@@ -1,34 +1,17 @@
-export interface MockUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  brand: string | null;
-  status: 'activo' | 'inactivo';
-  lastLogin: string;
+import type { MockUser, MockRole, MockAuditEntry, MockCatalogItem, Module, Action, PrivilegeMap } from '../interfaces/interface';
+
+// El Admin solo crea cuentas operativas (CM y Diseñador).
+// El Cliente se auto-registra públicamente.
+export const CREATABLE_ROLES = ['CM', 'Diseñador'];
+
+export function generateMockId(prefix: string): string {
+  return `${prefix}${Date.now()}`;
 }
 
-export interface MockRole {
-  id: string;
-  name: string;
-  description: string;
-  userCount: number;
-  permissions: Record<string, string[]>;
-}
-
-export interface MockAuditEntry {
-  id: string;
-  actor: string;
-  action: string;
-  entity: string;
-  date: string;
-}
-
-export interface MockCatalogItem {
-  id: string;
-  name: string;
-  status: 'activo' | 'inactivo';
-}
+export const USER_STATUS_STYLE: Record<MockUser['status'], { bg: string; color: string; label: string }> = {
+  activo: { bg: '#E8F5E9', color: '#2E7D32', label: 'Activo' },
+  inactivo: { bg: '#F5F5F5', color: '#616161', label: 'Inactivo' },
+};
 
 export const MOCK_USERS: MockUser[] = [
   { id: 'u1', name: 'Ana García', email: 'ana.garcia@bananagram.com', role: 'CM', brand: 'Zara MX', status: 'activo', lastLogin: 'Hoy 09:12' },
@@ -100,3 +83,68 @@ export const MOCK_SPECIALTIES: MockCatalogItem[] = [
   { id: 'sp3', name: 'Video y edición', status: 'activo' },
   { id: 'sp4', name: 'Paid media', status: 'inactivo' },
 ];
+
+export const ROLE_LABELS: Record<string, string> = {
+  administrador: 'Administrador',
+  community_manager: 'Community Manager',
+  disenador: 'Diseñador',
+  cliente: 'Cliente',
+};
+export const ROLE_ORDER = ['administrador', 'cliente', 'community_manager', 'disenador'];
+
+// Estado inicial de privilegios por rol (espeja mock-users.ts de commons).
+export const DEFAULT_PRIVILEGES: Record<string, PrivilegeMap> = {
+  administrador: {
+    users: ['manage'], brands: ['manage'], catalogs: ['manage'],
+    post: ['create', 'schedule', 'approve', 'reject', 'publish'],
+    campaigns: ['manage'], metrics: ['view'], score: ['view'], reports: ['export'],
+  },
+  community_manager: {
+    users: [], brands: [], catalogs: [],
+    post: ['create', 'schedule', 'publish'],
+    campaigns: ['view-own'], metrics: ['view'], score: ['view'], reports: [],
+  },
+  disenador: {
+    users: [], brands: [], catalogs: [],
+    post: ['create'],
+    campaigns: ['view-own'], metrics: [], score: [], reports: [],
+  },
+  cliente: {
+    users: [], brands: [], catalogs: [],
+    post: ['approve', 'reject'],
+    campaigns: ['create'], metrics: ['view'], score: ['view'], reports: ['export'],
+  },
+};
+
+export const ACTION_LABELS: Record<Action, string> = {
+  manage: 'Administrar', create: 'Crear', view: 'Ver', 'view-own': 'Ver propios',
+  schedule: 'Programar', approve: 'Aprobar', reject: 'Rechazar', publish: 'Publicar', export: 'Exportar',
+};
+
+// Solo se ofrecen como switches las acciones que realmente se usan en algún rol
+// para ese módulo (unión de DEFAULT_PRIVILEGES) — evita mostrar combinaciones
+// sin sentido de dominio (ej. "Programar" bajo "Usuarios") y es lo que más
+// reduce el amontonamiento de la pantalla anterior. No cambia qué puede
+// otorgarse hoy: ningún rol tiene, en los mocks reales, una acción fuera de
+// este conjunto.
+export const MODULE_ACTIONS: Record<Module, Action[]> = {
+  users: ['manage'],
+  brands: ['manage'],
+  catalogs: ['manage'],
+  post: ['create', 'schedule', 'approve', 'reject', 'publish'],
+  campaigns: ['manage', 'create', 'view-own'],
+  metrics: ['view'],
+  score: ['view'],
+  reports: ['export'],
+};
+
+export const MODULE_META: Record<Module, { label: string; description: string }> = {
+  users: { label: 'Usuarios', description: 'Alta, edición y activación de cuentas del sistema.' },
+  brands: { label: 'Marcas', description: 'Catálogo de marcas/perfiles de cliente (legacy, ver /brands).' },
+  catalogs: { label: 'Catálogos', description: 'Categorías, redes sociales y especialidades disponibles.' },
+  post: { label: 'Publicaciones', description: 'Ciclo de vida de un post: crear, programar, aprobar, rechazar, publicar.' },
+  campaigns: { label: 'Campañas', description: 'Creación y administración de campañas de contenido.' },
+  metrics: { label: 'Métricas', description: 'Acceso a los paneles de analítica de redes sociales.' },
+  score: { label: 'Score', description: 'Visualización del score digital de cada marca.' },
+  reports: { label: 'Reportes', description: 'Exportación de reportes de desempeño.' },
+};
