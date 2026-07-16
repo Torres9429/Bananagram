@@ -10,6 +10,8 @@ pnpm db:generate
 pnpm db:migrate
 echo "🌱 Cargando seed de demo..."
 pnpm seed
-echo "🚀 Levantando todos los servicios..."
-docker compose up -d
-echo "✅ Listo. Frontend: http://localhost:3000"
+echo "🚀 Levantando backend y frontends (turbo, en el host)..."
+echo "   Para arrancar todo:        pnpm dev"
+echo "   Para solo backend:         pnpm dev:backend"
+echo "   Para un front específico:  pnpm --filter @repo/<nombre> dev"
+echo "✅ Listo. Corre 'pnpm dev' (o los comandos de arriba) para iniciar."

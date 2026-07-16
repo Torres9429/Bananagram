@@ -4,6 +4,9 @@
   "packageManager": "pnpm@10.34.4",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:infra": "docker compose up -d",
+    "dev:backend": "turbo run dev --filter=@repo/api-gateway --filter=@repo/auth-service --filter=@repo/brands-service --filter=@repo/content-service --filter=@repo/analytics-service",
+    "dev:web": "turbo run dev --filter=@repo/web-shell",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",

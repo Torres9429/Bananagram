@@ -1,4 +1,11 @@
-version: "3.9"
+# Uso recomendado para desarrollo diario (liviano):
+#   docker compose up -d              # solo postgres + adminer
+#   pnpm dev                          # backend + fronts corriendo en el host (más rápido, hot reload)
+#
+# Uso para levantar el stack completo containerizado (más pesado, útil antes
+# de un deploy o para probar el build de producción de cada servicio):
+#   docker compose --profile full up -d --build
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -6,7 +13,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: gestor_redes
-    ports: ["5432:5432"]
+    ports: ["5433:5432"]
     volumes: [postgres_data:/var/lib/postgresql/data]
 
   adminer:
@@ -14,30 +21,35 @@ services:
     ports: ["8080:8080"]
 
   auth-service:
+    profiles: ["full"]
     build: ./apps/backend/services/auth-service
     env_file: .env
     ports: ["3001:3001"]
     depends_on: [postgres]
 
   brands-service:
+    profiles: ["full"]
     build: ./apps/backend/services/brands-service
     env_file: .env
     ports: ["3002:3002"]
     depends_on: [postgres]
 
   content-service:
+    profiles: ["full"]
     build: ./apps/backend/services/content-service
     env_file: .env
     ports: ["3003:3003"]
     depends_on: [postgres]
 
   analytics-service:
+    profiles: ["full"]
     build: ./apps/backend/services/analytics-service
     env_file: .env
     ports: ["3005:3005"]
     depends_on: [postgres]
 
   api-gateway:
+    profiles: ["full"]
     build: ./apps/backend/gateway
     env_file: .env
     ports: ["4000:4000"]
@@ -48,6 +60,7 @@ services:
       - analytics-service
 
   web-shell:
+    profiles: ["full"]
     build: ./apps/frontend/web-shell
     env_file: .env
     ports: ["3000:3000"]
