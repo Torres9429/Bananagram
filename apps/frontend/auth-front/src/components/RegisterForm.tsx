@@ -22,7 +22,8 @@ import { PasswordField } from './PasswordField';
 import { setCredentials, setCookieToken } from '@repo/ui/state';
 import { getPostAuthDestination } from '@repo/ui/utils';
 import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
-import { MOCK_CATEGORIES, type ProfileType } from '../lib/mock-data';
+import { MOCK_CATEGORIES, MOCK_CLIENT_EMAIL } from '../lib/mock-data';
+import type { ProfileType } from '../interfaces/interface';
 
 // Los 5 valores de ProfileType (§A.1 del análisis de dominio) — solo cambia cómo
 // se representa el perfil, nunca el flujo ni las capacidades.
@@ -35,10 +36,6 @@ const PROFILE_TYPE_OPTIONS: { value: ProfileType; icon: typeof BusinessOutlinedI
 ];
 
 const STEPS = ['Tu cuenta', 'Tu perfil'];
-
-// Mock: el registro usa la cuenta demo de Cliente.
-// Backend: POST /auth/register { name, email, password, type, profileName, category } → JWT real + Perfil creado.
-const MOCK_CLIENT_EMAIL = 'cliente@bananagram.mx';
 
 export function RegisterForm() {
   const dispatch = useDispatch();

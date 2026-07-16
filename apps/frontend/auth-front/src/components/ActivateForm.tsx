@@ -15,15 +15,11 @@ import { PasswordField } from './PasswordField';
 import { setCredentials, setCookieToken } from '@repo/ui/state';
 import { getPostAuthDestination } from '@repo/ui/utils';
 import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
+import { ROLE_LABEL } from '../lib/mock-data';
 
 // useSearchParams se usa SOLO para leer el email del enlace de activación
 // (no para sesión). La sesión se establece mediante la cookie.
 // En producción, este parámetro será un JWT firmado de un solo uso.
-
-const ROLE_LABEL: Record<string, string> = {
-  community_manager: 'Community Manager',
-  disenador: 'Diseñador',
-};
 
 export function ActivateForm() {
   const dispatch = useDispatch();
