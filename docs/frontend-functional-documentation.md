@@ -60,7 +60,7 @@ Fuera del onboarding, una marca ya existente crea nuevas campañas desde `/brand
 
 ### 2.4 ¿Cómo llega una publicación hasta Analytics?
 
-Esta es la pregunta más importante de responder con honestidad, porque **no hay una tubería real entre `posts-front` y `analytics-front` en el código actual**. Cada microfrontend mantiene su propio `mock-data.ts` de forma completamente independiente (documentado en el Capítulo 1 §1.1): `analytics-front` no importa, escucha ni consume nada de `posts-front`. Su propio dataset (`mock-metrics.ts` + `network-metrics.ts`, ver Capítulo 14) fue construido a mano para *narrar* el mismo universo de marcas/campañas/redes (los nombres de marca y campaña coinciden deliberadamente: "Zara MX", "Campaña Verano", etc.), y algunos ids de publicación incluso coinciden (`p1`, `p2`, `p5`, `p9`, `p11`) — pero eso es coincidencia de diseño narrativo, no una relación programática. En una implementación con backend real, este es exactamente el punto donde debería existir el pipeline de ingestión de métricas (publicación → evento de publicado → simulador/API de red social → `post_metrics`), tal como se documenta como pendiente en el Capítulo 17.
+Esta es la pregunta más importante de responder con honestidad, porque **no hay una tubería real entre `posts-front` y `analytics-front` en el código actual**. Cada microfrontend mantiene su propio `mock-data.ts` de forma completamente independiente (documentado en el Capítulo 1 §1.1): `analytics-front` no importa, escucha ni consume nada de `posts-front`. Su propio dataset (`lib/mock-data.ts`, ver Capítulo 14 y 18.6) fue construido a mano para *narrar* el mismo universo de marcas/campañas/redes (los nombres de marca y campaña coinciden deliberadamente: "Zara MX", "Campaña Verano", etc.), y algunos ids de publicación incluso coinciden (`p1`, `p2`, `p5`, `p9`, `p11`) — pero eso es coincidencia de diseño narrativo, no una relación programática. En una implementación con backend real, este es exactamente el punto donde debería existir el pipeline de ingestión de métricas (publicación → evento de publicado → simulador/API de red social → `post_metrics`), tal como se documenta como pendiente en el Capítulo 17.
 
 ```mermaid
 flowchart TD
@@ -97,7 +97,7 @@ pnpm workspace + Turborepo. Cada microfrontend es una app Next.js 16 (App Router
 - Cookie `bananagram_token` (`path=/; SameSite=Lax`, sin dominio explícito) — funciona entre puertos de `localhost` porque las cookies son por **host**, no por puerto.
 - `useSessionBootstrap()` (`@repo/ui`) es el único inicializador de sesión: al montar, lee la cookie y despacha `setCredentials` o `logout` sobre el slice `auth` de Redux. Se invoca idénticamente en los 6 `providers.tsx`.
 - El token es un JWT **simulado** (`base64(header).base64(payload).mock-signature`, sin firma real) que codifica `{sub, email, role, brandIds, permissions}`.
-- Navegación entre microfrontends: enlaces `http://localhost:PORT/...` con `window.location.href` (recarga completa; la cookie viaja automáticamente). Navegación dentro de un mismo microfrontend: `router.push` (SPA).
+- Navegación entre microfrontends: enlaces construidos desde `ZONE_URLS` (`@repo/ui/config` — ver Capítulo 18; antes constantes `http://localhost:PORT` repetidas en cada front) con `window.location.href` (recarga completa; la cookie viaja automáticamente). Navegación dentro de un mismo microfrontend: `router.push` (SPA).
 - **Mecanismo obsoleto**: `?mock_user=` en la URL y `useMockSessionFromUrl()` fueron eliminados el 2026-06-30 a favor de la cookie; los símbolos siguen exportados como no-ops para no romper imports antiguos.
 
 ### 3.3 Autenticación y permisos — estado real
@@ -491,7 +491,7 @@ flowchart LR
     UI["TrendCard en NetworkOverview"] --> Selector["selectAnalyticsKpiComparison"]
     Selector --> Engine["compareKpiPeriods / computeKpis"]
     Engine --> Facts["SocialMetricFact filtrados"]
-    Facts --> Mock["mock-metrics.ts + network-metrics.ts"]
+    Facts --> Mock["lib/mock-data.ts"]
 ```
 
 ```mermaid
@@ -505,7 +505,7 @@ flowchart LR
 flowchart LR
     UI3["PostingHeatMap"] --> Selector3["selectHeatMap"]
     Selector3 --> Engine3["computeHeatMap"]
-    Engine3 --> Facts3["SocialMetricFact + hora de publicación (timing-metrics.ts)"]
+    Engine3 --> Facts3["SocialMetricFact + hora de publicación (MOCK_PUBLISHED_HOUR, lib/mock-data.ts)"]
 ```
 
 ```mermaid
@@ -816,7 +816,7 @@ Los flujos anteriores (§15.1–15.4) muestran el recorrido típico de cada rol 
 
 - Todo `mock-data.ts` de cada microfrontend (independientes entre sí, sin sincronización).
 - `MOCK_USERS`/`MOCK_TOKENS` (`@repo/ui`) — credenciales y JWT simulados.
-- `analyticsFilters`/Analytics Engine — el único slice/motor con lógica real de transformación, pero operando sobre datos 100% mock (`mock-metrics.ts`, `network-metrics.ts`, `timing-metrics.ts`, todos en `analytics-front`).
+- `analyticsFilters`/Analytics Engine — el único slice/motor con lógica real de transformación, pero operando sobre datos 100% mock (`lib/mock-data.ts` en `analytics-front`, consolidado — antes repartido en 4 archivos, ver Capítulo 18.6).
 - `BrandScore` — un único snapshot estático por marca, sin histórico real.
 
 ### 17.2 Qué deberá consumir API real (agrupado por dominio)
@@ -843,7 +843,7 @@ Los flujos anteriores (§15.1–15.4) muestran el recorrido típico de cada rol 
 
 ### 17.4 Riesgos/inconsistencias a resolver antes de construir el backend
 
-- Dos modelos de privilegios no alineados: `admin-front/roles` usa sus propias constantes inline (`MODULES`/`ACTIONS` en inglés) mientras `admin-front/mock-data.ts` define un `MockRole` con claves en español, no usado por la página real.
+- Dos modelos de privilegios no alineados: `admin-front/interfaces/interface.ts` centraliza `MODULES`/`ACTIONS` (en inglés, usados por `/roles`) mientras `admin-front/lib/mock-data.ts` define un `MockRole` con claves en español (usado por `/users`, no por `/roles`) — se centralizaron ambos en el refactor de organización (Capítulo 18), pero el vocabulario en sí sigue sin unificarse a propósito (decisión explícita: mover sin cambiar valores, ver Capítulo 18.2).
 - `getMyCampaigns()` no filtra por usuario — retorna todas las campañas independientemente de quién esté autenticado; el diseño de la API real deberá decidir el criterio de "mis campañas" (por `campaign_team`, según el documento funcional original).
 - Enlaces cruzados rotos entre `posts-front` y `brands-front` (`/brands/campaigns/{id}` sin `brandId`) deben corregirse al definir el ruteo real.
 - `ContentSuggester.tsx` en posts-front apunta a un endpoint (`/api/ai/suggest-content`) que no existe en ningún lugar del monorepo — decidir si se conserva la función de IA (mencionada como feature avanzada en el documento funcional) o se elimina el componente huérfano.
@@ -870,4 +870,97 @@ Clasificación: **Funcional** (el flujo completo funciona de extremo a extremo, 
 
 ---
 
-*Documento generado por análisis estático de código el 2026-07-02. No fue modificado ningún archivo del proyecto durante su elaboración. Enriquecido posteriormente con las Secciones 1, 2, 5, 6.1, 8.6, 9, 10, 11.2, 15.5 y 17.5, sin eliminar ni resumir contenido previamente documentado.*
+## 18. Arquitectura técnica por front (post-refactor de organización)
+
+Los Capítulos 1–17 documentan el sistema desde el punto de vista funcional (qué hace cada pantalla). Este capítulo lo complementa desde el punto de vista técnico: cómo está organizado el código de cada front por dentro, tras un refactor de organización (no de comportamiento — ninguna pantalla ni flujo cambió) aplicado a los 6 microfrontends + `commons` para eliminar tres problemas que tenían en común: URLs hardcodeadas entre zonas, interfaces/types dispersos por cualquier archivo, y datos mock repartidos en varios archivos por front.
+
+### 18.1 El patrón aplicado a los 6 fronts (idéntico en todos)
+
+1. **`src/interfaces/interface.ts`** — un solo archivo con **todas** las `interface`/`type` del front: tipos de dominio, `Props` de componentes, tipos de store (`RootState`/`AppDispatch`), tipos derivados de constantes. Cero `interface`/`type` declarados en cualquier otro archivo del front (verificado con grep exhaustivo al cerrar cada uno).
+2. **`src/lib/mock-data.ts`** — único archivo de datos mock del front. Si existían archivos de mock dispersos (ej. una subcarpeta de `lib/`), se fusionaron aquí. Los helpers que generan/derivan mock data (`generateMockId`, `getSocialAccount`, `assignTeamToCampaign`, etc.) viven junto a los datos, no en `interfaces/interface.ts`.
+3. **`@repo/ui/config`** (`ZONE_URLS`, `API_BASE_URL`) — reemplaza cualquier constante `http://localhost:PORT` local. Es la única fuente de verdad de a qué puerto pertenece cada zona (`webShell`, `adminFront`, `analyticsFront`, `authFront`, `brandsFront`, `postsFront`) y de la URL base del API gateway.
+
+Excepción documentada: el "motor" de `analytics-front` (`lib/analytics/types.ts` + `engine.ts` + `network-config.ts`) es un módulo cohesivo de tipos + lógica pura + configuración declarativa, deliberadamente **sin React ni Redux** — sus tipos se quedaron ahí en vez de moverse a `interfaces/interface.ts`, para no forzar que ese módulo puro dependa del store de Redux (`RootState` importa `../store`).
+
+### 18.2 `auth-front` (puerto 3012) — el más simple
+
+**Estructura**: `app/{login,register,activate,forgot-password,reset-password}/page.tsx` + `components/` (`LoginForm`, `RegisterForm`, `ActivateForm`, `ForgotPasswordForm`, `ResetPasswordForm`, `PasswordField`, `AuthLayout`, `BrandPanel`) + `lib/mock-data.ts` + `store/`.
+
+**`interfaces/interface.ts`**: `ProfileType`, `PasswordFieldProps`, `AuthLayoutProps`, `RootState`, `AppDispatch`.
+
+**`lib/mock-data.ts`**: `MOCK_CATEGORIES` (catálogo para el paso de perfil del registro), `MOCK_CLIENT_EMAIL` (antes inline en `RegisterForm.tsx`), `ROLE_LABEL` (antes inline en `ActivateForm.tsx`).
+
+**No tiene** ninguna URL hardcodeada — es el único front que no navega directamente a otra zona en su propio código (la redirección post-login la resuelve `getPostAuthDestination()` en `commons`, no `auth-front`).
+
+**Conexión con el resto**: es siempre el punto de entrada (`/login`) y el destino de "cerrar sesión" desde el `TopBar` de cualquier otro front (vía `ZONE_URLS.authFront` en `commons/src/ui/organisms/TopBar/TopBar.tsx`).
+
+### 18.3 `posts-front` (puerto 3014)
+
+**Estructura**: `app/posts/{page,new,approvals,[id]}` + `components/` (`Sidebar`, `PostsTabs`, `RejectPostDialog`, `NetworkAvatar`, `CampaignDot`) + `lib/mock-data.ts` + `store/`.
+
+**`interfaces/interface.ts`**: `PostStatus` (re-exportado de `@repo/ui/types`), `SocialNetworkCode`, `SocialAccount`, `MockCampaign`, `PostMetrics`, `MockPost`, `StatusHistoryItem`, `NavItemWithPermission`, `RejectPostDialogProps`, `NetworkAvatarProps`, `CampaignDotProps`, `RootState`, `AppDispatch`.
+
+**`lib/mock-data.ts`**: `MOCK_SOCIAL_ACCOUNTS`, `MOCK_CAMPAIGNS`, `MOCK_POSTS`, `MOCK_STATUS_HISTORY`, `CHAR_LIMITS` (límite de caracteres por red), `NETWORK_LABELS` (antes duplicado como `NETWORK_NAMES` en una página y `NETWORK_LABEL` en otra — mismo diccionario, dos nombres distintos), `MOCK_AI_SUGGESTIONS`/`MOCK_TIME_SLOTS` (antes inline en el composer).
+
+**Conexión con el resto**: `Sidebar.tsx` usa `ZONE_URLS.{webShell,brandsFront,analyticsFront,adminFront}`. Es destino frecuente desde `brands-front` (crear/ver publicaciones de una campaña) y desde los dashboards de `web-shell`.
+
+### 18.4 `commons` (`@repo/ui`) — no es un front, es la dependencia de los 6
+
+**Estructura**: `src/{ui,state,types,utils,theme,config,mocks,api,session}/`, cada carpeta expuesta como subpath propio en `package.json` (`exports`).
+
+**`types/`** (ya seguía el patrón antes del refactor — es el ejemplo que inspiró `interfaces/interface.ts` en los fronts): `post.types.ts`, `score.types.ts`, `roles.enum.ts`, `modules.enum.ts`, `actions.enum.ts`, y el nuevo `auth.types.ts` (`AuthUser`, `AuthState`, `JwtPayload`, `MockUser` — antes inline en `state/auth.slice.ts` y `mocks/mock-users.ts`).
+
+**`config/`** (nuevo): `zone-urls.ts` exporta `ZONE_URLS` (un puerto por zona, con fallback `process.env.NEXT_PUBLIC_*_URL || 'http://localhost:PORT'`) y `API_BASE_URL` (mismo patrón que ya usaba `NEXT_PUBLIC_API_URL`, antes duplicado literal en 8 archivos distintos entre `commons` y `web-shell`).
+
+**Lo que NO se centralizó a propósito**: los ~20 `Props` de los componentes UI (`LabeledField`, `WidgetCard`, `ConfirmDialog`, `DataTable`, etc., ver Capítulo 12.1) se quedaron colocados junto a su componente — es el patrón estándar de una librería de componentes, no el anti-patrón de mezclar tipos con mock data que motivó el refactor de los fronts.
+
+### 18.5 `web-shell` (puerto 3000) — el host del sistema
+
+**Estructura**: `app/(app)/dashboard/`, `app/page.tsx` (landing), `components/dashboard/` (4 dashboards), `components/landing/{atoms,molecules,organisms,templates}/`, `components/layout/Sidebar.tsx`, `lib/mock-data.ts`, `store/api/*.ts` (7 stubs de RTK Query sin conectar), `next.config.ts`.
+
+**`interfaces/interface.ts`**: tipos de dominio (`MockCampaignSummary`, `SocialAccount`, `MockRecentPost`), `RootState`/`AppDispatch`, `NavItemWithPermission`, y **todos** los `Props`/tipos de los componentes de landing (`ChipProps`, `BadgeProps`, `LandingButtonProps`, `HeroActionProps`, `ScrollRevealProps`, `MarqueeProps`, `FeatureCardProps`, más `NetworkActivity`/`TimelineStep`/`FlowNode`/`VineLeaf`/`VineSpec`, antes tipos locales no exportados dentro de cada sección de la landing).
+
+**`lib/mock-data.ts`** (renombrado de `mock-dashboard.ts` para consistencia con los demás fronts): `MOCK_SOCIAL_ACCOUNTS`, `MOCK_DASHBOARD` (CM), `MOCK_POSTS_BY_STATUS`, `MOCK_ADMIN_DASHBOARD`, `MOCK_CLIENTE_DASHBOARD`, `MOCK_DISENADOR_DASHBOARD` — los 4 dashboards por rol en un solo archivo.
+
+**Particularidad única**: `next.config.ts` arma la tabla `ZONES` de sus `rewrites()` (los que hacen que `/login`, `/users`, `/brands`, `/posts`, `/metrics` en el dominio raíz apunten al front correspondiente) importando `ZONE_URLS` de `@repo/ui/config` — se confirmó empíricamente que Next.js sí transpila ese import de paquete workspace dentro del archivo de config, algo que no es obvio de antemano.
+
+**Conexión con el resto**: es el que más apunta hacia afuera — su `Sidebar`, sus 4 `Dashboard*.tsx` y `Header`/`Footer`/`HeroSection` de la landing usan `ZONE_URLS` hacia los 5 fronts restantes.
+
+### 18.6 `analytics-front` (puerto 3011)
+
+**Estructura**: `app/metrics/page.tsx`, `components/dashboard/` (~20 componentes: `NetworkOverview`, `CampaignBreakdown`, `TopContent`, `InsightsPanel`, `PostingHeatMap`, etc.), `lib/mock-data.ts`, `lib/analytics/{types,engine,network-config}.ts` (el "motor", ver 18.1), `store/{analyticsFilters.slice,analytics.selectors}.ts`.
+
+**`interfaces/interface.ts`**: tipos de `mock-data.ts` (`MockEngagementPoint`, `MockBrandMetric`, `SocialAccount`, `MockTopPost`), `Props` de componentes (`AnalyticsFilterDrawerProps`, `AnalyticsDashboardLayoutProps`), `NavItemWithPermission`, `RootState`, `AppDispatch`, `TabValue` (antes local en `app/metrics/page.tsx`).
+
+**`lib/mock-data.ts`** — el que más archivos tenía que fusionar: antes eran **5 archivos de mock distintos** (`lib/mock-data.ts` + `lib/analytics/{mock-metrics,network-metrics,timing-metrics,filter-options}.ts`), cada uno agregado en una fase distinta del desarrollo ("Capa NUEVA de datos (Fase 3)...", según sus propios comentarios) sin nunca consolidarse. Ahora es uno solo: `MOCK_METRIC_FACTS`/`CURRENT_RANGE`/`PREVIOUS_RANGE` (hechos base), `MOCK_NETWORK_SPECIFIC_METRICS`/`SUPPLEMENTAL_METRIC_FACTS` (métricas nativas por red + hechos adicionales de X), `MOCK_PUBLISHED_HOUR` (hora de publicación para el heatmap), `MOCK_CM_OPTIONS`/`MOCK_DESIGNER_OPTIONS`/`MOCK_CATEGORY_OPTIONS`/`MOCK_SPECIALTY_OPTIONS` (opciones deshabilitadas del Drawer de filtros, ver Capítulo 8.5), más lo que ya tenía (`MOCK_BRAND_METRICS`, etc.).
+
+**El "motor" (`lib/analytics/`) no se tocó** — sigue siendo el único módulo del sistema con lógica de negocio real desacoplada de React/Redux (Capítulo 14).
+
+**Conexión con el resto**: recibe navegación desde todos (`Sidebar` de cada front apunta a `ZONE_URLS.analyticsFront + '/metrics'`); no navega hacia ningún otro front en su propio código.
+
+### 18.7 `brands-front` (puerto 3013) — el más grande
+
+**Estructura**: la mayor superficie de rutas del sistema — `app/brands/[id]/{page,calendar,campaigns,campaigns/[campaignId]/{page,posts,team},metrics,reports,score}`, `app/profile/{page,calendar,campaigns/{page,[campaignId]/{page,team}}}`, `app/{my-brand,my-campaigns,onboarding,team}`, `components/{BrandTabs,CampaignTabs,CreateCampaignDialog,campaigns/CampaignCard,layout/Sidebar,profile/{ClientSection,ProfileHeader,StaffProfileSection}}`, `lib/{mock-data,topbar-titles}.ts`.
+
+**`interfaces/interface.ts`** — el más grande: 15 tipos de dominio que vivían mezclados con datos en `mock-data.ts` (`CampaignStatus`, `SocialNetworkOption`, `ProfileType`, `SocialNetworkCode`, `SocialAccount`, `MockProfile`, `MockCampaign`, `MockTeamMember`, `MockCalendarEvent`, `MockCampaignPost`, `Availability`, `MockAvailableDesigner`, `MockAvailableCM`, `MockMyCampaign`, `MockTeamAggregate`), más `RootState`/`AppDispatch`, `NavItemWithPermission`, `Props` de 5 componentes (`CreateCampaignDialog`, `CampaignCard`, `StaffProfileSection`, `CampaignTabs`, `ProfileHeader`), `TitleRoute` (`lib/topbar-titles.ts`, resuelve el título del `TopBar` por ruta exacta) y `CalendarEventItem` (antes local en `app/profile/calendar/page.tsx`).
+
+**`lib/mock-data.ts`** (431 líneas): queda con los datos (`MOCK_PROFILES`, `MOCK_CAMPAIGNS`, `MOCK_CALENDAR_EVENTS`, `MOCK_AVAILABLE_CMS`/`MOCK_AVAILABLE_DESIGNERS`, `MOCK_TEAM_BY_CAMPAIGN`, `MOCK_POSTS_BY_CAMPAIGN`) y ~10 funciones helper (`getSocialAccount`, `getCurrentClientProfile`, `assignTeamToCampaign`, `getMyCampaigns`, `getTeamAggregate`, `getAvailableCMsForCategory`, etc.) — se quedaron junto a los datos en vez de un archivo aparte, mismo criterio que `generateMockId` en `admin-front`.
+
+**Particularidad de dominio**: tiene dos rutas paralelas para lo mismo — `/brands/[id]/*` (legacy, navegación por ID de marca, la usa Admin) y `/profile/*` (nueva, "mi perfil", la usa el usuario logueado) — documentado también en el Capítulo 6.4.
+
+**Conexión con el resto**: el que más enlaces salientes tiene — `Sidebar`, `ClientSection` y 3 páginas más usan `ZONE_URLS.postsFront` (crear/ver publicaciones de una campaña) y `ZONE_URLS.analyticsFront` (ver métricas de una marca).
+
+### 18.8 Tabla resumen
+
+| Front | Puerto | Líneas en `src/` | `interfaces/interface.ts` | Particularidad técnica |
+|---|---|---|---|---|
+| `auth-front` | 3012 | ~900 | 5 tipos | Sin URLs hardcodeadas ya desde antes del refactor |
+| `posts-front` | 3014 | ~1600 | 12 tipos | `NETWORK_LABELS` unificó un diccionario duplicado con 2 nombres distintos |
+| `commons` | — | ~2000 | (`types/` + `config/`) | No es un front; `Props` de sus ~30 componentes UI quedaron intactos a propósito |
+| `web-shell` | 3000 | ~2300 | 20+ tipos | `next.config.ts` importa `ZONE_URLS` para sus `rewrites()` |
+| `analytics-front` | 3011 | ~3400 | 10 tipos | Fusionó 5 archivos de mock en 1; el "motor" (`lib/analytics/`) quedó fuera del patrón a propósito |
+| `brands-front` | 3013 | ~3500 | 22 tipos | El más grande; dos rutas paralelas (`/brands/*` legacy vs `/profile/*`) |
+
+---
+
+*Documento generado por análisis estático de código el 2026-07-02. No fue modificado ningún archivo del proyecto durante su elaboración. Enriquecido posteriormente con las Secciones 1, 2, 5, 6.1, 8.6, 9, 10, 11.2, 15.5 y 17.5, sin eliminar ni resumir contenido previamente documentado. Actualizado el 2026-07-16 tras un refactor de organización de código (interfaces/mocks/URLs centralizados) que no cambió ningún comportamiento funcional: se corrigieron referencias de archivos obsoletas y se agregó la Sección 18 (arquitectura técnica por front).*
