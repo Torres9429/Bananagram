@@ -23,8 +23,8 @@ import {
   MOCK_TEAM_BY_CAMPAIGN,
   getAvailableDesigners,
   assignTeamToCampaign,
-  type MockTeamMember,
 } from '../../../../../../lib/mock-data';
+import type { MockTeamMember } from '../../../../../../interfaces/interface';
 
 export default function CampaignTeamPage() {
   const params = useParams<{ id: string; campaignId: string }>();

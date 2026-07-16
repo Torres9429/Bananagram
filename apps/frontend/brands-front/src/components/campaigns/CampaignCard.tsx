@@ -5,16 +5,8 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { AVAILABLE_SOCIAL_NETWORKS, CAMPAIGN_STATUS_LABEL, getCampaignSocialAccounts, type MockCampaign } from '../../lib/mock-data';
-
-interface CampaignCardProps {
-  campaign: MockCampaign;
-  onClick: () => void;
-  // Nombre del perfil dueño de la campaña — solo relevante para quien ve
-  // campañas de varios perfiles a la vez (CM/Diseñador en /my-campaigns).
-  // El Cliente ya sabe que son las suyas, así que no lo pasa.
-  profileName?: string;
-}
+import { AVAILABLE_SOCIAL_NETWORKS, CAMPAIGN_STATUS_LABEL, getCampaignSocialAccounts } from '../../lib/mock-data';
+import type { CampaignCardProps } from '../../interfaces/interface';
 
 // Extraído de ClientSection (§1 modernización campañas CM/Diseñador) para
 // reutilizar el mismo look de card entre Cliente y /my-campaigns sin duplicar

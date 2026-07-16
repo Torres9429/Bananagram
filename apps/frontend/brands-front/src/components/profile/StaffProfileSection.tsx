@@ -11,13 +11,7 @@ import Alert from '@mui/material/Alert';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { LabeledField, ProfileCompletenessBadge, AvailabilityToggle, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_CATEGORIES, MOCK_SPECIALTIES } from '../../lib/mock-data';
-import type { Availability, MockAvailableCM, MockAvailableDesigner } from '../../lib/mock-data';
-
-interface StaffProfileSectionProps {
-  mockProfile: MockAvailableCM | MockAvailableDesigner | null;
-  name: string;
-  onNameChange: (name: string) => void;
-}
+import type { Availability, StaffProfileSectionProps } from '../../interfaces/interface';
 
 // Contenido de CM/Diseñador en ProfilePage (§4 del rediseño de dominio) — misma
 // lógica y campos que la pantalla tenía antes de separar el Header común; solo

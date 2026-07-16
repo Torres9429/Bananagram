@@ -10,8 +10,8 @@ import {
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
   getSocialAccount,
-  type MockCampaignPost,
 } from '../../../../../../lib/mock-data';
+import type { MockCampaignPost } from '../../../../../../interfaces/interface';
 
 export default function CampaignPostsPage() {
   const params = useParams<{ id: string; campaignId: string }>();

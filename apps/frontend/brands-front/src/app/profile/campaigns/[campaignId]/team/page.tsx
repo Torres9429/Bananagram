@@ -23,8 +23,8 @@ import {
   MOCK_PROFILES,
   getAvailableDesigners,
   assignTeamToCampaign,
-  type MockTeamMember,
 } from '../../../../../lib/mock-data';
+import type { MockTeamMember } from '../../../../../interfaces/interface';
 
 // Equipo de campaña en /profile — mismo contenido que
 // brands-front/app/brands/[id]/campaigns/[campaignId]/team, pero SIN

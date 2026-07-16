@@ -21,6 +21,7 @@ import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import { StatusChip, usePermissions, PrimaryButton } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
+import { ZONE_URLS } from '@repo/ui/config';
 import {
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
@@ -29,8 +30,6 @@ import {
   CAMPAIGN_STATUS_LABEL,
   getSocialAccount,
 } from '../../../../lib/mock-data';
-
-const POSTS_FRONT_URL = 'http://localhost:3014';
 
 // Detalle operativo de campaña en /profile — mismo contenido que
 // brands-front/app/brands/[id]/campaigns/[campaignId], pero SIN CampaignTabs
@@ -90,7 +89,7 @@ export default function ProfileCampaignDetailPage() {
           <Button
             variant="outlined"
             startIcon={<ArticleOutlinedIcon />}
-            onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts?campaign=${campaign.id}`; }}
+            onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts?campaign=${campaign.id}`; }}
             sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
           >
             Ver todas las publicaciones
@@ -109,7 +108,7 @@ export default function ProfileCampaignDetailPage() {
             <Button
               variant="outlined"
               startIcon={<RateReviewOutlinedIcon />}
-              onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/approvals`; }}
+              onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/approvals`; }}
               sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
             >
               Ver aprobaciones
@@ -118,7 +117,7 @@ export default function ProfileCampaignDetailPage() {
           {can('post', 'create') && (
             <PrimaryButton
               startIcon={<AddCircleOutlineIcon />}
-              onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/new`; }}
+              onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/new`; }}
             >
               Crear publicación
             </PrimaryButton>
@@ -188,7 +187,7 @@ export default function ProfileCampaignDetailPage() {
             {posts.length > 3 && (
               <Typography
                 variant="caption"
-                onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts?campaign=${campaign.id}`; }}
+                onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts?campaign=${campaign.id}`; }}
                 sx={{ color: 'primary.contrastTextMuted', fontWeight: 600, cursor: 'pointer' }}
               >
                 Ver todas →

@@ -8,6 +8,7 @@ import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import type { CampaignTabsProps } from '../interfaces/interface';
 
 const SECTIONS = [
   { suffix: '', label: 'Resumen' },
@@ -15,13 +16,7 @@ const SECTIONS = [
   { suffix: '/team', label: 'Equipo' },
 ];
 
-interface Props {
-  brandId: string;
-  campaignId: string;
-  backHref?: string;
-}
-
-export function CampaignTabs({ brandId, campaignId, backHref }: Props) {
+export function CampaignTabs({ brandId, campaignId, backHref }: CampaignTabsProps) {
   const pathname = usePathname();
   const router = useRouter();
   const base = `/brands/${brandId}/campaigns/${campaignId}`;

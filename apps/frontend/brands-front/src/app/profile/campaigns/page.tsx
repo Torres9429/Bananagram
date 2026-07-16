@@ -18,8 +18,8 @@ import {
   CAMPAIGN_STATUS_LABEL,
   assignTeamToCampaign,
   getCurrentClientProfile,
-  type MockCampaign,
 } from '../../../lib/mock-data';
+import type { MockCampaign } from '../../../interfaces/interface';
 
 // Listado de campañas del Cliente en /profile — mismo contenido que
 // brands-front/app/brands/[id]/campaigns, pero SIN BrandTabs.

@@ -21,6 +21,7 @@ import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import { EmptyState, FormDialog, LabeledField, LabeledSelect, ScoreGauge, PrimaryButton } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
+import { ZONE_URLS } from '@repo/ui/config';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CampaignCard } from '../campaigns/CampaignCard';
 import {
@@ -32,7 +33,7 @@ import {
   getCurrentClientProfile,
   assignTeamToCampaign,
 } from '../../lib/mock-data';
-import type { MockCampaign, MockProfile, SocialAccount, SocialNetworkCode } from '../../lib/mock-data';
+import type { MockCampaign, MockProfile, SocialAccount, SocialNetworkCode } from '../../interfaces/interface';
 
 // Estructura de la sección Cliente en ProfilePage (§3 del rediseño de dominio).
 // Placeholder: usa el primer MockProfile como "el Perfil del Cliente" porque hoy
@@ -46,8 +47,6 @@ import type { MockCampaign, MockProfile, SocialAccount, SocialNetworkCode } from
 // propia — mismo patrón que ya usa app/brands/[id]/campaigns/page.tsx para
 // altas de campaña. "Editar perfil" es, por lo mismo, solo de sesión: no
 // muta MOCK_PROFILES, igual que "Agregar red social" no mutaba MOCK_SOCIAL_ACCOUNTS.
-const POSTS_FRONT_URL = 'http://localhost:3014';
-
 export function ClientSection() {
   const router = useRouter();
   const user = useSelector(selectUser);
@@ -143,7 +142,7 @@ export function ClientSection() {
             sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
             Ver calendario
           </Button>
-          <Button size="small" variant="outlined" startIcon={<RateReviewOutlinedIcon />} onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/approvals`; }}
+          <Button size="small" variant="outlined" startIcon={<RateReviewOutlinedIcon />} onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/approvals`; }}
             sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
             Ver aprobaciones
           </Button>

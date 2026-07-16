@@ -14,8 +14,8 @@ import {
   MOCK_CAMPAIGNS,
   CAMPAIGN_STATUS_LABEL,
   assignTeamToCampaign,
-  type MockCampaign,
 } from '../../../../lib/mock-data';
+import type { MockCampaign } from '../../../../interfaces/interface';
 
 export default function CampaignsPage() {
   const params = useParams<{ id: string }>();

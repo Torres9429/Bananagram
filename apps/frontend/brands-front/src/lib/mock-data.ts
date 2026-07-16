@@ -1,17 +1,20 @@
-// TODO(dominio-v3): BrandScore vive en @repo/ui y lo consume analytics-front
-// (analytics.selectors.ts) — no renombrar a ProfileScore hasta tocar analytics
-// en una fase dedicada, para no romper ese contrato compartido.
-import type { BrandScore } from '@repo/ui/types';
-
-export type CampaignStatus = 'active' | 'paused' | 'finished';
-
-// Catálogo de redes sociales disponibles para el onboarding del Cliente.
-// Espeja MOCK_SOCIAL_NETWORKS de admin-front sin cruzar microfronts.
-export interface SocialNetworkOption {
-  code: SocialNetworkCode;
-  label: string;
-  color: string;
-}
+import type {
+  CampaignStatus,
+  SocialNetworkOption,
+  ProfileType,
+  SocialNetworkCode,
+  SocialAccount,
+  MockProfile,
+  MockCampaign,
+  MockTeamMember,
+  MockCalendarEvent,
+  MockCampaignPost,
+  Availability,
+  MockAvailableDesigner,
+  MockAvailableCM,
+  MockMyCampaign,
+  MockTeamAggregate,
+} from '../interfaces/interface';
 
 export const AVAILABLE_SOCIAL_NETWORKS: SocialNetworkOption[] = [
   { code: 'IG', label: 'Instagram',  color: '#E1306C' },
@@ -26,12 +29,6 @@ export const MOCK_CATEGORIES = ['Moda', 'Deportes', 'Tecnología', 'Entretenimie
 
 
 
-// "brand"/"company"/"organization"/"creator" = entidad gestionada por un tercero (Nike, Zara...)
-// "personal" = persona (Juan Pérez, Dra. María López...)
-// Únicamente afecta cómo se presenta en la UI; el resto del modelo y las
-// operaciones (campañas, posts, métricas, score) son exactamente iguales.
-export type ProfileType = 'brand' | 'company' | 'organization' | 'creator' | 'personal';
-
 export const PROFILE_TYPE_LABELS: Record<ProfileType, string> = {
   brand: 'Marca',
   company: 'Empresa',
@@ -39,84 +36,6 @@ export const PROFILE_TYPE_LABELS: Record<ProfileType, string> = {
   creator: 'Creador',
   personal: 'Perfil personal',
 };
-
-export type SocialNetworkCode = 'IG' | 'TK' | 'LI' | 'FB' | 'X' | 'YT';
-
-// Una cuenta específica de un Profile en una red social (ej. @nike en Instagram).
-// Un Profile puede tener varias SocialAccount — una por cada red que gestiona.
-// TODO(dominio-v3): brandId es el nombre de campo compartido con el backend
-// (JWT AuthState.brandIds, contrato Post.brandProfileId en commons) — no
-// renombrar aquí hasta que el backend también migre a "profileId".
-export interface SocialAccount {
-  id: string;
-  brandId: string;
-  socialNetwork: SocialNetworkCode;
-  handle: string;
-  followers: number;
-  active: boolean;
-}
-
-export interface MockProfile {
-  id: string;
-  name: string;
-  type: ProfileType;
-  color: string;
-  category: string;
-  activeCampaigns: number;
-  score: BrandScore;
-  profiles: SocialAccount[];
-}
-
-// TODO(dominio-v3): brandId — ver nota en SocialAccount, mismo contrato compartido.
-export interface MockCampaign {
-  id: string;
-  brandId: string;
-  name: string;
-  status: CampaignStatus;
-  startDate: string;
-  endDate: string;
-  postsCount: number;
-  // Subconjunto de SocialAccount que esta campaña usa (§A.4 del análisis de dominio).
-  // Todavía no se consume en ninguna pantalla — solo preparación del modelo.
-  socialAccountIds: string[];
-}
-
-export interface MockTeamMember {
-  id: string;
-  name: string;
-  role: string;
-  avatarBg: string;
-  avatarColor: string;
-}
-
-// Un evento de calendario corresponde a un post agendado en una SocialAccount
-// específica — la red social se obtiene de esa SocialAccount, no es un campo propio.
-// campaignId/status se agregaron para soportar los filtros de /profile/calendar
-// (campaña, estado) — mismos valores que ya usa MockCampaignPost, sin duplicar concepto.
-export interface MockCalendarEvent {
-  id: string;
-  title: string;
-  brandId: string;
-  brandProfileId: string;
-  campaignId: string;
-  status: MockCampaignPost['status'];
-  start: string;
-  end: string;
-  // Id de la publicación en posts-front (MOCK_POSTS), SOLO cuando existe una
-  // correspondencia real por título entre ambos mocks independientes — no todo
-  // evento de calendario tiene una publicación equivalente ahí.
-  postId?: string;
-}
-
-// Igual que el calendario: el post pertenece a una SocialAccount, no tiene un
-// campo `network` independiente.
-export interface MockCampaignPost {
-  id: string;
-  title: string;
-  brandProfileId: string;
-  status: 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'programado' | 'publicado';
-  scheduledAt: string;
-}
 
 export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, { label: string; bg: string; color: string }> = {
   active: { label: 'Activa', bg: '#E8F5E9', color: '#2E7D32' },
@@ -239,35 +158,6 @@ export function campaignUsesSocialAccount(campaignId: string, socialAccountId: s
 // Especialidades disponibles para el perfil de CM/Diseñador.
 export const MOCK_SPECIALTIES = ['Diseño gráfico', 'Copywriting', 'Video y edición', 'Fotografía', 'Paid media', 'SEO/SEM', 'Animación'];
 
-export type Availability = 'disponible' | 'no_disponible';
-
-// Un perfil de CM o Diseñador visible para selección.
-// perfil_completo = categories.length > 0 && specialties.length > 0
-export interface MockAvailableDesigner {
-  id: string;
-  name: string;
-  avatarBg: string;
-  avatarColor: string;
-  categories: string[];
-  specialties: string[];
-  availability: Availability;
-  perfilCompleto: boolean;
-  bio: string;
-}
-
-export interface MockAvailableCM {
-  id: string;
-  name: string;
-  categories: string[];
-  specialties: string[];
-  availability: Availability;
-  perfilCompleto: boolean;
-  bio: string;
-  avatarBg: string;
-  avatarColor: string;
-  designers: MockAvailableDesigner[];
-}
-
 // Diseñadores disponibles en el sistema (perfil_completo = true, disponibilidad = disponible).
 // Solo estos aparecen en el listado del CM al armar su equipo.
 export const MOCK_AVAILABLE_DESIGNERS: MockAvailableDesigner[] = [
@@ -373,25 +263,11 @@ export const MOCK_POSTS_BY_CAMPAIGN: Record<string, MockCampaignPost[]> = {
   ],
 };
 
-export interface MockMyCampaign extends MockCampaign {
-  profileName: string;
-  profileColor: string;
-}
-
 export function getMyCampaigns(): MockMyCampaign[] {
   return MOCK_CAMPAIGNS.map((c) => {
     const profile = MOCK_PROFILES.find((b) => b.id === c.brandId)!;
     return { ...c, profileName: profile.name, profileColor: profile.color };
   });
-}
-
-export interface MockTeamAggregate {
-  id: string;
-  name: string;
-  role: string;
-  avatarBg: string;
-  avatarColor: string;
-  campaigns: { id: string; name: string; profileName: string }[];
 }
 
 export function getTeamAggregate(): MockTeamAggregate[] {

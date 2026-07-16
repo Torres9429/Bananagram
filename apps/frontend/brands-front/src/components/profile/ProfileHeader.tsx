@@ -6,11 +6,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import { getInitials } from '@repo/ui/utils';
-
-interface ProfileHeaderProps {
-  name: string;
-  subtitle: string;
-}
+import type { ProfileHeaderProps } from '../../interfaces/interface';
 
 // Encabezado común de ProfilePage (§2 del rediseño de dominio) — identidad
 // básica compartida por cualquier tipo de perfil. El contenido específico de

@@ -15,7 +15,7 @@ import { FormDialog, LabeledField, LabeledSelect } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
 import { findUserByEmail } from '@repo/ui';
-import type { MockCampaign, CampaignStatus, MockTeamMember } from '../lib/mock-data';
+import type { MockCampaign, CampaignStatus, MockTeamMember, CreateCampaignDialogProps } from '../interfaces/interface';
 import { getAvailableCMsForCategory, getSocialAccountsByProfile, AVAILABLE_SOCIAL_NETWORKS } from '../lib/mock-data';
 
 const STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
@@ -24,15 +24,7 @@ const STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
   { value: 'finished', label: 'Finalizada' },
 ];
 
-interface Props {
-  open: boolean;
-  brandId: string;
-  brandCategory: string;
-  onClose: () => void;
-  onCreate: (campaign: MockCampaign, team: MockTeamMember[]) => void;
-}
-
-export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, onCreate }: Props) {
+export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, onCreate }: CreateCampaignDialogProps) {
   const user = useSelector(selectUser);
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');

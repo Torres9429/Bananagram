@@ -21,6 +21,7 @@ import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { LabeledField, LabeledSelect, PostPreviewDialog, WidgetCard, STATUS_LABELS, STATUS_COLORS, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
+import { ZONE_URLS } from '@repo/ui/config';
 import {
   MOCK_CAMPAIGNS,
   MOCK_CALENDAR_EVENTS,
@@ -28,9 +29,8 @@ import {
   getSocialAccount,
   getSocialAccountsByProfile,
   getCurrentClientProfile,
-  type MockCampaignPost,
-  type SocialNetworkCode,
 } from '../../../lib/mock-data';
+import type { MockCampaignPost, SocialNetworkCode, CalendarEventItem } from '../../../interfaces/interface';
 
 const localizer = dateFnsLocalizer({
   format,
@@ -39,8 +39,6 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales: { es },
 });
-
-const POSTS_FRONT_URL = 'http://localhost:3014';
 
 // Textos de react-big-calendar en español — la librería viene en inglés por
 // defecto (Today/Back/Next/Month/Week/Day/Agenda...); esto NO afecta el
@@ -61,17 +59,6 @@ const CALENDAR_MESSAGES: Messages = {
 };
 
 const ALL_STATUSES: MockCampaignPost['status'][] = ['borrador', 'en_revision', 'aprobado', 'rechazado', 'programado', 'publicado'];
-
-interface CalendarEventItem {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  networkCode: SocialNetworkCode;
-  networkColor: string;
-  status: MockCampaignPost['status'];
-  postId?: string;
-}
 
 // Fila del evento — reemplaza el título default de react-big-calendar por un
 // punto de color (red) + título + acento de color por estado, sin librería nueva.
@@ -369,7 +356,7 @@ export default function ProfileCalendarPage() {
         networkLabel={selectedNetworkLabel}
         campaignName={selectedCampaign?.name ?? null}
         scheduledAt={selectedScheduledAt}
-        onViewFull={selectedEvent?.postId ? () => { window.location.href = `${POSTS_FRONT_URL}/posts/${selectedEvent.postId}`; } : undefined}
+        onViewFull={selectedEvent?.postId ? () => { window.location.href = `${ZONE_URLS.postsFront}/posts/${selectedEvent.postId}`; } : undefined}
         onApprove={canReviewEvent && can('post', 'approve') ? handleApproveSelected : undefined}
         onReject={canReviewEvent && can('post', 'reject') ? handleRejectSelected : undefined}
       />

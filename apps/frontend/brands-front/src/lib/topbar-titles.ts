@@ -1,12 +1,4 @@
-// Resuelve el título del TopBar por ruta exacta (no solo por el primer
-// segmento del path) — necesario porque /profile y sus sub-rutas
-// (/profile/calendar, /profile/campaigns/*) representan pantallas distintas
-// dentro del mismo dominio de Perfil único. '*' matchea un segmento dinámico
-// (ej. el [campaignId] de /profile/campaigns/[campaignId]).
-interface TitleRoute {
-  segments: string[];
-  title: string;
-}
+import type { TitleRoute } from '../interfaces/interface';
 
 const TITLE_ROUTES: TitleRoute[] = [
   { segments: ['profile'], title: 'Mi perfil' },
