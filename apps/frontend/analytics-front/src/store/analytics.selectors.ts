@@ -20,11 +20,16 @@ import {
   rankPosts,
   reachByNetwork,
 } from '../lib/analytics/engine';
-import { CURRENT_RANGE, MOCK_METRIC_FACTS, PREVIOUS_RANGE } from '../lib/analytics/mock-metrics';
-import { MOCK_NETWORK_SPECIFIC_METRICS, SUPPLEMENTAL_METRIC_FACTS } from '../lib/analytics/network-metrics';
-import { MOCK_PUBLISHED_HOUR } from '../lib/analytics/timing-metrics';
-import { MOCK_BRAND_METRICS } from '../lib/mock-data';
-import type { RootState } from './index';
+import {
+  CURRENT_RANGE,
+  MOCK_METRIC_FACTS,
+  PREVIOUS_RANGE,
+  MOCK_NETWORK_SPECIFIC_METRICS,
+  SUPPLEMENTAL_METRIC_FACTS,
+  MOCK_PUBLISHED_HOUR,
+  MOCK_BRAND_METRICS,
+} from '../lib/mock-data';
+import type { RootState } from '../interfaces/interface';
 
 // Único punto de verdad: cualquier widget que necesite datos de analítica
 // pasa por estos selectores — nunca vuelve a filtrar/agregar por su cuenta.

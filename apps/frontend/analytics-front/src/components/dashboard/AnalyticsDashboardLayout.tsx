@@ -1,16 +1,6 @@
-import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
-
-interface AnalyticsDashboardLayoutProps {
-  /** Fila de KPIs (Grid items ya armados, ej. <Grid item xs={12} md={3}><TrendCard .../></Grid>) */
-  kpiRow: ReactNode;
-  /**
-   * Slot abierto para futuras secciones del dashboard (gráficas, tablas, timeline,
-   * heatmap, insights, comparadores). Vacío en esta fase — solo se define el shell.
-   */
-  children?: ReactNode;
-}
+import type { AnalyticsDashboardLayoutProps } from '../../interfaces/interface';
 
 /**
  * Shell de layout del Centro de Inteligencia de Redes Sociales.

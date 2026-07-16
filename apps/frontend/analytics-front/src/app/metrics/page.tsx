@@ -26,14 +26,7 @@ import { PostingHeatMap } from '../../components/dashboard/PostingHeatMap';
 import { AudienceOverview } from '../../components/dashboard/AudienceOverview';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectSelectedNetwork } from '../../store/analytics.selectors';
-import type { SocialNetworkCode } from '../../lib/analytics/types';
-
-// Pestañas de primer nivel (§B.1/§B.2 del rediseño de dominio): "General" + una por
-// red. El valor de cada Tab reutiliza directamente SocialNetworkCode — no existe un
-// estado de tab separado del filtro de red ya existente en Redux (selectedNetwork):
-// cambiar de tab ES seleccionar la red, mismo mecanismo que ya usaban
-// SocialNetworkTabs/NetworkComparison, ahora promovido a navegación de primer nivel.
-type TabValue = 'general' | SocialNetworkCode;
+import type { TabValue } from '../../interfaces/interface';
 
 const TABS: { value: TabValue; label: string }[] = [
   { value: 'general', label: 'General' },

@@ -43,16 +43,12 @@ import {
   MOCK_CM_OPTIONS,
   MOCK_DESIGNER_OPTIONS,
   MOCK_SPECIALTY_OPTIONS,
-} from '../../lib/analytics/filter-options';
+} from '../../lib/mock-data';
 import type { PostStatus, SocialNetworkCode } from '../../lib/analytics/types';
+import type { AnalyticsFilterDrawerProps } from '../../interfaces/interface';
 import { useDateRangeFilter } from './useDateRangeFilter';
 
 const ALL_STATUSES: PostStatus[] = ['borrador', 'en_revision', 'aprobado', 'rechazado', 'programado', 'publicado'];
-
-interface AnalyticsFilterDrawerProps {
-  open: boolean;
-  onClose: () => void;
-}
 
 /**
  * Drawer lateral (desktop) / Bottom sheet (mobile) con el detalle completo de filtros.

@@ -18,7 +18,7 @@ import { EmptyState } from '@repo/ui';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { selectFactsForNetworkTabs, selectNetworkTabsSummary } from '../../store/analytics.selectors';
 import { compareNetworks } from '../../lib/analytics/engine';
-import { MOCK_NETWORK_SPECIFIC_METRICS } from '../../lib/analytics/network-metrics';
+import { MOCK_NETWORK_SPECIFIC_METRICS } from '../../lib/mock-data';
 import { COMPARABLE_METRICS, NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import type { SocialNetworkCode } from '../../lib/analytics/types';
 

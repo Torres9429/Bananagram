@@ -11,19 +11,14 @@ import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import { SidebarNav, type SidebarNavItem, usePermissions } from '@repo/ui/ui';
+import { SidebarNav, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { AppRole } from '@repo/ui/types';
+import { ZONE_URLS } from '@repo/ui/config';
 import { useSelector } from 'react-redux';
+import type { NavItemWithPermission } from '../../interfaces/interface';
 
-const WEB_SHELL_URL = 'http://localhost:3000';
-const POSTS_FRONT_URL = 'http://localhost:3014';
-const BRANDS_FRONT_URL = 'http://localhost:3013';
-const ADMIN_FRONT_URL = 'http://localhost:3010';
-
-interface NavItemWithPermission extends SidebarNavItem {
-  requirePermission?: { module: string; action: string }[];
-}
+const { webShell: WEB_SHELL_URL, postsFront: POSTS_FRONT_URL, brandsFront: BRANDS_FRONT_URL, adminFront: ADMIN_FRONT_URL } = ZONE_URLS;
 
 const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
