@@ -110,7 +110,7 @@ export function RegisterForm() {
         <Chip label="Cliente" size="small" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 700 }} />
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-        Registra tu perfil y comienza a gestionar contenido
+        Registra tu perfil y comienza a generar contenido
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
         Paso {step + 1} de {STEPS.length} · {STEPS[step]}

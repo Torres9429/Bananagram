@@ -22,11 +22,10 @@ const { webShell: WEB_SHELL_URL, postsFront: POSTS_FRONT_URL, analyticsFront: AN
 
 const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
-  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'post', action: 'approve' }] },
-  // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
-  // browsing multi-perfil que se conserva por compatibilidad (ver
-  // brands-front/src/app/brands). No quitar hasta que /brands se retire.
-  { key: 'brands', label: 'Marcas', href: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: 'brands', action: 'manage' }] },
+  // Mis Campañas / Mi perfil van primero (justo después de Dashboard): son
+  // mutuamente excluyentes por rol (view-own vs. create), así que cada rol ve
+  // arriba exactamente el ítem que corresponde a su landing post-login
+  // (Cliente → Mi perfil /profile; CM/Diseñador → Mis Campañas /my-campaigns).
   // activeMatchPrefixes: el detalle/equipo/publicaciones de una campaña vive
   // en /profile/campaigns/*, que no tiene su propio ítem de nav — sin esto,
   // ningún ítem quedaba activo al entrar al detalle de una campaña.
@@ -35,6 +34,11 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // — sus campañas se navegan desde /profile, así que activeMatchPrefixes
   // cubre /profile/campaigns/* aquí para que "Mi perfil" quede activo ahí.
   { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, activeMatchPrefixes: ['/profile/campaigns'], icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
+  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'post', action: 'approve' }] },
+  // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
+  // browsing multi-perfil que se conserva por compatibilidad (ver
+  // brands-front/src/app/brands). No quitar hasta que /brands se retire.
+  { key: 'brands', label: 'Marcas', href: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: 'brands', action: 'manage' }] },
   // Calendario (fase UX): mismo par de permisos ya usado por "Mi perfil"/"Team"
   // — Cliente (campaigns:create) o CM/Diseñador (campaigns:view-own). No es un
   // permiso nuevo. Admin queda excluido igual que el resto vía isAdmin, abajo.

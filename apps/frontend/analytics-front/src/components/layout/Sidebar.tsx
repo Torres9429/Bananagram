@@ -22,13 +22,17 @@ const { webShell: WEB_SHELL_URL, postsFront: POSTS_FRONT_URL, brandsFront: BRAND
 
 const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
+  // Mis Campañas / Mi perfil van primero (justo después de Dashboard): son
+  // mutuamente excluyentes por rol (view-own vs. create), así que cada rol ve
+  // arriba exactamente el ítem que corresponde a su landing post-login
+  // (Cliente → Mi perfil /profile; CM/Diseñador → Mis Campañas /my-campaigns).
+  { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
+  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
   { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'post', action: 'approve' }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.
   { key: 'brands', label: 'Marcas', href: `${BRANDS_FRONT_URL}/brands`, icon: <StorefrontIcon />, requirePermission: [{ module: 'brands', action: 'manage' }] },
-  { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
-  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
   { key: 'calendar', label: 'Calendario', href: `${BRANDS_FRONT_URL}/profile/calendar`, icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }, { module: 'campaigns', action: 'view-own' }] },
   { key: 'metrics', label: 'Métricas', href: '/metrics', icon: <BarChartIcon />, requirePermission: [{ module: 'metrics', action: 'view' }] },
   { key: 'team', label: 'Team', href: `${BRANDS_FRONT_URL}/team`, icon: <GroupIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
