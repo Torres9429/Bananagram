@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-
-export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning';
+import type { BadgeTone, BadgeProps } from '../../../interfaces/interface';
 
 const DOT_COLOR: Record<BadgeTone, string> = {
   neutral: 'text.secondary',
@@ -9,11 +8,6 @@ const DOT_COLOR: Record<BadgeTone, string> = {
   success: 'success.main',
   warning: 'warning.main',
 };
-
-export interface BadgeProps {
-  label: string;
-  tone?: BadgeTone;
-}
 
 /** Pill de estado (punto + texto) usado en el timeline de Publicaciones. Colores derivados 100% de palette.*.main. */
 export function Badge({ label, tone = 'neutral' }: BadgeProps) {

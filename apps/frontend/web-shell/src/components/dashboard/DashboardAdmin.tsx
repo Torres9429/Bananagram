@@ -13,12 +13,11 @@ import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import { WidgetCard, PrimaryButton } from '@repo/ui/ui';
-import { MOCK_ADMIN_DASHBOARD } from '../../lib/mock-dashboard';
-
-const ADMIN_FRONT_URL = 'http://localhost:3010';
+import { ZONE_URLS } from '@repo/ui/config';
+import { MOCK_ADMIN_DASHBOARD } from '../../lib/mock-data';
 
 function nav(path: string) {
-  window.location.href = `${ADMIN_FRONT_URL}${path}`;
+  window.location.href = `${ZONE_URLS.adminFront}${path}`;
 }
 
 export function DashboardAdmin() {

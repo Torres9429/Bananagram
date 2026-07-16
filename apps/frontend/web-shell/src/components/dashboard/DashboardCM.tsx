@@ -16,9 +16,10 @@ import {
   Tooltip as RechartsTooltip, PieChart, Pie, Cell,
 } from 'recharts';
 import { StatusChip, WidgetCard, PrimaryButton } from '@repo/ui/ui';
-import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, getMockPostsByNetwork, getSocialAccount } from '../../lib/mock-dashboard';
+import { ZONE_URLS } from '@repo/ui/config';
+import { MOCK_DASHBOARD, MOCK_POSTS_BY_STATUS, getMockPostsByNetwork, getSocialAccount } from '../../lib/mock-data';
 
-const POSTS_FRONT_URL = 'http://localhost:3014';
+const { postsFront: POSTS_FRONT_URL } = ZONE_URLS;
 
 export function DashboardCM() {
   const theme = useTheme();

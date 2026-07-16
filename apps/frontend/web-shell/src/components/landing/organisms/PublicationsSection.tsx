@@ -3,15 +3,9 @@ import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { Badge, type BadgeTone } from '../atoms/Badge';
+import { Badge } from '../atoms/Badge';
 import { ScrollReveal } from '../molecules/ScrollReveal';
-
-interface TimelineStep {
-  status: string;
-  tone: BadgeTone;
-  description: string;
-  timestamp: string;
-}
+import type { TimelineStep } from '../../../interfaces/interface';
 
 const STEPS: TimelineStep[] = [
   { status: 'Borrador', tone: 'neutral', description: 'La diseñadora sube 3 piezas creativas.', timestamp: 'hace 2 días' },

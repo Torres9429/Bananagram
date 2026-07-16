@@ -11,10 +11,10 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import PublishedWithChangesOutlinedIcon from '@mui/icons-material/PublishedWithChangesOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { StatusChip, WidgetCard, EmptyState, PrimaryButton } from '@repo/ui/ui';
-import { MOCK_DISENADOR_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
+import { ZONE_URLS } from '@repo/ui/config';
+import { MOCK_DISENADOR_DASHBOARD, getSocialAccount } from '../../lib/mock-data';
 
-const POSTS_FRONT_URL = 'http://localhost:3014';
-const BRANDS_FRONT_URL = 'http://localhost:3013';
+const { postsFront: POSTS_FRONT_URL, brandsFront: BRANDS_FRONT_URL } = ZONE_URLS;
 
 export function DashboardDisenador() {
   const { designerName, myPosts, assignedCampaigns, recentPosts } = MOCK_DISENADOR_DASHBOARD;

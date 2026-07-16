@@ -1,17 +1,6 @@
-import type { PostStatus } from '@repo/ui/types';
 import type { Theme } from '@mui/material/styles';
-
-export interface MockCampaignSummary {
-  id: string;
-  name: string;
-  color: string;
-  progress: number;
-}
-
-export interface SocialAccount {
-  id: string;
-  socialNetwork: string;
-}
+import type { PostStatus } from '@repo/ui/types';
+import type { MockCampaignSummary, SocialAccount, MockRecentPost } from '../interfaces/interface';
 
 export const MOCK_SOCIAL_ACCOUNTS: SocialAccount[] = [
   { id: 'bp1', socialNetwork: 'Instagram' },
@@ -20,13 +9,6 @@ export const MOCK_SOCIAL_ACCOUNTS: SocialAccount[] = [
 
 export function getSocialAccount(id: string): SocialAccount | undefined {
   return MOCK_SOCIAL_ACCOUNTS.find((p) => p.id === id);
-}
-
-export interface MockRecentPost {
-  id: string;
-  title: string;
-  status: PostStatus;
-  brandProfileId: string;
 }
 
 // ── Dashboard compartido (CM) ─────────────────────────────────────

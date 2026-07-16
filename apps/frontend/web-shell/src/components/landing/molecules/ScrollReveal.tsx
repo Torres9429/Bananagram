@@ -1,12 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-
-export interface ScrollRevealProps {
-  children: ReactNode;
-  delay?: number;
-}
+import type { ScrollRevealProps } from '../../../interfaces/interface';
 
 /** Wrapper de entrada suave por scroll (fade + slide-up), reutilizado por Hero y las secciones. */
 export function ScrollReveal({ children, delay = 0 }: ScrollRevealProps) {

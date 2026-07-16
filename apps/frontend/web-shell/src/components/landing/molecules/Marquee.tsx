@@ -4,10 +4,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { motion, useReducedMotion } from 'framer-motion';
-
-export interface MarqueeProps {
-  items: string[];
-}
+import type { MarqueeProps } from '../../../interfaces/interface';
 
 // Cada "mitad" se repite varias veces para garantizar que sea más ancha que
 // cualquier viewport real (si no, en pantallas anchas el contenido se acaba

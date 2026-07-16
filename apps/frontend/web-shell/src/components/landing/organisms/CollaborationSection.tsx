@@ -9,14 +9,8 @@ import SupportAgentOutlinedIcon from '@mui/icons-material/SupportAgentOutlined';
 import BrushOutlinedIcon from '@mui/icons-material/BrushOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
-import type { ReactNode } from 'react';
 import { ScrollReveal } from '../molecules/ScrollReveal';
-
-interface FlowNode {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}
+import type { FlowNode } from '../../../interfaces/interface';
 
 const FLOW: FlowNode[] = [
   { icon: <PersonOutlineOutlinedIcon />, title: 'Cliente', description: 'Define el objetivo y la visión de marca.' },

@@ -3,20 +3,7 @@
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import { motion, useReducedMotion } from 'framer-motion';
-
-interface VineLeaf {
-  cx: number;
-  cy: number;
-  rx: number;
-  ry: number;
-  rotate: number;
-}
-
-interface VineSpec {
-  top: { x: number; y: number };
-  path: string;
-  leaves: VineLeaf[];
-}
+import type { VineSpec } from '../../../interfaces/interface';
 
 // Coordenadas tomadas 1:1 de la referencia (liana continua + hojas ancladas encima, viewBox local 180x900).
 const LEFT_VINE: VineSpec = {

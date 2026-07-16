@@ -5,8 +5,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Link from '@mui/material/Link';
 import Image from 'next/image';
-
-const AUTH_FRONT_LOGIN_URL = 'http://localhost:3012/login';
+import { ZONE_URLS } from '@repo/ui/config';
 
 const PRODUCT_LINKS = [
   { label: 'Funciones', href: '#funciones' },
@@ -16,7 +15,7 @@ const PRODUCT_LINKS = [
 ];
 
 const ACCOUNT_LINKS = [
-  { label: 'Iniciar sesión', href: AUTH_FRONT_LOGIN_URL },
+  { label: 'Iniciar sesión', href: `${ZONE_URLS.authFront}/login` },
   { label: 'Solicitar demo', href: '#contacto' },
 ];
 

@@ -1,11 +1,12 @@
 import type { NextConfig } from 'next';
+import { ZONE_URLS } from '@repo/ui/config';
 
 const ZONES = {
-  AUTH:      'http://localhost:3012',
-  ADMIN:     'http://localhost:3010',
-  BRANDS:    'http://localhost:3013',
-  POSTS:     'http://localhost:3014',
-  ANALYTICS: 'http://localhost:3011',
+  AUTH:      ZONE_URLS.authFront,
+  ADMIN:     ZONE_URLS.adminFront,
+  BRANDS:    ZONE_URLS.brandsFront,
+  POSTS:     ZONE_URLS.postsFront,
+  ANALYTICS: ZONE_URLS.analyticsFront,
 };
 
 const nextConfig: NextConfig = {

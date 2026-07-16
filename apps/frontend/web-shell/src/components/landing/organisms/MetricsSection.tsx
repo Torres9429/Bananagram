@@ -18,6 +18,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useTheme } from '@mui/material/styles';
 import { MetricCard, ScoreGauge } from '@repo/ui/ui';
 import { ScrollReveal } from '../molecules/ScrollReveal';
+import type { NetworkActivity } from '../../../interfaces/interface';
 
 // Mismos 3 componentes y pesos reales de la fórmula del score digital
 // (ver CLAUDE.md): Score = Consistencia×0.30 + Engagement×0.40 + Frecuencia×0.30.
@@ -33,15 +34,6 @@ function breakdownColor(value: number) {
   if (value >= 70) return 'success.main';
   if (value < 60) return 'error.main';
   return 'warning.main';
-}
-
-interface NetworkActivity {
-  code: string;
-  name: string;
-  tone: 'primary' | 'success' | 'info';
-  posts: number;
-  engagement: string;
-  fill: number;
 }
 
 // Mismas 3 redes que ya usamos en Campañas/Calendario, para no inventar canales nuevos.

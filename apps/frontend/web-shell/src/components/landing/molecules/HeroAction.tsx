@@ -2,11 +2,7 @@
 
 import Stack from '@mui/material/Stack';
 import { LandingButton } from '../atoms/LandingButton';
-
-export interface HeroActionProps {
-  onPrimaryClick?: () => void;
-  onSecondaryClick?: () => void;
-}
+import type { HeroActionProps } from '../../../interfaces/interface';
 
 export function HeroAction({ onPrimaryClick, onSecondaryClick }: HeroActionProps) {
   return (

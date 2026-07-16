@@ -1,17 +1,7 @@
-import type { ReactNode } from 'react';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-
-export type FeatureCardTone = 'primary' | 'secondary' | 'success' | 'warning' | 'info' | 'error';
-
-export interface FeatureCardProps {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  visual?: ReactNode;
-  tone?: FeatureCardTone;
-}
+import type { FeatureCardProps } from '../../../interfaces/interface';
 
 /** Tarjeta ícono+título+descripción+visual opcional, usada por Campañas/Publicaciones/Calendario/Colaboración. */
 export function FeatureCard({ icon, title, description, visual, tone = 'primary' }: FeatureCardProps) {

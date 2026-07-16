@@ -12,10 +12,10 @@ import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import { ScoreGauge, StatusChip, WidgetCard, PrimaryButton } from '@repo/ui/ui';
 import { getInitials } from '@repo/ui/utils';
-import { MOCK_CLIENTE_DASHBOARD, getSocialAccount } from '../../lib/mock-dashboard';
+import { ZONE_URLS } from '@repo/ui/config';
+import { MOCK_CLIENTE_DASHBOARD, getSocialAccount } from '../../lib/mock-data';
 
-const POSTS_FRONT_URL = 'http://localhost:3014';
-const BRANDS_FRONT_URL = 'http://localhost:3013';
+const { postsFront: POSTS_FRONT_URL, brandsFront: BRANDS_FRONT_URL } = ZONE_URLS;
 
 export function DashboardCliente() {
   const { brandName, pendingApprovals, activeCampaigns, score, scoreClassification, metrics24h, team, postsToApprove } = MOCK_CLIENTE_DASHBOARD;
