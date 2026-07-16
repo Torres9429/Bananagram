@@ -151,7 +151,10 @@ model Brand {
   @@map("brands")
 }
 
-enum BrandType { brand profile }
+enum BrandType {
+  brand
+  profile
+}
 
 model BrandProfile {
   id              String        @id @default(uuid())
@@ -201,7 +204,11 @@ model Campaign {
   @@map("campaigns")
 }
 
-enum CampaignStatus { active paused finished }
+enum CampaignStatus {
+  active
+  paused
+  finished
+}
 
 model CampaignTeam {
   id         String   @id @default(uuid())
@@ -243,7 +250,14 @@ model Post {
   @@map("posts")
 }
 
-enum PostStatus { borrador en_revision aprobado rechazado programado publicado }
+enum PostStatus {
+  borrador
+  en_revision
+  aprobado
+  rechazado
+  programado
+  publicado
+}
 
 model PostStatusHistory {
   id         BigInt   @id @default(autoincrement())
@@ -298,7 +312,10 @@ model Report {
   @@map("reports")
 }
 
-enum ReportFormat { csv pdf }
+enum ReportFormat {
+  csv
+  pdf
+}
 
 // ── Auditoría ────────────────────────────────────────────────────────
 model AuditLog {
