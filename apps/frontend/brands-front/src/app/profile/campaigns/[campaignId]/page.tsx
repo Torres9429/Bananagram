@@ -18,6 +18,7 @@ import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { StatusChip, usePermissions, PrimaryButton } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
@@ -207,7 +208,18 @@ export default function ProfileCampaignDetailPage() {
                       {getSocialAccount(p.brandProfileId)?.socialNetwork ?? '—'} · {p.scheduledAt}
                     </Typography>
                   </Box>
-                  <StatusChip status={p.status} />
+                  <Stack direction="row" gap={0.5} alignItems="center">
+                    <StatusChip status={p.status} />
+                    <Tooltip title="Ver publicación">
+                      <IconButton
+                        size="small"
+                        onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/${p.id}`; }}
+                        sx={{ color: 'secondary.main' }}
+                      >
+                        <VisibilityOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
                 </Box>
               ))}
             </Stack>
