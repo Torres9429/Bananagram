@@ -31,31 +31,38 @@ convenciones (`agents/conventions.md`), pero la mayoría de las piezas todavía 
 Antes de asumir que algo "ya funciona", verifica contra esta lista:
 
 ### Backend — nada expone rutas de negocio todavía
-- **Los 4 microservicios (`auth`, `brands`, `content`, `analytics`) tienen `AppModule` con `imports: []`**
+- **Los 3 microservicios (`auth`, `core`, `alexa`) tienen `AppModule` con `imports: []`**
   y un comentario `// TODO: importar módulos de dominio`. Es decir: `AuthModule`, `PermissionsModule`,
-  `CampaignsModule`, `ReportsModule` existen como clases pero **no están registrados** — al levantar
-  cualquiera de estos servicios hoy, no responden en ninguna ruta de negocio (solo Swagger vacío en
-  `/docs` y el prefijo global `api`).
+  `CampaignsModule`, `ReportsModule`, `IdeasModule` existen como clases pero **no están registrados** — al
+  levantar cualquiera de estos servicios hoy, no responden en ninguna ruta de negocio (solo Swagger vacío
+  en `/docs` y el prefijo global `api`). `core-service` fusiona lo que antes eran brands/content/analytics
+  -service (una sola carpeta, un solo `main.ts`/puerto/package.json); `alexa-service` es nuevo, BFF de la
+  Alexa Skill, sin base de datos propia (ver `docs/base/service-boundaries.md`).
 - **El gateway no proxea nada.** `http-proxy-middleware` está en `package.json` pero no se usa en ningún
   archivo. `apps/backend/gateway/src/app.module.ts` solo registra `HealthController` (`GET /health`) +
   `CorrelationIdMiddleware`. No hay ruta que reenvíe a los microservicios.
-- **`brands-service/campaigns`** (controller/service/module/DTOs) son clases completamente vacías —
+- **`core-service/campaigns`** (controller/service/module/DTOs) son clases completamente vacías —
   `@Controller('campaigns') export class CampaignsController {}`, sin métodos, sin lógica.
-- **`analytics-service/reports`** — mismo caso: `ReportsController`/`ReportsService`/`ReportsModule`
+- **`core-service/reports`** — mismo caso: `ReportsController`/`ReportsService`/`ReportsModule`
   vacíos, `CreateReportDto` vacío.
-- **`content-service` no tiene ningún controller** — solo existe la lógica de dominio sin exponer:
-  `post-state-machine.ts` + `transitions.map.ts` (válido, real), `char-limits.map.ts` (real),
-  `PostSchedulerService` (cron real, `@Cron('* * * * *')`, publica posts `programado`→`publicado`, pero
-  no es alcanzable por HTTP).
+- **`core-service/ideas`** y **`alexa-service/campaigns`+`alexa-service/ideas`** — mismo patrón de stub
+  vacío, nuevos con la reorganización a 3 microservicios (`ContentIdea`, pensado originalmente para un
+  servicio dedicado a Alexa, se queda en `core-service`; `alexa-service` solo tendrá el wiring HTTP hacia
+  `core-service`/`auth-service`, sin lógica ni tablas propias).
+- **La parte de `core-service` que viene de lo que era `content-service` no tiene ningún controller** —
+  solo existe la lógica de dominio sin exponer: `post-state-machine.ts` + `transitions.map.ts` (válido,
+  real), `char-limits.map.ts` (real), `PostSchedulerService` (cron real, `@Cron('* * * * *')`, publica
+  posts `programado`→`publicado`, pero no es alcanzable por HTTP).
 - **Lo que SÍ es lógica de negocio real y completa** (aunque inalcanzable por HTTP hoy):
-  - `content-service`: máquina de estados de posts, límites de caracteres por red.
-  - `analytics-service/score/score.service.ts`: `ScoreService.calculate(brandId)` — **calcula y persiste**
-    en `brand_scores`. Fórmula real: `score = consistency×0.30 + engagement×0.40 + coverage×0.20 + frequency×0.10`
+  - `core-service` (parte antes `content-service`): máquina de estados de posts, límites de caracteres por red.
+  - `core-service/score/score.service.ts` (antes en `analytics-service`): `ScoreService.calculate(brandId)`
+    — **calcula y persiste** en `brand_scores`. Fórmula real:
+    `score = consistency×0.30 + engagement×0.40 + coverage×0.20 + frequency×0.10`
     — **esto difiere del texto en `CLAUDE.md`** (`Consistencia×0.30 + Engagement×0.40 + Frecuencia×0.30`,
     sin término de cobertura). Si te piden tocar el score, confirma con el usuario cuál fórmula es la
     vigente antes de asumir.
-  - `analytics-service/cron/metrics-cron.service.ts` (`@Cron('0 */6 * * *')`) + `metrics/decay-simulator.ts`
-    — generan métricas simuladas con decaimiento exponencial, real y funcional.
+  - `core-service/cron/metrics-cron.service.ts` (antes en `analytics-service`, `@Cron('0 */6 * * *')`) +
+    `metrics/decay-simulator.ts` — generan métricas simuladas con decaimiento exponencial, real y funcional.
   - `auth-service`: `AuthController`/`AuthService`/`AuthRepository` completos (login, refresh, logout, me),
     `PermissionsController` (`GET /me/permissions`) — todos con código real, solo falta el `imports` en
     `AppModule` para quedar accesibles.
@@ -115,8 +122,8 @@ correspondiente con endpoints reales y reemplazar el `useState`/mock-data por ho
 - `src/middleware/correlation-id.middleware.ts` — genera/propaga `X-Request-Id` (uuid) en cada request.
 - Dependencia `http-proxy-middleware` presente pero **sin uso** (ver §0).
 
-### 1.2 `commons` compartido por los 4 microservicios (`apps/backend/commons/`, paquete `@repo/prisma`, se importa por **ruta relativa**, no por nombre de paquete)
-- `prisma/schema.prisma` — schema único, 18 tablas (ver `.agents/database.md` y sección 1.7 abajo).
+### 1.2 `commons` compartido por auth-service y core-service (`apps/backend/commons/`, paquete `@repo/prisma`, se importa por **ruta relativa**, no por nombre de paquete). `alexa-service` no lo usa — no tiene Prisma ni acceso a la BD.
+- `prisma/schema.prisma` — schema único, 19 tablas (ver `.agents/database.md` y sección 1.6 abajo).
 - `prisma/client.ts` — instancia compartida de `PrismaClient` (`export const prisma = new PrismaClient()`), usada directamente en repositories/services (no hay capa repository formal en todos los servicios — `auth-service` sí tiene `AuthRepository`, el resto llama `prisma.*` directo en el service).
 - `guards/jwt-auth.guard.ts` — `JwtAuthGuard extends AuthGuard('jwt')`.
 - `guards/permission.guard.ts` — lee metadata `@RequirePermission(module, action)`, valida `user.permissions[module].includes(action)`, si no `ForbiddenException`.
@@ -144,32 +151,40 @@ correspondiente con endpoints reales y reemplazar el `useState`/mock-data por ho
 - Refresh tokens: 7 días, single-use, `usedAt` marca consumo (`AuthRepository.markTokenUsed`).
 - `JwtStrategy` — extrae Bearer token, secret `JWT_SECRET` env (fallback `'supersecret'`), `validate(payload) { return payload }` (sin verificación adicional de usuario existente).
 
-### 1.4 `brands-service` (puerto 3002, paquete `@repo/brands-service`)
-- **Único módulo de dominio scaffoldeado**: `campaigns/` — controller/service/module/DTOs **totalmente vacíos** (ver §0). No hay nada más en este servicio (no hay módulo de `brands`/`brand-profiles`/`brand-users` pese a que el schema Prisma sí los define).
-
-### 1.5 `content-service` (puerto 3003, paquete `@repo/content-service`)
-- **Sin ningún controller.** Solo lógica de dominio pura:
+### 1.4 `core-service` (puerto 3002, paquete `@repo/core-service`) — fusiona lo que antes eran brands-service + content-service + analytics-service
+- **`campaigns/`** (antes brands-service) — controller/service/module/DTOs **totalmente vacíos** (ver §0). No hay nada más del dominio "marcas" (no hay módulo de `brands`/`brand-profiles`/`brand-users` pese a que el schema Prisma sí los define).
+- **Parte "posts" (antes content-service), sin ningún controller.** Solo lógica de dominio pura:
   - `posts/state-machine/transitions.map.ts` — `VALID_TRANSITIONS`: `borrador→en_revision→{aprobado|rechazado}`, `aprobado→programado→publicado`, `rechazado→borrador`, `publicado→[]` (terminal).
   - `posts/state-machine/post-state-machine.ts` — `validateTransition(from, to, comment?, createdBy?, userId?)`: transición inválida → `422`; `to=rechazado` sin `comment` → `400`; `to=aprobado` con `createdBy===userId` → `403` (regla "el creador no puede aprobar", ver `CLAUDE.md`).
   - `char-limits/char-limits.map.ts` — `CHAR_LIMITS`: x=280, instagram=2200, linkedin=3000, facebook=63206, tiktok=2200, youtube=5000.
   - `scheduler/post-scheduler.service.ts` — `@Cron('* * * * *')`, cada minuto publica posts `programado` cuyo `scheduledAt<=now` → `publicado` + `publishedAt`. Real y funcional en cron, pero sin HTTP.
+- **Parte "analítica" (antes analytics-service)**:
+  - `reports/` — controller/service/module/DTO **totalmente vacíos** (ver §0).
+  - `score/score.service.ts` — `ScoreService.calculate(brandId)`: real, calcula y persiste en `brand_scores`. Componentes: `consistency` (% posts en horario pico 9/12/18/20h), `engagement` (curva por tramos sobre `engagementRate` promedio), `coverage` (% redes activas con ≥1 post), `frequency` (100 − desviación estándar de días entre posts ×10). **Fórmula: `score = consistency×0.30 + engagement×0.40 + coverage×0.20 + frequency×0.10`** — ver discrepancia con `CLAUDE.md` en §0. `classification`: ≤40 'bajo', ≤70 'medio', si no 'alto'.
+  - `cron/metrics-cron.service.ts` — `@Cron('0 */6 * * *')`, genera `post_metrics` simuladas para posts publicados en los últimos 7 días.
+  - `metrics/decay-simulator.ts` — `simulateMetrics(followers, baseEngagementRate, publishedAt)`: `likes = followers × baseEngagementRate × e^(-horasDesdePublicado/48) × random[0.8,1.2]`, deriva `comments`/`shares`/`reach`/`engagementRate`.
+- **`ideas/`** (nuevo, dominio `ContentIdea` para la Alexa Skill) — controller/service/module/DTO **totalmente vacíos**, mismo patrón que `campaigns/`/`reports/`. Endpoints previstos (sin implementar): `POST/GET /campaigns/:id/ideas`, `DELETE /ideas/:id` — ver `docs/base/modelo2.txt` sección core-service.
 
-### 1.6 `analytics-service` (puerto 3005, paquete `@repo/analytics-service`)
-- `reports/` — controller/service/module/DTO **totalmente vacíos** (ver §0).
-- `score/score.service.ts` — `ScoreService.calculate(brandId)`: real, calcula y persiste en `brand_scores`. Componentes: `consistency` (% posts en horario pico 9/12/18/20h), `engagement` (curva por tramos sobre `engagementRate` promedio), `coverage` (% redes activas con ≥1 post), `frequency` (100 − desviación estándar de días entre posts ×10). **Fórmula: `score = consistency×0.30 + engagement×0.40 + coverage×0.20 + frequency×0.10`** — ver discrepancia con `CLAUDE.md` en §0. `classification`: ≤40 'bajo', ≤70 'medio', si no 'alto'.
-- `cron/metrics-cron.service.ts` — `@Cron('0 */6 * * *')`, genera `post_metrics` simuladas para posts publicados en los últimos 7 días.
-- `metrics/decay-simulator.ts` — `simulateMetrics(followers, baseEngagementRate, publishedAt)`: `likes = followers × baseEngagementRate × e^(-horasDesdePublicado/48) × random[0.8,1.2]`, deriva `comments`/`shares`/`reach`/`engagementRate`.
+### 1.5 `alexa-service` (puerto 3004, paquete `@repo/alexa-service`) — nuevo, BFF de la Alexa Skill
+- **Sin base de datos propia** — no tiene Prisma, no importa `commons/prisma`. Su única razón de ser es
+  traducir los intents del Lambda de la skill en llamadas HTTP a `core-service` (campañas, métricas,
+  ideas) y `auth-service` (account-linking/identidad).
+- `campaigns/` e `ideas/` — controller/service/module **totalmente vacíos**, mismo patrón de stub que el
+  resto del repo. Cuando se implemente, cada método hará un `fetch`/circuit-breaker hacia el endpoint
+  equivalente de `core-service`, no lógica de negocio propia.
+- Ver `docs/skill/AlexaSkill-Diseno-Final.md` y `docs/skill/lambda-codigo-por-pasos.md` para el contrato
+  completo de endpoints que este servicio debe exponer al Lambda.
 
-### 1.7 Modelo de datos (`apps/backend/commons/prisma/schema.prisma`) — resumen de tablas
+### 1.6 Modelo de datos (`apps/backend/commons/prisma/schema.prisma`) — resumen de tablas
 Identidad/acceso: `Role`, `Module`, `Action`, `RolePermission` (RBAC dinámico), `User`, `RefreshToken`.
 Catálogos: `Category`, `Specialty`, `SocialNetwork`, `UserCategory`, `UserSpecialty`.
 Marcas: `Brand` (`type: brand|profile`), `BrandProfile` (una fila por red social de una marca), `BrandUser`.
-Contenido: `Campaign`, `CampaignTeam`, `CampaignCategory`, `Post`, `PostStatusHistory` (BIGINT, inmutable).
+Contenido: `Campaign`, `CampaignTeam`, `CampaignCategory`, `Post`, `PostStatusHistory` (BIGINT, inmutable), `ContentIdea` (nuevo, ideas de contenido de la Alexa Skill).
 Analítica: `PostMetric`, `BrandScore`, `Report`.
 Auditoría: `AuditLog` (BIGINT, inmutable), `Notification`.
 Todas las tablas de negocio: `deletedAt` (soft delete), `createdAt`/`updatedAt`, UUID PK excepto `AuditLog`/`PostStatusHistory` (BIGINT autoincrement).
 
-### 1.8 Seed / credenciales demo (`packages/seed/src/index.js`)
+### 1.7 Seed / credenciales demo (`packages/seed/src/index.js`)
 Corre con `pnpm seed`. Crea (idempotente, `upsert`):
 - 9 módulos / 9 acciones (mismos slugs que `commons/types/modules.enum.ts` / `actions.enum.ts`).
 - 4 roles con matriz de permisos: `administrador` (acceso total a todo), `community_manager`

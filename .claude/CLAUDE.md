@@ -21,7 +21,7 @@ Stack: Next.js (MFE host, Multi-Zones) + NestJS (microservicios) + PostgreSQL + 
 
 ## Fórmula score digital
 Documentada como `Score = (Consistencia×0.30) + (Engagement×0.40) + (Frecuencia×0.30)`, pero el código real
-en `apps/backend/services/analytics-service/src/score/score.service.ts` calcula
+en `apps/backend/services/core-service/src/score/score.service.ts` calcula
 `Consistencia×0.30 + Engagement×0.40 + Cobertura×0.20 + Frecuencia×0.10` (4 factores, no 3). Confirmar con
 el usuario cuál es la vigente antes de tocar el score.
 
@@ -30,11 +30,14 @@ el usuario cuál es la vigente antes de tocar el score.
 Este repo está en etapa de scaffold: la estructura sigue las convenciones, pero casi nada está conectado
 end-to-end todavía.
 
-- **Los 4 microservicios backend (`auth`, `brands`, `content`, `analytics`) tienen `AppModule` con
+- **Los 3 microservicios backend (`auth`, `core`, `alexa`) tienen `AppModule` con
   `imports: []`** — ningún controller de dominio responde hoy, aunque el código (auth-service completo,
-  máquina de estados de posts, score, cron de métricas) es real.
+  máquina de estados de posts, score, cron de métricas, ahora todo dentro de core-service) es real.
+  `core-service` fusiona lo que antes eran brands/content/analytics-service; `alexa-service` es nuevo,
+  BFF de la Alexa Skill, sin base de datos propia (ver `docs/base/service-boundaries.md`).
 - **El gateway no proxea nada** — `http-proxy-middleware` está instalado pero sin usar; solo expone `/health`.
-- `brands-service/campaigns` y `analytics-service/reports` son stubs vacíos (sin métodos).
+- `core-service/campaigns`, `core-service/reports` y `core-service/ideas` son stubs vacíos (sin métodos),
+  igual que `alexa-service/campaigns` y `alexa-service/ideas`.
 - **Todo el frontend corre en modo mock**: login/registro/sesión usan JWTs sin firmar generados en
   `@repo/ui/mocks`, guardados en la cookie `bananagram_token`. Ningún microfrontend hace fetch real a un
   backend — los 7 slices RTK Query de `web-shell/src/store/api/*.ts` están vacíos y ni siquiera
@@ -76,7 +79,7 @@ pnpm seed                      # carga datos demo (packages/seed)
 
 pnpm dev                       # todo (backend + fronts) vía turbo
 pnpm dev:infra                  # docker compose up -d (alias)
-pnpm dev:backend                # solo los 4 microservicios + gateway
+pnpm dev:backend                # solo los 3 microservicios + gateway
 pnpm dev:web                    # solo web-shell
 pnpm dev:frontend               # web-shell + los 5 microfrontends
 
@@ -86,7 +89,7 @@ pnpm lint                      # turbo run lint
 ```
 
 - No hay `jest.config.js` ni `.eslintrc` explícitos en el repo — `test`/`lint` corren `jest`/`eslint` con configuración por defecto de cada paquete cuando existan. `apps/frontend/*` no tienen script `lint` propio todavía; no asumas que `pnpm lint` cubre todo.
-- Para correr un solo servicio backend: `pnpm --filter @repo/auth-service dev` (o `test`/`build`). Nombres de paquete backend: `@repo/auth-service`, `@repo/brands-service`, `@repo/content-service`, `@repo/analytics-service`, y el gateway (sin nombre `@repo/` explícito, revisar `apps/backend/gateway/package.json`).
+- Para correr un solo servicio backend: `pnpm --filter @repo/auth-service dev` (o `test`/`build`). Nombres de paquete backend: `@repo/auth-service`, `@repo/core-service`, `@repo/alexa-service`, y el gateway (sin nombre `@repo/` explícito, revisar `apps/backend/gateway/package.json`).
 - Para un solo frontend: `pnpm --filter @repo/web-shell dev` (equivalentes: `admin-front`, `analytics-front`, `auth-front`, `brands-front`, `posts-front` — cada uno con su propio puerto fijo, ver abajo).
 - Tests de integración backend viven en `apps/backend/test/*.spec.ts` (no dentro de cada servicio) y usan `apps/backend/test/helpers/auth.helper.ts` (JWT de prueba por rol) y `db.helper.ts` (limpieza de tablas). Tests e2e cross-servicio en `apps/e2e/src/*.e2e.spec.ts` (paquete `@repo/e2e`, usa `supertest`).
 - `docker compose --profile full up -d --build` levanta el stack completo containerizado (todos los servicios + fronts); el modo diario (`docker compose up -d`, sin profile) solo levanta `postgres` + `adminer` y se espera correr el resto con `pnpm dev` en el host.
@@ -103,9 +106,8 @@ pnpm lint                      # turbo run lint
 | posts-front                | 3014   |
 | api-gateway                | 4000   |
 | auth-service                | 3001   |
-| brands-service               | 3002   |
-| content-service               | 3003   |
-| analytics-service               | 3005   |
+| core-service               | 3002   |
+| alexa-service               | 3004   |
 | postgres (host)                   | 5433   |
 | adminer                              | 8080   |
 
@@ -117,7 +119,7 @@ pnpm lint                      # turbo run lint
 
 `apps/backend/`
 - `gateway/` — único punto de entrada HTTP externo (puerto 4000). Usa `http-proxy-middleware` para enrutar a cada servicio; también aplica `CorrelationIdMiddleware` (propaga `X-Request-ID`) a todas las rutas.
-- `services/{auth,brands,content,analytics}-service/` — un microservicio NestJS por dominio, cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, pero **comparten un único schema de Prisma** (no hay DB-per-service).
+- `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes, ideas de contenido) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill y **no tiene base de datos propia** (solo consume las APIs de core-service y auth-service). `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **comparten un único schema de Prisma** (no hay DB-per-service).
 - `commons/` — código compartido importado por **path relativo** (no es un workspace package con alias corto), p.ej. `../../../../../commons/types/post-status.enum`:
   - `prisma/schema.prisma` — schema único para todos los servicios (18 tablas, ver `.agents/database.md`)
   - `guards/` — `JwtAuthGuard`, `BrandAccessGuard` (valida `brandId` del recurso contra `brandIds[]` del JWT), `PermissionGuard`
@@ -131,7 +133,7 @@ Convenciones (`.agents/backend.md`, `agents/conventions.md`):
 - Un módulo por dominio dentro de cada microservicio; controllers solo coordinan (request → service → response), la lógica vive en services, Prisma se accede vía repositories.
 - Guards en TODOS los endpoints protegidos: `JwtAuthGuard` + `BrandAccessGuard` + `PermissionGuard`. DTOs con `class-validator` en endpoints con body.
 - Nunca lanzar HTTP exceptions desde services — solo desde controllers/filters.
-- Máquina de estados de posts en `content-service/src/posts/state-machine/` (`post-state-machine.ts` + `transitions.map.ts`): transición inválida → 422, rechazo sin comentario → 400, auto-aprobación (creador == aprobador) → 403.
+- Máquina de estados de posts en `core-service/src/posts/state-machine/` (`post-state-machine.ts` + `transitions.map.ts`): transición inválida → 422, rechazo sin comentario → 400, auto-aprobación (creador == aprobador) → 403.
 
 ### Base de datos (`.agents/database.md`)
 - Multi-tenancy por row-level: toda tabla de negocio tiene `brand_id UUID NOT NULL` FK → `brands` (ADR-0001); los guards validan pertenencia, no hay schema-per-tenant.
