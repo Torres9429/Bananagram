@@ -1,13 +1,11 @@
 import type { TextFieldProps } from '@mui/material/TextField';
 import type { store } from '../store';
 
-// Espejo mínimo del modelo de dominio de brands-front (§A.1/§A.2 del análisis de
-// dominio): cada microfront mantiene su propia copia de mocks porque no hay un
-// servicio compartido. Aquí solo se necesita lo indispensable para que el
-// registro pueda capturar el tipo y la info básica del Perfil que nace con el
-// Usuario — no se replica el resto del modelo de brands-front (SocialAccount,
-// campañas, etc.), que no aplica a auth-front.
-export type ProfileType = 'brand' | 'company' | 'organization' | 'creator' | 'personal';
+// ProfileType ahora se importa de @repo/ui/types (fuente canónica, ver
+// PROFILE_TYPES) en vez de mantener una copia local con los mismos 5 valores
+// — ver docs/frontend-db-alignment.md §9.8. Re-exportado aquí para no romper
+// los imports existentes desde este archivo.
+export type { ProfileType } from '@repo/ui/types';
 
 export interface PasswordFieldProps extends Omit<TextFieldProps, 'type' | 'label'> {
   label?: string;

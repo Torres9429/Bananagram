@@ -23,7 +23,7 @@ import { setCredentials, setCookieToken } from '@repo/ui/state';
 import { getPostAuthDestination } from '@repo/ui/utils';
 import { findUserByEmail, buildTokenFromUser } from '@repo/ui';
 import { MOCK_CATEGORIES, MOCK_CLIENT_EMAIL } from '../lib/mock-data';
-import type { ProfileType } from '../interfaces/interface';
+import type { ProfileType } from '@repo/ui/types';
 
 // Los 5 valores de ProfileType (§A.1 del análisis de dominio) — solo cambia cómo
 // se representa el perfil, nunca el flujo ni las capacidades.
@@ -46,7 +46,7 @@ export function RegisterForm() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [profileType, setProfileType] = useState<ProfileType>('brand');
   const [profileName, setProfileName] = useState('');
-  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
@@ -82,7 +82,7 @@ export function RegisterForm() {
     }
 
     setError(null);
-    if (profileName.trim() === '' || category === '') {
+    if (profileName.trim() === '' || categoryId === '') {
       setError('Completa el nombre y la categoría de tu perfil');
       return;
     }
@@ -215,14 +215,14 @@ export function RegisterForm() {
 
           <LabeledSelect
             label="Categoría:"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as string)}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value as string)}
             displayEmpty
             disabled={submitted}
           >
             <MenuItem value="" disabled><em>Selecciona una categoría</em></MenuItem>
             {MOCK_CATEGORIES.map((c) => (
-              <MenuItem key={c} value={c}>{c}</MenuItem>
+              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
             ))}
           </LabeledSelect>
 
