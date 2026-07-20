@@ -1,0 +1,329 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "bananagram assistant",
+      "intents": [
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
+        { "name": "AMAZON.YesIntent", "samples": [] },
+        { "name": "AMAZON.NoIntent", "samples": [] },
+        {
+          "name": "GetActiveCampaignsIntent",
+          "samples": [
+            "what campaigns do I have",
+            "list my campaigns",
+            "show me the active campaigns",
+            "which campaigns are available",
+            "what are my campaigns"
+          ],
+          "slots": []
+        },
+        {
+          "name": "SelectCampaignIntent",
+          "samples": [
+            "{campaignName}",
+            "select {campaignName}",
+            "I want to review {campaignName}",
+            "open campaign {campaignName}",
+            "switch to {campaignName}",
+            "let's go with {campaignName}"
+          ],
+          "slots": [
+            { "name": "campaignName", "type": "LIST_CAMPAIGNS" }
+          ]
+        },
+        {
+          "name": "GetCampaignMetricsIntent",
+          "samples": [
+            "how is this campaign doing",
+            "give me the metrics",
+            "what results does it have",
+            "what are the numbers for this campaign",
+            "how is the campaign performing",
+            "what's the engagement"
+          ],
+          "slots": []
+        },
+        {
+          "name": "GetTopContentIntent",
+          "samples": [
+            "what was the best post",
+            "show me the content with the most interaction",
+            "which post performed best",
+            "what was the best post on {networkName}",
+            "what performed best this {dateRange}",
+            "the best post on {networkName} {dateRange}"
+          ],
+          "slots": [
+            { "name": "networkName", "type": "LIST_NETWORKS" },
+            { "name": "dateRange", "type": "LIST_PERIODS" }
+          ]
+        },
+        {
+          "name": "GenerateContentIdeasIntent",
+          "samples": [
+            "give me content ideas",
+            "what can I post",
+            "generate content for this campaign",
+            "suggest {quantity} ideas",
+            "what can I post on {networkName}",
+            "give me {quantity} ideas for {networkName}"
+          ],
+          "slots": [
+            { "name": "networkName", "type": "LIST_NETWORKS" },
+            { "name": "quantity", "type": "AMAZON.NUMBER" }
+          ]
+        },
+        {
+          "name": "SaveIdeaIntent",
+          "samples": [
+            "save idea {ideaNumber}",
+            "save number {ideaNumber}",
+            "save it with the title {ideaTitle}"
+          ],
+          "slots": [
+            { "name": "ideaNumber", "type": "AMAZON.NUMBER" },
+            { "name": "ideaTitle", "type": "AMAZON.SearchQuery" }
+          ]
+        },
+        {
+          "name": "SaveCustomIdeaIntent",
+          "samples": [
+            "I have an idea",
+            "save this idea",
+            "note down an idea",
+            "I want to log a note",
+            "save {ideaText}"
+          ],
+          "slots": [
+            { "name": "ideaText", "type": "AMAZON.SearchQuery" }
+          ]
+        },
+        {
+          "name": "GetSavedIdeasIntent",
+          "samples": [
+            "what ideas do I have saved",
+            "read me my ideas",
+            "show me my notes",
+            "what are my ideas",
+            "how many ideas have I saved"
+          ],
+          "slots": []
+        },
+        {
+          "name": "DeleteIdeaIntent",
+          "samples": [
+            "delete the idea {ideaTitle}",
+            "remove the idea {ideaTitle}",
+            "I want to delete an idea",
+            "delete the idea titled {ideaTitle}",
+            "remove my idea about {ideaTitle}"
+          ],
+          "slots": [
+            { "name": "ideaTitle", "type": "AMAZON.SearchQuery" }
+          ]
+        },
+        {
+          "name": "GetIdeaRecommendationsIntent",
+          "samples": [
+            "give me recommendations",
+            "what do you recommend for this campaign",
+            "recommend some content",
+            "how can I improve this campaign",
+            "what do you suggest to improve engagement",
+            "give me some improvement ideas",
+            "what do you suggest",
+            "recommend something",
+            "give me some advice for this campaign",
+            "what should I improve",
+            "do you have any recommendation"
+          ],
+          "slots": []
+        },
+        {
+          "name": "GetCampaignSummaryIntent",
+          "samples": [
+            "give me a summary",
+            "summarize the campaign",
+            "give me a campaign overview",
+            "give me the general summary",
+            "how is everything going in this campaign"
+          ],
+          "slots": []
+        },
+        {
+          "name": "ChangeCampaignIntent",
+          "samples": [
+            "change campaign",
+            "I want to change campaigns",
+            "I want to work with a different campaign",
+            "change campaign to {campaignName}",
+            "switch to a different campaign"
+          ],
+          "slots": [
+            { "name": "campaignName", "type": "LIST_CAMPAIGNS" }
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "LIST_CAMPAIGNS",
+          "values": [
+            { "id": "verano-2026", "name": { "value": "Verano 2026", "synonyms": ["summer", "summer twenty twenty six", "summer campaign"] } },
+            { "id": "black-friday", "name": { "value": "Black Friday", "synonyms": ["black friday campaign"] } },
+            { "id": "regreso-a-clases", "name": { "value": "Regreso a Clases", "synonyms": ["back to school", "back to school campaign"] } }
+          ]
+        },
+        {
+          "name": "LIST_NETWORKS",
+          "values": [
+            { "id": "instagram", "name": { "value": "Instagram", "synonyms": ["insta", "ig"] } },
+            { "id": "tiktok", "name": { "value": "TikTok", "synonyms": ["tik tok"] } },
+            { "id": "facebook", "name": { "value": "Facebook", "synonyms": ["fb"] } },
+            { "id": "linkedin", "name": { "value": "LinkedIn", "synonyms": ["linked in"] } },
+            { "id": "youtube", "name": { "value": "YouTube", "synonyms": ["you tube"] } },
+            { "id": "x", "name": { "value": "X", "synonyms": ["twitter"] } }
+          ]
+        },
+        {
+          "name": "LIST_PERIODS",
+          "values": [
+            { "name": { "value": "week", "synonyms": ["this week", "a week"] } },
+            { "name": { "value": "month", "synonyms": ["this month", "a month"] } },
+            { "name": { "value": "campaign", "synonyms": ["whole campaign", "entire campaign", "the whole campaign"] } }
+          ]
+        }
+      ]
+    },
+    "dialog": {
+      "intents": [
+        {
+          "name": "SelectCampaignIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "campaignName",
+              "type": "LIST_CAMPAIGNS",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.campaignName" }
+            }
+          ]
+        },
+        {
+          "name": "SaveIdeaIntent",
+          "confirmationRequired": true,
+          "prompts": { "confirmation": "Confirm.Intent.SaveIdeaIntent" },
+          "slots": [
+            {
+              "name": "ideaNumber",
+              "type": "AMAZON.NUMBER",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.ideaNumber" }
+            },
+            {
+              "name": "ideaTitle",
+              "type": "AMAZON.SearchQuery",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.ideaTitle" }
+            }
+          ]
+        },
+        {
+          "name": "SaveCustomIdeaIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "ideaText",
+              "type": "AMAZON.SearchQuery",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.ideaText" }
+            }
+          ]
+        },
+        {
+          "name": "DeleteIdeaIntent",
+          "confirmationRequired": true,
+          "prompts": { "confirmation": "Confirm.Intent.DeleteIdeaIntent" },
+          "slots": [
+            {
+              "name": "ideaTitle",
+              "type": "AMAZON.SearchQuery",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.DeleteIdeaIntent.ideaTitle" }
+            }
+          ]
+        },
+        {
+          "name": "ChangeCampaignIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "campaignName",
+              "type": "LIST_CAMPAIGNS",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.campaignName" }
+            }
+          ]
+        }
+      ],
+      "delegationStrategy": "SKILL_RESPONSE"
+    },
+    "prompts": [
+      {
+        "id": "Elicit.Slot.campaignName",
+        "variations": [
+          { "type": "PlainText", "value": "Tell me the name of the campaign you want to review." },
+          { "type": "PlainText", "value": "You can say a campaign name, for example Verano twenty twenty six." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.ideaNumber",
+        "variations": [
+          { "type": "PlainText", "value": "Tell me which idea number you want to save, one, two or three." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.ideaTitle",
+        "variations": [
+          { "type": "PlainText", "value": "Tell me what title you want to save it under." }
+        ]
+      },
+      {
+        "id": "Confirm.Intent.SaveIdeaIntent",
+        "variations": [
+          { "type": "PlainText", "value": "Confirm that you want to save this idea titled {ideaTitle}, by saying yes or no." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.ideaText",
+        "variations": [
+          { "type": "PlainText", "value": "Sure, tell me the idea." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.DeleteIdeaIntent.ideaTitle",
+        "variations": [
+          { "type": "PlainText", "value": "Tell me the title of the idea you want to delete." }
+        ]
+      },
+      {
+        "id": "Confirm.Intent.DeleteIdeaIntent",
+        "variations": [
+          { "type": "PlainText", "value": "Confirm you want to delete the idea titled {ideaTitle}, by saying yes or no." }
+        ]
+      }
+    ]
+  }
+}
