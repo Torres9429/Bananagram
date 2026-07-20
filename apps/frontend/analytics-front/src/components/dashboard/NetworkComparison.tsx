@@ -80,7 +80,7 @@ export function NetworkComparison() {
                 </Stack>
               </TableCell>
               <TableCell align="right">{kpis.totalReach.toLocaleString()}</TableCell>
-              <TableCell align="right">{kpis.avgEngagementRate}%</TableCell>
+              <TableCell align="right">{kpis.avgEngagement}%</TableCell>
               <TableCell align="right">+{kpis.followersGained.toLocaleString()}</TableCell>
               <TableCell align="right">{kpis.postsCount}</TableCell>
               <TableCell align="right">{(kpis.postsCount / 2).toFixed(1)}/sem</TableCell>

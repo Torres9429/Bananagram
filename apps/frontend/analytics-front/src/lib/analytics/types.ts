@@ -1,24 +1,28 @@
 // Tipos del dominio de analítica — propios de analytics-front.
-// Se mantiene el mismo shape de red social/estado que brands-front y posts-front
-// (SocialNetworkCode, PostStatus) para narrativa consistente entre microfrontends,
-// siguiendo el patrón ya existente de que cada microfrontend mantiene su propia
-// copia de tipos/mocks (no hay servicio compartido de datos).
+// SocialNetworkCode y PostStatus se re-exportan directamente desde @repo/ui/types
+// (fuente de verdad, alineada a modelo.txt) en vez de mantener copias locales
+// que puedan desincronizarse — ver docs/frontend-db-alignment.md §1.3/§1.5.
 
-export type SocialNetworkCode = 'IG' | 'TK' | 'LI' | 'FB' | 'X' | 'YT';
+export type { SocialNetworkCode, PostStatus } from '@repo/ui/types';
 
-export type PostStatus = 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'programado' | 'publicado';
+import type { PostStatus, SocialNetworkCode } from '@repo/ui/types';
 
 /**
  * Hecho atómico de métrica: una fila por publicación/red/fecha.
  * Todo agregado (por red, por campaña, por marca) se calcula a partir de esto —
  * nunca se guarda un total precalculado.
+ *
+ * `impressions` (sin equivalente en `PostMetric` de modelo.txt) se eliminó: en
+ * este dominio siempre representó "cuántas veces se vio la publicación", que es
+ * exactamente lo que ahora modela `views` (campo real de BD) — mantener ambos
+ * habría sido un duplicado sin distinción funcional (ver docs/frontend-db-alignment.md §9.10).
  */
 export interface SocialMetricFact {
   id: string;
   networkCode: SocialNetworkCode;
   brandId: string;
   brandName: string;
-  brandProfileId: string;
+  socialAccountId: string; // antes brandProfileId — es la cuenta social (red), no la marca
   campaignId: string | null;
   campaignName: string | null;
   postId: string | null;
@@ -26,19 +30,19 @@ export interface SocialMetricFact {
   status: PostStatus;
   publishedAt: string; // ISO date (YYYY-MM-DD)
   reach: number;
-  impressions: number;
+  views?: number; // antes `impressions` — renombrado, ver comentario arriba
   likes: number;
   comments: number;
   shares: number;
   followersGained: number;
-  engagementRate: number; // %
+  engagement: number; // % — antes `engagementRate` (alineado a PostMetric.engagement)
 }
 
 export interface AnalyticsKpis {
   totalReach: number;
-  totalImpressions: number;
+  totalViews: number; // antes `totalImpressions`
   totalInteractions: number;
-  avgEngagementRate: number;
+  avgEngagement: number; // antes `avgEngagementRate`
   followersGained: number;
   postsCount: number;
 }
@@ -140,9 +144,9 @@ export interface ScoreSnapshot {
   score: number;
   consistency: number;
   engagement: number;
-  coverage: number;
   frequency: number;
-  classification: 'bajo' | 'medio' | 'alto';
+  coverage: number; // informativa — no entra al cálculo ponderado (ver modelo.txt BrandScore)
+  classification: string; // string abierto (no enum en BD) — igual que BrandScore.classification en @repo/ui
 }
 
 export interface ScoreFactor {
@@ -153,9 +157,12 @@ export interface ScoreFactor {
 
 export interface ScoreExplanation {
   score: ScoreSnapshot;
+  /** Derivados SOLO de consistency/engagement/frequency (los 3 factores que sí ponderan) —
+   * `coverage` queda deliberadamente fuera de este arreglo, ver docs/frontend-db-alignment.md §1.4.
+   * Se lee directo de `score.coverage` donde haga falta mostrarlo (informativo). */
   positiveFactors: ScoreFactor[];
   negativeFactors: ScoreFactor[];
-  topNetwork: { networkCode: SocialNetworkCode; engagementRate: number } | null;
+  topNetwork: { networkCode: SocialNetworkCode; engagement: number } | null;
   topCampaign: { campaignId: string; campaignName: string; followersGained: number; sharePercent: number } | null;
   bestPosts: SocialMetricFact[];
   worstPosts: SocialMetricFact[];

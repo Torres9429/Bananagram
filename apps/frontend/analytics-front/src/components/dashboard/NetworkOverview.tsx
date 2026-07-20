@@ -49,10 +49,10 @@ export function NetworkOverview({ networkCode }: { networkCode: SocialNetworkCod
           <TrendCard
             icon={<TrendingUpOutlinedIcon />}
             label="Engagement rate"
-            value={current.avgEngagementRate}
+            value={current.avgEngagement}
             unit="%"
-            deltaPercent={deltas.avgEngagementRate}
-            trend={trendOf(deltas.avgEngagementRate)}
+            deltaPercent={deltas.avgEngagement}
+            trend={trendOf(deltas.avgEngagement)}
             comparisonLabel="vs. semana anterior"
           />
         </Grid>

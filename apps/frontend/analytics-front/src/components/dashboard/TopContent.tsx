@@ -17,7 +17,7 @@ const columns: DataTableColumn<SocialMetricFact>[] = [
     key: 'engagement',
     header: 'Engagement',
     align: 'right',
-    render: (p) => <Typography variant="body2" fontWeight={700} sx={{ color: '#2E7D32' }}>{p.engagementRate}%</Typography>,
+    render: (p) => <Typography variant="body2" fontWeight={700} sx={{ color: '#2E7D32' }}>{p.engagement}%</Typography>,
   },
 ];
 

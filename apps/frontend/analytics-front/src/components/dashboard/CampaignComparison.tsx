@@ -11,9 +11,9 @@ import { EmptyState, LabeledSelect } from '@repo/ui/ui';
 import { selectCampaignOptions, selectFactsForNetworkTabs } from '../../store/analytics.selectors';
 import { compareCampaigns } from '../../lib/analytics/engine';
 
-const ROWS: { key: 'totalReach' | 'avgEngagementRate' | 'postsCount' | 'totalInteractions'; label: string; unit?: string }[] = [
+const ROWS: { key: 'totalReach' | 'avgEngagement' | 'postsCount' | 'totalInteractions'; label: string; unit?: string }[] = [
   { key: 'totalReach', label: 'Alcance' },
-  { key: 'avgEngagementRate', label: 'Engagement', unit: '%' },
+  { key: 'avgEngagement', label: 'Engagement', unit: '%' },
   { key: 'postsCount', label: 'Publicaciones' },
   { key: 'totalInteractions', label: 'Interacciones' },
 ];
@@ -85,7 +85,7 @@ export function CampaignComparison() {
               <Typography variant="body2" fontWeight={700} mb={1}>Top de {result.campaignA.campaignName}</Typography>
               <Stack gap={0.5}>
                 {result.campaignA.topPosts.map((p) => (
-                  <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagementRate}%)</Typography>
+                  <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagement}%)</Typography>
                 ))}
               </Stack>
             </Grid>
@@ -93,7 +93,7 @@ export function CampaignComparison() {
               <Typography variant="body2" fontWeight={700} mb={1}>Top de {result.campaignB.campaignName}</Typography>
               <Stack gap={0.5}>
                 {result.campaignB.topPosts.map((p) => (
-                  <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagementRate}%)</Typography>
+                  <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagement}%)</Typography>
                 ))}
               </Stack>
             </Grid>

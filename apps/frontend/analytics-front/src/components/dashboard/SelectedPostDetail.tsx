@@ -57,7 +57,7 @@ export function SelectedPostDetail() {
           <Typography variant="caption" color="text.secondary">Comments</Typography>
         </Grid>
         <Grid item xs={6} sm={3}>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#2E7D32' }}>{fact.engagementRate}%</Typography>
+          <Typography variant="h6" fontWeight={700} sx={{ color: '#2E7D32' }}>{fact.engagement}%</Typography>
           <Typography variant="caption" color="text.secondary">Engagement rate</Typography>
         </Grid>
 

@@ -48,7 +48,18 @@ import type { PostStatus, SocialNetworkCode } from '../../lib/analytics/types';
 import type { AnalyticsFilterDrawerProps } from '../../interfaces/interface';
 import { useDateRangeFilter } from './useDateRangeFilter';
 
-const ALL_STATUSES: PostStatus[] = ['borrador', 'en_revision', 'aprobado', 'rechazado', 'programado', 'publicado'];
+const ALL_STATUSES: PostStatus[] = [
+  'borrador',
+  'en_revision',
+  'aprobado',
+  'rechazado',
+  'programado',
+  'publicando',
+  'publicado',
+  'parcial',
+  'error',
+  'cancelado',
+];
 
 /**
  * Drawer lateral (desktop) / Bottom sheet (mobile) con el detalle completo de filtros.

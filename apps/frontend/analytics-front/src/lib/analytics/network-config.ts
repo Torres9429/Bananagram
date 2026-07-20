@@ -12,12 +12,12 @@ export interface NetworkDisplayInfo {
 
 /** Colores oficiales de marca — mismos valores ya usados en brands-front (AVAILABLE_SOCIAL_NETWORKS). */
 export const NETWORK_DISPLAY: Record<SocialNetworkCode, NetworkDisplayInfo> = {
-  IG: { label: 'Instagram', color: '#E1306C', iconKey: 'instagram' },
-  TK: { label: 'TikTok', color: '#010101', iconKey: 'tiktok' },
-  FB: { label: 'Facebook', color: '#1877F2', iconKey: 'facebook' },
-  X: { label: 'X', color: '#000000', iconKey: 'x' },
-  LI: { label: 'LinkedIn', color: '#0A66C2', iconKey: 'linkedin' },
-  YT: { label: 'YouTube', color: '#FF0000', iconKey: 'youtube' },
+  instagram: { label: 'Instagram', color: '#E1306C', iconKey: 'instagram' },
+  tiktok: { label: 'TikTok', color: '#010101', iconKey: 'tiktok' },
+  facebook: { label: 'Facebook', color: '#1877F2', iconKey: 'facebook' },
+  x: { label: 'X', color: '#000000', iconKey: 'x' },
+  linkedin: { label: 'LinkedIn', color: '#0A66C2', iconKey: 'linkedin' },
+  youtube: { label: 'YouTube', color: '#FF0000', iconKey: 'youtube' },
 };
 
 export interface NetworkMetricFieldConfig {
@@ -31,10 +31,15 @@ export interface NetworkMetricFieldConfig {
  * `key` resuelve contra el objeto combinado (universales + NetworkSpecificMetrics)
  * que arma computeNetworkKPIs() en engine.ts.
  */
+// `impressions` (sin equivalente en BD) se colapsó en `views` (campo real de
+// PostMetric) en todas las redes — ver decisión en types.ts y
+// docs/frontend-db-alignment.md §9.10. El label sigue variando por red
+// (IG/X/LI dicen "Impressions", TikTok/YouTube dicen "Views") porque es
+// terminología nativa de cada plataforma, pero ambos leen el mismo campo `views`.
 export const NETWORK_METRIC_FIELDS: Record<SocialNetworkCode, NetworkMetricFieldConfig[]> = {
-  IG: [
+  instagram: [
     { key: 'reach', label: 'Reach' },
-    { key: 'impressions', label: 'Impressions' },
+    { key: 'views', label: 'Impressions' },
     { key: 'profileVisits', label: 'Profile Visits' },
     { key: 'saves', label: 'Saves' },
     { key: 'storyReplies', label: 'Story Replies' },
@@ -42,8 +47,8 @@ export const NETWORK_METRIC_FIELDS: Record<SocialNetworkCode, NetworkMetricField
     { key: 'storyTaps', label: 'Story Taps' },
     { key: 'followers', label: 'Followers' },
   ],
-  TK: [
-    { key: 'impressions', label: 'Views' },
+  tiktok: [
+    { key: 'views', label: 'Views' },
     { key: 'watchTimeSeconds', label: 'Watch Time', unit: 's' },
     { key: 'avgWatchTimeSeconds', label: 'Average Watch Time', unit: 's' },
     { key: 'completionRate', label: 'Completion Rate', unit: '%' },
@@ -52,30 +57,30 @@ export const NETWORK_METRIC_FIELDS: Record<SocialNetworkCode, NetworkMetricField
     { key: 'comments', label: 'Comments' },
     { key: 'followers', label: 'Followers' },
   ],
-  FB: [
+  facebook: [
     { key: 'reach', label: 'Reach' },
     { key: 'reactions', label: 'Reactions' },
     { key: 'linkClicks', label: 'Link Clicks' },
     { key: 'followers', label: 'Followers' },
     { key: 'shares', label: 'Shares' },
   ],
-  X: [
-    { key: 'impressions', label: 'Impressions' },
+  x: [
+    { key: 'views', label: 'Impressions' },
     { key: 'replies', label: 'Replies' },
     { key: 'quotes', label: 'Quotes' },
     { key: 'reposts', label: 'Reposts' },
     { key: 'bookmarks', label: 'Bookmarks' },
     { key: 'profileVisits', label: 'Profile Visits' },
   ],
-  LI: [
-    { key: 'impressions', label: 'Impressions' },
+  linkedin: [
+    { key: 'views', label: 'Impressions' },
     { key: 'ctr', label: 'CTR', unit: '%' },
     { key: 'clicks', label: 'Clicks' },
     { key: 'followers', label: 'Followers' },
     { key: 'reactions', label: 'Reactions' },
   ],
-  YT: [
-    { key: 'impressions', label: 'Views' },
+  youtube: [
+    { key: 'views', label: 'Views' },
     { key: 'watchTimeSeconds', label: 'Watch Time', unit: 's' },
     { key: 'avgViewDurationSeconds', label: 'Average View Duration', unit: 's' },
     { key: 'ctr', label: 'CTR', unit: '%' },
@@ -91,12 +96,12 @@ export const RATE_METRIC_KEYS = new Set(['completionRate', 'avgWatchTimeSeconds'
 
 /** Título del widget de mejores publicaciones, propio de cada red (mismo dato vía rankPosts, distinta etiqueta). */
 export const NETWORK_TOP_CONTENT_LABEL: Record<SocialNetworkCode, string> = {
-  IG: 'Top Reels',
-  TK: 'Trending Videos',
-  FB: 'Top publicaciones',
-  X: 'Top publicaciones',
-  LI: 'Top publicaciones',
-  YT: 'Top Videos',
+  instagram: 'Top Reels',
+  tiktok: 'Trending Videos',
+  facebook: 'Top publicaciones',
+  x: 'Top publicaciones',
+  linkedin: 'Top publicaciones',
+  youtube: 'Top Videos',
 };
 
 export interface ComparableMetricOption {
@@ -109,10 +114,10 @@ export interface ComparableMetricOption {
 
 /** Catálogo del selector de métrica en NetworkComparison. */
 export const COMPARABLE_METRICS: ComparableMetricOption[] = [
-  { key: 'engagementRate', label: 'Engagement', unit: '%', networks: ['IG', 'TK', 'FB', 'X', 'LI', 'YT'] },
-  { key: 'reach', label: 'Alcance', networks: ['IG', 'FB'] },
-  { key: 'impressions', label: 'Views', networks: ['IG', 'TK', 'FB', 'X', 'LI', 'YT'] },
-  { key: 'ctr', label: 'CTR', unit: '%', networks: ['LI', 'YT'] },
-  { key: 'watchTimeSeconds', label: 'Watch Time', unit: 's', networks: ['TK', 'YT'] },
-  { key: 'followers', label: 'Seguidores', networks: ['IG', 'TK', 'FB', 'LI', 'YT'] },
+  { key: 'engagement', label: 'Engagement', unit: '%', networks: ['instagram', 'tiktok', 'facebook', 'x', 'linkedin', 'youtube'] },
+  { key: 'reach', label: 'Alcance', networks: ['instagram', 'facebook'] },
+  { key: 'views', label: 'Views', networks: ['instagram', 'tiktok', 'facebook', 'x', 'linkedin', 'youtube'] },
+  { key: 'ctr', label: 'CTR', unit: '%', networks: ['linkedin', 'youtube'] },
+  { key: 'watchTimeSeconds', label: 'Watch Time', unit: 's', networks: ['tiktok', 'youtube'] },
+  { key: 'followers', label: 'Seguidores', networks: ['instagram', 'tiktok', 'facebook', 'linkedin', 'youtube'] },
 ];
