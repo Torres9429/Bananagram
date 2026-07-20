@@ -9,6 +9,7 @@ import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { ClientSection } from '../../components/profile/ClientSection';
 import { StaffProfileSection } from '../../components/profile/StaffProfileSection';
 import { MOCK_AVAILABLE_CMS, MOCK_AVAILABLE_DESIGNERS, PROFILE_TYPE_LABELS, getCurrentClientProfile } from '../../lib/mock-data';
+import type { ProfileType } from '../../interfaces/interface';
 
 // En mock, el perfil del usuario activo se obtiene buscando en los arrays
 // de CMs o Diseñadores disponibles, según su rol.
@@ -46,7 +47,9 @@ export default function ProfilePage() {
 
   const clientProfile = getCurrentClientProfile(user?.email);
   const headerName = role === 'cliente' ? clientProfile.name : name;
-  const headerSubtitle = role === 'cliente' ? PROFILE_TYPE_LABELS[clientProfile.type] : (STAFF_ROLE_LABELS[role] ?? '');
+  const headerSubtitle = role === 'cliente'
+    ? (PROFILE_TYPE_LABELS[clientProfile.profileType as ProfileType] ?? clientProfile.profileType ?? '')
+    : (STAFF_ROLE_LABELS[role] ?? '');
 
   function renderSection() {
     switch (role) {

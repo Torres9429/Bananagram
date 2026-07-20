@@ -5,7 +5,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { AVAILABLE_SOCIAL_NETWORKS, CAMPAIGN_STATUS_LABEL, getCampaignSocialAccounts } from '../../lib/mock-data';
+import { getSocialNetwork, CAMPAIGN_STATUS_LABEL, getCampaignSocialAccounts } from '../../lib/mock-data';
 import type { CampaignCardProps } from '../../interfaces/interface';
 
 // Extraído de ClientSection (§1 modernización campañas CM/Diseñador) para
@@ -13,7 +13,7 @@ import type { CampaignCardProps } from '../../interfaces/interface';
 // el JSX del estado/redes/hover/"Ver detalle".
 export function CampaignCard({ campaign, onClick, profileName }: CampaignCardProps) {
   const s = CAMPAIGN_STATUS_LABEL[campaign.status];
-  const usedNetworks = Array.from(new Set(getCampaignSocialAccounts(campaign.id).map((a) => a.socialNetwork)));
+  const usedNetworks = Array.from(new Set(getCampaignSocialAccounts(campaign.id).map((a) => a.socialNetworkId)));
 
   return (
     <Paper
@@ -42,9 +42,10 @@ export function CampaignCard({ campaign, onClick, profileName }: CampaignCardPro
         {usedNetworks.length === 0 ? (
           <Typography variant="caption" color="text.secondary">Sin redes asignadas</Typography>
         ) : (
-          usedNetworks.map((code) => {
-            const netColor = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === code)?.color ?? '#6B6B6B';
-            return <Chip key={code} size="small" label={code} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700, height: 20, fontSize: 11 }} />;
+          usedNetworks.map((id) => {
+            const network = getSocialNetwork(id);
+            const netColor = network?.color ?? '#6B6B6B';
+            return <Chip key={id} size="small" label={network?.label ?? id} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700, height: 20, fontSize: 11 }} />;
           })
         )}
       </Stack>

@@ -1,48 +1,38 @@
-import type { BrandScore } from '@repo/ui/types';
+import type { BrandScore, ProfileType, SocialNetworkCode, SocialAccount, SocialNetworkOption } from '@repo/ui/types';
 import type { SidebarNavItem } from '@repo/ui/ui';
 import type { store } from '../store';
 
+export type { ProfileType, SocialNetworkCode };
+
 export type CampaignStatus = 'active' | 'paused' | 'finished';
 
-// Catálogo de redes sociales disponibles para el onboarding del Cliente.
-// Espeja MOCK_SOCIAL_NETWORKS de admin-front sin cruzar microfronts.
-export interface SocialNetworkOption {
-  code: SocialNetworkCode;
-  label: string;
-  color: string;
-}
+// Catálogo de redes sociales y SocialAccount ahora se importan directo de
+// @repo/ui/types (mock-world.ts) — antes eran interfaces locales casi
+// idénticas (mismos campos) mantenidas por separado en brands-front, lo que
+// permitía que este app y posts-front divergieran en shape. Se re-exportan
+// con el mismo nombre para no tocar los ~10 call-sites que las importan
+// desde './interfaces/interface' (ver docs/frontend-db-alignment §7).
+export type { SocialNetworkOption, SocialAccount };
 
-// "brand"/"company"/"organization"/"creator" = entidad gestionada por un tercero (Nike, Zara...)
-// "personal" = persona (Juan Pérez, Dra. María López...)
-// Únicamente afecta cómo se presenta en la UI; el resto del modelo y las
-// operaciones (campañas, posts, métricas, score) son exactamente iguales.
-export type ProfileType = 'brand' | 'company' | 'organization' | 'creator' | 'personal';
-
-export type SocialNetworkCode = 'IG' | 'TK' | 'LI' | 'FB' | 'X' | 'YT';
-
-// Una cuenta específica de un Profile en una red social (ej. @nike en Instagram).
-// Un Profile puede tener varias SocialAccount — una por cada red que gestiona.
-// TODO(dominio-v3): brandId es el nombre de campo compartido con el backend
-// (JWT AuthState.brandIds, contrato Post.brandProfileId en commons) — no
-// renombrar aquí hasta que el backend también migre a "profileId".
-export interface SocialAccount {
-  id: string;
-  brandId: string;
-  socialNetwork: SocialNetworkCode;
-  handle: string;
-  followers: number;
-  active: boolean;
-}
-
+// Representa Brand (modelo.txt). "brand"/"company"/"organization"/"creator" =
+// entidad gestionada por un tercero (Nike, Zara...); "personal" = persona
+// (Juan Pérez, Dra. María López...). Únicamente afecta cómo se presenta en la
+// UI; el resto del modelo y las operaciones (campañas, posts, métricas,
+// score) son exactamente iguales — ver PROFILE_TYPES/ProfileType en
+// @repo/ui/types (fuente canónica, ya no se duplica el union aquí).
 export interface MockProfile {
   id: string;
   name: string;
-  type: ProfileType;
+  profileType: string | null;
   color: string;
-  category: string;
+  categoryId: string;
   activeCampaigns: number;
   score: BrandScore;
-  profiles: SocialAccount[];
+  socialAccounts: SocialAccount[];
+  ownerId: string;
+  slug: string;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
 }
 
 // TODO(dominio-v3): brandId — ver nota en SocialAccount, mismo contrato compartido.
@@ -57,8 +47,17 @@ export interface MockCampaign {
   // Subconjunto de SocialAccount que esta campaña usa (§A.4 del análisis de dominio).
   // Todavía no se consume en ninguna pantalla — solo preparación del modelo.
   socialAccountIds: string[];
+  objective?: string | null;
+  description?: string | null;
+  createdBy: string; // FK -> users.id del Cliente que creó la campaña (ya NO es "team")
+  cmId: string; // FK única — un solo CM por campaña, ver MOCK_AVAILABLE_CMS/getCampaignCM
 }
 
+// Representa un Diseñador asignado a una campaña (CampaignDesigner join, sin
+// campo de rol propio). El CM ya NO se modela con esto — vive en
+// MockCampaign.cmId (relación 1, no una lista) — ver
+// docs/frontend-db-alignment.md §1.2/§9.7. `role` se conserva solo como label
+// de presentación ("Diseñador"), no como discriminador de tipo.
 export interface MockTeamMember {
   id: string;
   name: string;
@@ -75,7 +74,7 @@ export interface MockCalendarEvent {
   id: string;
   title: string;
   brandId: string;
-  brandProfileId: string;
+  socialAccountId: string;
   campaignId: string;
   status: MockCampaignPost['status'];
   start: string;
@@ -91,7 +90,7 @@ export interface MockCalendarEvent {
 export interface MockCampaignPost {
   id: string;
   title: string;
-  brandProfileId: string;
+  socialAccountId: string;
   status: 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'programado' | 'publicado';
   scheduledAt: string;
 }
@@ -151,7 +150,10 @@ export interface CreateCampaignDialogProps {
   brandId: string;
   brandCategory: string;
   onClose: () => void;
-  onCreate: (campaign: MockCampaign, team: MockTeamMember[]) => void;
+  // El CM ya no es un "team member" (viaja en MockCampaign.cmId) — designers
+  // es la lista de Diseñadores elegidos (CampaignDesigner), sin el CM ni el
+  // Cliente mezclados adentro.
+  onCreate: (campaign: MockCampaign, designers: MockTeamMember[]) => void;
 }
 
 export interface CampaignCardProps {

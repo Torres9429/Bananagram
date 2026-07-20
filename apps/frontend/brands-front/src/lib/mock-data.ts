@@ -1,3 +1,14 @@
+import {
+  AVAILABLE_SOCIAL_NETWORKS,
+  getSocialNetwork,
+  MOCK_BRANDS,
+  MOCK_SOCIAL_ACCOUNTS,
+  getSocialAccount,
+  getSocialAccountsByBrand,
+  MOCK_CAMPAIGNS as SHARED_MOCK_CAMPAIGNS,
+  getSocialAccountsForCampaign,
+  campaignUsesSocialAccount,
+} from '@repo/ui';
 import type {
   CampaignStatus,
   SocialNetworkOption,
@@ -16,18 +27,31 @@ import type {
   MockTeamAggregate,
 } from '../interfaces/interface';
 
-export const AVAILABLE_SOCIAL_NETWORKS: SocialNetworkOption[] = [
-  { code: 'IG', label: 'Instagram',  color: '#E1306C' },
-  { code: 'TK', label: 'TikTok',     color: '#010101' },
-  { code: 'FB', label: 'Facebook',   color: '#1877F2' },
-  { code: 'LI', label: 'LinkedIn',   color: '#0A66C2' },
-  { code: 'X',  label: 'X (Twitter)',color: '#000000' },
-  { code: 'YT', label: 'YouTube',    color: '#FF0000' },
-];
+// Catálogo de redes sociales, marcas, cuentas sociales y campañas base ahora
+// viven en @repo/ui (mock-world.ts) — fuente única compartida con
+// posts-front, para que "la cuenta de Instagram de Zara" sea la MISMA
+// entidad (mismo id, mismos followers) sin importar desde qué microfront se
+// consulte. Antes brands-front mantenía su propia copia con los mismos IDs
+// (bp1, c1...) pero potencialmente valores distintos. Se re-exportan con el
+// mismo nombre que tenían localmente para no tocar los call-sites existentes.
+export { AVAILABLE_SOCIAL_NETWORKS, getSocialNetwork, MOCK_SOCIAL_ACCOUNTS, getSocialAccount, campaignUsesSocialAccount };
+
+// Alias local: el nombre "byProfile" es el que usan todos los call-sites de
+// brands-front (el concepto de "Profile" = Brand en este app); mock-world lo
+// expone como getSocialAccountsByBrand (nombre canónico del modelo).
+export function getSocialAccountsByProfile(brandId: string): SocialAccount[] {
+  return getSocialAccountsByBrand(brandId);
+}
 
 export const MOCK_CATEGORIES = ['Moda', 'Deportes', 'Tecnología', 'Entretenimiento', 'Gastronomía', 'Salud', 'Educación', 'Arte'];
 
-
+// MOCK_CATEGORIES es un catálogo plano de strings (sin ids propios) — un
+// MockProfile.categoryId válido es uno de estos mismos strings, así que
+// "resolver el nombre" es una operación identidad; se deja como función para
+// no acoplar los call-sites a ese detalle si el catálogo gana ids reales.
+export function getCategoryName(categoryId: string): string {
+  return categoryId;
+}
 
 export const PROFILE_TYPE_LABELS: Record<ProfileType, string> = {
   brand: 'Marca',
@@ -43,89 +67,60 @@ export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, { label: string; bg: 
   finished: { label: 'Finalizada', bg: '#F5F5F5', color: '#616161' },
 };
 
-const ZARA_PROFILES: SocialAccount[] = [
-  { id: 'bp1', brandId: 'b1', socialNetwork: 'IG', handle: '@zaramx', followers: 1200000, active: true },
-  { id: 'bp2', brandId: 'b1', socialNetwork: 'LI', handle: 'Zara México', followers: 45000, active: true },
-  { id: 'bp3', brandId: 'b1', socialNetwork: 'FB', handle: 'Zara México', followers: 980000, active: true },
-];
+// Score por marca — no está en mock-world.ts (es un mock local del dominio de
+// analytics, fuera del alcance de "mundo compartido"). Se mantiene tal cual
+// estaba, indexado por Brand.id.
+const MOCK_SCORE_BY_BRAND: Record<string, MockProfile['score']> = {
+  b1: { id: 'score-b1', brandId: 'b1', score: 82, consistency: 88, engagement: 80, coverage: 75, frequency: 85, classification: 'alto', snapshotDate: '28 jun' },
+  b2: { id: 'score-b2', brandId: 'b2', score: 74, consistency: 70, engagement: 78, coverage: 68, frequency: 72, classification: 'medio', snapshotDate: '28 jun' },
+  b3: { id: 'score-b3', brandId: 'b3', score: 58, consistency: 55, engagement: 62, coverage: 50, frequency: 60, classification: 'medio', snapshotDate: '28 jun' },
+  b4: { id: 'score-b4', brandId: 'b4', score: 71, consistency: 65, engagement: 88, coverage: 55, frequency: 60, classification: 'medio', snapshotDate: '28 jun' },
+};
 
-const NIKE_PROFILES: SocialAccount[] = [
-  { id: 'bp4', brandId: 'b2', socialNetwork: 'TK', handle: '@nikemx', followers: 560000, active: true },
-  { id: 'bp5', brandId: 'b2', socialNetwork: 'IG', handle: '@nikemexico', followers: 2100000, active: true },
-];
+// MOCK_PROFILES ahora se construye a partir de MOCK_BRANDS (@repo/ui,
+// mock-world.ts) — sus datos base (id/name/profileType/ownerId/slug/logoUrl/
+// primaryColor) vienen de ahí; solo color/activeCampaigns/score/socialAccounts
+// son extras propios de brands-front (no están en mock-world). `color` espeja
+// `primaryColor` (mismo valor, campo legado que ya consumían varias pantallas
+// de este app). `activeCampaigns` se recalcula desde SHARED_MOCK_CAMPAIGNS en
+// vez de quedar hardcodeado, para no divergir de la fuente compartida.
+export const MOCK_PROFILES: MockProfile[] = MOCK_BRANDS.map((brand) => ({
+  id: brand.id,
+  name: brand.name,
+  profileType: brand.profileType,
+  color: brand.primaryColor ?? '#616161',
+  categoryId: brand.categoryId ?? '',
+  activeCampaigns: SHARED_MOCK_CAMPAIGNS.filter((c) => c.brandId === brand.id && c.status === 'active').length,
+  score: MOCK_SCORE_BY_BRAND[brand.id],
+  socialAccounts: getSocialAccountsByBrand(brand.id),
+  ownerId: brand.ownerId,
+  slug: brand.slug,
+  logoUrl: brand.logoUrl,
+  primaryColor: brand.primaryColor,
+}));
 
-const SPOTIFY_PROFILES: SocialAccount[] = [
-  { id: 'bp6', brandId: 'b3', socialNetwork: 'TK', handle: '@spotifymx', followers: 340000, active: true },
-];
+// postsCount no está en mock-world.ts (Campaign no lo tiene — se deriva de
+// posts-front en la realidad, pero ese mock es independiente, ver nota en
+// MockCalendarEvent.postId). Se mantiene como extra local indexado por id,
+// con los mismos valores que ya tenía este app.
+const POSTS_COUNT_BY_CAMPAIGN: Record<string, number> = {
+  c1: 12,
+  c4: 4,
+  c2: 8,
+  c3: 20,
+  c5: 6,
+};
 
-// Perfil Personal (§Parte C) — creador de contenido individual, no una marca
-// comercial. Valida que ProfileType.personal funciona con el mismo modelo
-// (SocialAccount, campaña, equipo, calendario) sin bifurcar flujo.
-const ALEX_PROFILES: SocialAccount[] = [
-  { id: 'bp7', brandId: 'b4', socialNetwork: 'IG', handle: '@alexrivera', followers: 45000, active: true },
-  { id: 'bp8', brandId: 'b4', socialNetwork: 'TK', handle: '@alexrivera', followers: 92000, active: true },
-];
-
-export const MOCK_PROFILES: MockProfile[] = [
-  {
-    id: 'b1',
-    name: 'Zara MX',
-    type: 'brand',
-    color: '#E0A800',
-    category: 'Moda',
-    activeCampaigns: 2,
-    score: { score: 82, consistency: 88, engagement: 80, coverage: 75, frequency: 85, classification: 'alto', snapshotDate: '28 jun' },
-    profiles: ZARA_PROFILES,
-  },
-  {
-    id: 'b2',
-    name: 'Nike MX',
-    type: 'brand',
-    color: '#42A5F5',
-    category: 'Deportes',
-    activeCampaigns: 1,
-    score: { score: 74, consistency: 70, engagement: 78, coverage: 68, frequency: 72, classification: 'medio', snapshotDate: '28 jun' },
-    profiles: NIKE_PROFILES,
-  },
-  {
-    id: 'b3',
-    name: 'Spotify MX',
-    type: 'brand',
-    color: '#66BB6A',
-    category: 'Entretenimiento',
-    activeCampaigns: 1,
-    score: { score: 58, consistency: 55, engagement: 62, coverage: 50, frequency: 60, classification: 'medio', snapshotDate: '28 jun' },
-    profiles: SPOTIFY_PROFILES,
-  },
-  {
-    id: 'b4',
-    name: 'Alex Rivera',
-    type: 'personal',
-    color: '#AB47BC',
-    category: 'Entretenimiento',
-    activeCampaigns: 1,
-    score: { score: 71, consistency: 65, engagement: 88, coverage: 55, frequency: 60, classification: 'medio', snapshotDate: '28 jun' },
-    profiles: ALEX_PROFILES,
-  },
-];
-
-export const MOCK_SOCIAL_ACCOUNTS: SocialAccount[] = [...ZARA_PROFILES, ...NIKE_PROFILES, ...SPOTIFY_PROFILES, ...ALEX_PROFILES];
-
-export function getSocialAccount(id: string): SocialAccount | undefined {
-  return MOCK_SOCIAL_ACCOUNTS.find((p) => p.id === id);
-}
-
-export function getSocialAccountsByProfile(brandId: string): SocialAccount[] {
-  return MOCK_SOCIAL_ACCOUNTS.filter((p) => p.brandId === brandId);
-}
-
-export const MOCK_CAMPAIGNS: MockCampaign[] = [
-  { id: 'c1', brandId: 'b1', name: 'Campaña Verano', status: 'active', startDate: '1 jun', endDate: '31 jul', postsCount: 12, socialAccountIds: ['bp1', 'bp2', 'bp3'] },
-  { id: 'c4', brandId: 'b1', name: 'Black Friday', status: 'paused', startDate: '1 nov', endDate: '30 nov', postsCount: 4, socialAccountIds: ['bp1', 'bp3'] },
-  { id: 'c2', brandId: 'b2', name: 'Nike Run Launch', status: 'active', startDate: '15 jun', endDate: '15 ago', postsCount: 8, socialAccountIds: ['bp4', 'bp5'] },
-  { id: 'c3', brandId: 'b3', name: 'Spotify Weekly', status: 'finished', startDate: '1 ene', endDate: '31 may', postsCount: 20, socialAccountIds: ['bp6'] },
-  { id: 'c5', brandId: 'b4', name: 'Serie Reels diarios', status: 'active', startDate: '10 jun', endDate: '10 ago', postsCount: 6, socialAccountIds: ['bp7', 'bp8'] },
-];
+// MOCK_CAMPAIGNS se deriva de SHARED_MOCK_CAMPAIGNS (@repo/ui, mock-world.ts)
+// + postsCount local — mismo id/brandId/status/fechas/socialAccountIds/cmId/
+// createdBy/objective/description que ve posts-front, sin duplicar esos
+// valores a mano aquí (evita que vuelvan a divergir como antes).
+export const MOCK_CAMPAIGNS: MockCampaign[] = SHARED_MOCK_CAMPAIGNS.map((c) => ({
+  ...c,
+  startDate: c.startDate ?? '',
+  endDate: c.endDate ?? '',
+  postsCount: POSTS_COUNT_BY_CAMPAIGN[c.id] ?? 0,
+}));
 
 // Resuelve el Perfil del Cliente autenticado — hoy la única asociación real
 // usuario↔perfil en los mocks (antes todo Cliente veía siempre MOCK_PROFILES[0]).
@@ -140,19 +135,14 @@ export function getCurrentClientProfile(userEmail?: string | null): MockProfile 
   return MOCK_PROFILES.find((p) => p.id === profileId) ?? MOCK_PROFILES[0];
 }
 
-// Utilidades del modelo de dominio nuevo (§A.4 del análisis de dominio) — preparadas
-// para consumo futuro. Ninguna pantalla las utiliza todavía.
+// Alias local: mock-world expone esto como getSocialAccountsForCampaign
+// (nombre genérico, también usado por posts-front); brands-front conserva el
+// nombre "getCampaignSocialAccounts" que ya usaban sus call-sites
+// (components/campaigns/CampaignCard.tsx). campaignUsesSocialAccount se
+// re-exporta arriba tal cual desde @repo/ui (mismo nombre, sin call-sites
+// hoy pero se mantiene por si algo la retoma).
 export function getCampaignSocialAccounts(campaignId: string): SocialAccount[] {
-  const campaign = MOCK_CAMPAIGNS.find((c) => c.id === campaignId);
-  if (!campaign) return [];
-  return campaign.socialAccountIds
-    .map((id) => getSocialAccount(id))
-    .filter((a): a is SocialAccount => !!a);
-}
-
-export function campaignUsesSocialAccount(campaignId: string, socialAccountId: string): boolean {
-  const campaign = MOCK_CAMPAIGNS.find((c) => c.id === campaignId);
-  return campaign?.socialAccountIds.includes(socialAccountId) ?? false;
+  return getSocialAccountsForCampaign(campaignId);
 }
 
 // Especialidades disponibles para el perfil de CM/Diseñador.
@@ -227,39 +217,52 @@ export function getAvailableDesigners(): MockAvailableDesigner[] {
   return MOCK_AVAILABLE_DESIGNERS.filter((d) => d.perfilCompleto && d.availability === 'disponible');
 }
 
-export function assignTeamToCampaign(campaignId: string, members: MockTeamMember[]) {
-  MOCK_TEAM_BY_CAMPAIGN[campaignId] = members;
+// El CM ya NO vive en una lista de team members — es Campaign.cmId (FK única,
+// ver interfaces/interface.ts). Se resuelve en tiempo real desde
+// MOCK_AVAILABLE_CMS por id en vez de duplicar sus datos en otra estructura
+// (decisión 7 de docs/frontend-db-alignment.md §9.7: "agregar cmId directo al
+// objeto MockCampaign y resolver el nombre desde ahí").
+export function getCampaignCM(campaignId: string): MockTeamMember | null {
+  const campaign = MOCK_CAMPAIGNS.find((c) => c.id === campaignId);
+  if (!campaign) return null;
+  const cm = MOCK_AVAILABLE_CMS.find((c) => c.id === campaign.cmId);
+  if (!cm) return null;
+  return { id: cm.id, name: cm.name, role: 'Community Manager', avatarBg: cm.avatarBg, avatarColor: cm.avatarColor };
 }
 
-export const MOCK_TEAM_BY_CAMPAIGN: Record<string, MockTeamMember[]> = {
+// Solo Diseñadores (CampaignDesigner: join N sin campo de rol) — el CM ya no
+// se mezcla aquí (ver getCampaignCM) y el Cliente nunca fue un team member
+// (es Campaign.createdBy). El flujo "Agregar/Quitar Diseñador" sigue
+// mutando esta estructura exactamente igual que antes.
+export function assignTeamToCampaign(campaignId: string, designers: MockTeamMember[]) {
+  MOCK_CAMPAIGN_DESIGNERS[campaignId] = designers;
+}
+
+export const MOCK_CAMPAIGN_DESIGNERS: Record<string, MockTeamMember[]> = {
   c1: [
-    { id: 'u1', name: 'Ana García', role: 'Community Manager', avatarBg: '#FFF8E1', avatarColor: 'primary.contrastTextMuted' },
     { id: 'u3', name: 'Elías Bailón', role: 'Diseñador', avatarBg: '#E3F2FD', avatarColor: '#1565C0' },
-    { id: 'u4', name: 'Rocío Rodríguez', role: 'Cliente', avatarBg: '#E8F5E9', avatarColor: '#2E7D32' },
   ],
   c2: [
-    { id: 'u1', name: 'Ana García', role: 'Community Manager', avatarBg: '#FFF8E1', avatarColor: 'primary.contrastTextMuted' },
     { id: 'u2', name: 'Alexa Delgado', role: 'Diseñador', avatarBg: '#E3F2FD', avatarColor: '#1565C0' },
   ],
   c5: [
     { id: 'u2', name: 'Alexa Delgado', role: 'Diseñador', avatarBg: '#E3F2FD', avatarColor: '#1565C0' },
-    { id: 'u10', name: 'Alex Rivera', role: 'Cliente', avatarBg: '#F3E5F5', avatarColor: '#6A1B9A' },
   ],
 };
 
 export const MOCK_POSTS_BY_CAMPAIGN: Record<string, MockCampaignPost[]> = {
   c1: [
-    { id: 'p1', title: 'Post lanzamiento verano', brandProfileId: 'bp1', status: 'borrador', scheduledAt: '—' },
-    { id: 'p3', title: 'Carrusel colores SS25', brandProfileId: 'bp2', status: 'en_revision', scheduledAt: '—' },
-    { id: 'p4', title: 'Story promo weekend', brandProfileId: 'bp3', status: 'programado', scheduledAt: 'Hoy 18:00' },
+    { id: 'p1', title: 'Post lanzamiento verano', socialAccountId: 'bp1', status: 'borrador', scheduledAt: '—' },
+    { id: 'p3', title: 'Carrusel colores SS25', socialAccountId: 'bp2', status: 'en_revision', scheduledAt: '—' },
+    { id: 'p4', title: 'Story promo weekend', socialAccountId: 'bp3', status: 'programado', scheduledAt: 'Hoy 18:00' },
   ],
   c2: [
-    { id: 'p2', title: 'Reel Nike 30 seg', brandProfileId: 'bp4', status: 'rechazado', scheduledAt: '—' },
-    { id: 'p5', title: 'Reels sustentabilidad', brandProfileId: 'bp5', status: 'publicado', scheduledAt: 'Ayer 12:00' },
+    { id: 'p2', title: 'Reel Nike 30 seg', socialAccountId: 'bp4', status: 'rechazado', scheduledAt: '—' },
+    { id: 'p5', title: 'Reels sustentabilidad', socialAccountId: 'bp5', status: 'publicado', scheduledAt: 'Ayer 12:00' },
   ],
   c5: [
-    { id: 'p6', title: 'Rutina de la mañana', brandProfileId: 'bp7', status: 'en_revision', scheduledAt: '—' },
-    { id: 'p7', title: 'Trend challenge TikTok', brandProfileId: 'bp8', status: 'programado', scheduledAt: 'Mañana 20:00' },
+    { id: 'p6', title: 'Rutina de la mañana', socialAccountId: 'bp7', status: 'en_revision', scheduledAt: '—' },
+    { id: 'p7', title: 'Trend challenge TikTok', socialAccountId: 'bp8', status: 'programado', scheduledAt: 'Mañana 20:00' },
   ],
 };
 
@@ -270,12 +273,17 @@ export function getMyCampaigns(): MockMyCampaign[] {
   });
 }
 
+// Agrega CM + Diseñadores de cada campaña (sin Cliente, ver decisión 7) para
+// la vista "Equipo" (/team) — antes iteraba MOCK_TEAM_BY_CAMPAIGN directo,
+// ahora combina las dos fuentes (getCampaignCM + MOCK_CAMPAIGN_DESIGNERS).
 export function getTeamAggregate(): MockTeamAggregate[] {
   const byMember = new Map<string, MockTeamAggregate>();
-  for (const [campaignId, members] of Object.entries(MOCK_TEAM_BY_CAMPAIGN)) {
-    const campaign = MOCK_CAMPAIGNS.find((c) => c.id === campaignId);
-    const profile = campaign ? MOCK_PROFILES.find((b) => b.id === campaign.brandId) : undefined;
-    if (!campaign || !profile) continue;
+  for (const campaign of MOCK_CAMPAIGNS) {
+    const profile = MOCK_PROFILES.find((b) => b.id === campaign.brandId);
+    if (!profile) continue;
+    const cm = getCampaignCM(campaign.id);
+    const designers = MOCK_CAMPAIGN_DESIGNERS[campaign.id] ?? [];
+    const members = cm ? [cm, ...designers] : designers;
     for (const member of members) {
       const entry = byMember.get(member.id) ?? { ...member, campaigns: [] };
       entry.campaigns.push({ id: campaign.id, name: campaign.name, profileName: profile.name });
@@ -286,22 +294,22 @@ export function getTeamAggregate(): MockTeamAggregate[] {
 }
 
 export const MOCK_CALENDAR_EVENTS: MockCalendarEvent[] = [
-  { id: 'e1', title: 'Post lanzamiento verano (Zara)', brandId: 'b1', brandProfileId: 'bp1', campaignId: 'c1', status: 'publicado', start: '2026-06-29T10:00:00', end: '2026-06-29T11:00:00', postId: 'p1' },
-  { id: 'e2', title: 'Story promo weekend (Zara)', brandId: 'b1', brandProfileId: 'bp3', campaignId: 'c4', status: 'publicado', start: '2026-06-30T18:00:00', end: '2026-06-30T19:00:00', postId: 'p4' },
-  { id: 'e3', title: 'Reel Nike Run (Nike)', brandId: 'b2', brandProfileId: 'bp4', campaignId: 'c2', status: 'publicado', start: '2026-07-01T09:00:00', end: '2026-07-01T10:00:00' },
-  { id: 'e4', title: 'Playlist viernes (Spotify)', brandId: 'b3', brandProfileId: 'bp6', campaignId: 'c3', status: 'publicado', start: '2026-07-03T15:00:00', end: '2026-07-03T16:00:00' },
+  { id: 'e1', title: 'Post lanzamiento verano (Zara)', brandId: 'b1', socialAccountId: 'bp1', campaignId: 'c1', status: 'publicado', start: '2026-06-29T10:00:00', end: '2026-06-29T11:00:00', postId: 'p1' },
+  { id: 'e2', title: 'Story promo weekend (Zara)', brandId: 'b1', socialAccountId: 'bp3', campaignId: 'c4', status: 'publicado', start: '2026-06-30T18:00:00', end: '2026-06-30T19:00:00', postId: 'p4' },
+  { id: 'e3', title: 'Reel Nike Run (Nike)', brandId: 'b2', socialAccountId: 'bp4', campaignId: 'c2', status: 'publicado', start: '2026-07-01T09:00:00', end: '2026-07-01T10:00:00' },
+  { id: 'e4', title: 'Playlist viernes (Spotify)', brandId: 'b3', socialAccountId: 'bp6', campaignId: 'c3', status: 'publicado', start: '2026-07-03T15:00:00', end: '2026-07-03T16:00:00' },
   // Eventos adicionales de Zara MX (b1, el perfil del Cliente demo) — dan
   // material real a los filtros de campaña/red/estado en /profile/calendar.
-  { id: 'e5', title: 'Carrusel colección otoño (Zara)', brandId: 'b1', brandProfileId: 'bp1', campaignId: 'c1', status: 'programado', start: '2026-07-05T10:00:00', end: '2026-07-05T11:00:00' },
-  { id: 'e6', title: 'Post corporativo LinkedIn (Zara)', brandId: 'b1', brandProfileId: 'bp2', campaignId: 'c1', status: 'aprobado', start: '2026-07-04T14:00:00', end: '2026-07-04T14:30:00' },
-  { id: 'e7', title: 'Promo Black Friday early (Zara)', brandId: 'b1', brandProfileId: 'bp3', campaignId: 'c4', status: 'programado', start: '2026-07-06T12:00:00', end: '2026-07-06T12:30:00' },
-  { id: 'e8', title: 'Reel detrás de cámaras (Zara)', brandId: 'b1', brandProfileId: 'bp1', campaignId: 'c1', status: 'en_revision', start: '2026-07-03T09:00:00', end: '2026-07-03T09:30:00' },
-  { id: 'e9', title: 'Story cuenta regresiva Black Friday (Zara)', brandId: 'b1', brandProfileId: 'bp3', campaignId: 'c4', status: 'borrador', start: '2026-07-08T16:00:00', end: '2026-07-08T16:30:00' },
-  { id: 'e10', title: 'Artículo aliados de marca (Zara)', brandId: 'b1', brandProfileId: 'bp2', campaignId: 'c1', status: 'publicado', start: '2026-06-27T11:00:00', end: '2026-06-27T11:30:00' },
+  { id: 'e5', title: 'Carrusel colección otoño (Zara)', brandId: 'b1', socialAccountId: 'bp1', campaignId: 'c1', status: 'programado', start: '2026-07-05T10:00:00', end: '2026-07-05T11:00:00' },
+  { id: 'e6', title: 'Post corporativo LinkedIn (Zara)', brandId: 'b1', socialAccountId: 'bp2', campaignId: 'c1', status: 'aprobado', start: '2026-07-04T14:00:00', end: '2026-07-04T14:30:00' },
+  { id: 'e7', title: 'Promo Black Friday early (Zara)', brandId: 'b1', socialAccountId: 'bp3', campaignId: 'c4', status: 'programado', start: '2026-07-06T12:00:00', end: '2026-07-06T12:30:00' },
+  { id: 'e8', title: 'Reel detrás de cámaras (Zara)', brandId: 'b1', socialAccountId: 'bp1', campaignId: 'c1', status: 'en_revision', start: '2026-07-03T09:00:00', end: '2026-07-03T09:30:00' },
+  { id: 'e9', title: 'Story cuenta regresiva Black Friday (Zara)', brandId: 'b1', socialAccountId: 'bp3', campaignId: 'c4', status: 'borrador', start: '2026-07-08T16:00:00', end: '2026-07-08T16:30:00' },
+  { id: 'e10', title: 'Artículo aliados de marca (Zara)', brandId: 'b1', socialAccountId: 'bp2', campaignId: 'c1', status: 'publicado', start: '2026-06-27T11:00:00', end: '2026-06-27T11:30:00' },
   // Eventos de Alex Rivera (b4, Perfil personal) — sin postId: no existe una
   // publicación real correspondiente en posts-front (mock independiente, ver
   // nota en MockCalendarEvent.postId).
-  { id: 'e11', title: 'Rutina de la mañana', brandId: 'b4', brandProfileId: 'bp7', campaignId: 'c5', status: 'en_revision', start: '2026-07-02T08:00:00', end: '2026-07-02T08:15:00' },
-  { id: 'e12', title: 'Trend challenge TikTok', brandId: 'b4', brandProfileId: 'bp8', campaignId: 'c5', status: 'programado', start: '2026-07-03T20:00:00', end: '2026-07-03T20:15:00' },
-  { id: 'e13', title: 'Reel unboxing', brandId: 'b4', brandProfileId: 'bp7', campaignId: 'c5', status: 'publicado', start: '2026-06-28T19:00:00', end: '2026-06-28T19:15:00' },
+  { id: 'e11', title: 'Rutina de la mañana', brandId: 'b4', socialAccountId: 'bp7', campaignId: 'c5', status: 'en_revision', start: '2026-07-02T08:00:00', end: '2026-07-02T08:15:00' },
+  { id: 'e12', title: 'Trend challenge TikTok', brandId: 'b4', socialAccountId: 'bp8', campaignId: 'c5', status: 'programado', start: '2026-07-03T20:00:00', end: '2026-07-03T20:15:00' },
+  { id: 'e13', title: 'Reel unboxing', brandId: 'b4', socialAccountId: 'bp7', campaignId: 'c5', status: 'publicado', start: '2026-06-28T19:00:00', end: '2026-06-28T19:15:00' },
 ];

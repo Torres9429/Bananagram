@@ -20,7 +20,8 @@ import { CampaignTabs } from '../../../../../../components/CampaignTabs';
 import {
   MOCK_PROFILES,
   MOCK_CAMPAIGNS,
-  MOCK_TEAM_BY_CAMPAIGN,
+  MOCK_CAMPAIGN_DESIGNERS,
+  getCampaignCM,
   getAvailableDesigners,
   assignTeamToCampaign,
 } from '../../../../../../lib/mock-data';
@@ -31,17 +32,20 @@ export default function CampaignTeamPage() {
   const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === params.campaignId) ?? MOCK_CAMPAIGNS[0];
 
-  const [team, setTeam] = useState<MockTeamMember[]>(MOCK_TEAM_BY_CAMPAIGN[campaign.id] ?? []);
+  // El CM ya no vive en el mismo arreglo que los Diseñadores (Campaign.cmId
+  // es una FK única, no un team member más) — se resuelve aparte y no
+  // participa en el flujo de Agregar/Quitar Diseñador de abajo.
+  const cm = getCampaignCM(campaign.id);
+  const [designers, setDesigners] = useState<MockTeamMember[]>(MOCK_CAMPAIGN_DESIGNERS[campaign.id] ?? []);
   const [addOpen, setAddOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<MockTeamMember | null>(null);
   const [selectedDesignerId, setSelectedDesignerId] = useState<string | null>(null);
 
   const availableDesigners = getAvailableDesigners().filter(
-    (d) => !team.some((m) => m.id === d.id),
+    (d) => !designers.some((m) => m.id === d.id),
   );
 
-  const cm = team.find((m) => m.role === 'Community Manager');
-  const designers = team.filter((m) => m.role !== 'Community Manager' && m.role !== 'Cliente');
+  const totalMembers = designers.length + (cm ? 1 : 0);
 
   function handleAddDesigner() {
     if (!selectedDesignerId) return;
@@ -56,8 +60,8 @@ export default function CampaignTeamPage() {
       avatarColor: designer.avatarColor,
     };
 
-    const updated = [...team, newMember];
-    setTeam(updated);
+    const updated = [...designers, newMember];
+    setDesigners(updated);
     assignTeamToCampaign(campaign.id, updated);
     setSelectedDesignerId(null);
     setAddOpen(false);
@@ -65,8 +69,8 @@ export default function CampaignTeamPage() {
 
   function handleRemoveConfirm() {
     if (!removeTarget) return;
-    const updated = team.filter((m) => m.id !== removeTarget.id);
-    setTeam(updated);
+    const updated = designers.filter((m) => m.id !== removeTarget.id);
+    setDesigners(updated);
     assignTeamToCampaign(campaign.id, updated);
     setRemoveTarget(null);
   }
@@ -79,7 +83,7 @@ export default function CampaignTeamPage() {
           <Box>
             <Typography variant="h5" fontWeight={700}>Equipo — {campaign.name}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {team.length} {team.length === 1 ? 'integrante' : 'integrantes'} · {brand.name}
+              {totalMembers} {totalMembers === 1 ? 'integrante' : 'integrantes'} · {brand.name}
             </Typography>
           </Box>
           <ProtectedAction module="post" action="schedule">

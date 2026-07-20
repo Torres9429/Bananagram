@@ -38,7 +38,7 @@ export default function BrandsPage() {
                   </Avatar>
                   <Box>
                     <Typography variant="subtitle1" fontWeight={700}>{brand.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{brand.category}</Typography>
+                    <Typography variant="caption" color="text.secondary">{brand.categoryId}</Typography>
                   </Box>
                 </Stack>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">

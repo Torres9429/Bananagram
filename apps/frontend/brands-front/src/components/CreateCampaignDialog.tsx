@@ -14,9 +14,8 @@ import Alert from '@mui/material/Alert';
 import { FormDialog, LabeledField, LabeledSelect } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
-import { findUserByEmail } from '@repo/ui';
 import type { MockCampaign, CampaignStatus, MockTeamMember, CreateCampaignDialogProps } from '../interfaces/interface';
-import { getAvailableCMsForCategory, getSocialAccountsByProfile, AVAILABLE_SOCIAL_NETWORKS } from '../lib/mock-data';
+import { getAvailableCMsForCategory, getSocialAccountsByProfile, getSocialNetwork } from '../lib/mock-data';
 
 const STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
   { value: 'active', label: 'Activa' },
@@ -27,6 +26,8 @@ const STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
 export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, onCreate }: CreateCampaignDialogProps) {
   const user = useSelector(selectUser);
   const [name, setName] = useState('');
+  const [objective, setObjective] = useState('');
+  const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState<CampaignStatus>('active');
@@ -55,14 +56,13 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
   function handleCreate() {
     if (!name.trim() || !selectedCm || socialAccountIds.length === 0) return;
 
-    const clienteName = (user?.email && findUserByEmail(user.email)?.name) || 'Cliente';
-    const team: MockTeamMember[] = [
-      { id: selectedCm.id, name: selectedCm.name, role: 'Community Manager', avatarBg: selectedCm.avatarBg, avatarColor: selectedCm.avatarColor },
-      ...selectedCm.designers
-        .filter((d) => designerIds.includes(d.id))
-        .map((d) => ({ id: d.id, name: d.name, role: 'Diseñador', avatarBg: d.avatarBg, avatarColor: d.avatarColor })),
-      { id: user?.id ?? 'cliente', name: clienteName, role: 'Cliente', avatarBg: '#E8F5E9', avatarColor: '#2E7D32' },
-    ];
+    // El CM ya no viaja como "team member" — se setea directo en
+    // MockCampaign.cmId (FK única). Solo los Diseñadores elegidos se
+    // reportan como team (CampaignDesigner, sin el Cliente mezclado adentro
+    // — ver docs/frontend-db-alignment.md §9.7).
+    const designers: MockTeamMember[] = selectedCm.designers
+      .filter((d) => designerIds.includes(d.id))
+      .map((d) => ({ id: d.id, name: d.name, role: 'Diseñador', avatarBg: d.avatarBg, avatarColor: d.avatarColor }));
 
     onCreate(
       {
@@ -74,11 +74,17 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
         endDate: endDate || 'Sin definir',
         postsCount: 0,
         socialAccountIds,
+        objective: objective.trim() || null,
+        description: description.trim() || null,
+        createdBy: user?.id ?? 'cliente',
+        cmId: selectedCm.id,
       },
-      team,
+      designers,
     );
 
     setName('');
+    setObjective('');
+    setDescription('');
     setStartDate('');
     setEndDate('');
     setStatus('active');
@@ -99,6 +105,8 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
       onConfirm={handleCreate}
     >
       <LabeledField label="Nombre" placeholder="Ej. Campaña Verano 2026" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+      <LabeledField label="Objetivo (opcional)" placeholder="Ej. Aumentar el alcance de la colección" value={objective} onChange={(e) => setObjective(e.target.value)} />
+      <LabeledField label="Descripción (opcional)" placeholder="Ej. Contenido semanal en Instagram y TikTok" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={2} />
       <Stack direction="row" gap={2}>
         <Box sx={{ flex: 1 }}>
           <LabeledField label="Inicio" type="date" placeholder="dd/mm/aaaa" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -129,11 +137,12 @@ export function CreateCampaignDialog({ open, brandId, brandCategory, onClose, on
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
             {availableSocialAccounts.map((account) => {
               const active = socialAccountIds.includes(account.id);
-              const color = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === account.socialNetwork)?.color ?? '#6B6B6B';
+              const network = getSocialNetwork(account.socialNetworkId);
+              const color = network?.color ?? '#6B6B6B';
               return (
                 <Chip
                   key={account.id}
-                  label={`${account.socialNetwork} · ${account.handle}`}
+                  label={`${network?.label ?? account.socialNetworkId} · ${account.handle}`}
                   onClick={() => toggleSocialAccount(account.id)}
                   sx={{
                     px: 2,
