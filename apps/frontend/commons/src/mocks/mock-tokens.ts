@@ -1,12 +1,7 @@
 import { AppModule } from '../types/modules.enum';
 import { AppAction } from '../types/actions.enum';
 import { AppRole } from '../types/roles.enum';
-
-function encodeMockJwt(payload: object): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = btoa(JSON.stringify(payload));
-  return `${header}.${body}.mock-signature`;
-}
+import { encodeMockJwt } from '../state/auth.slice';
 
 export const MOCK_TOKENS = {
   admin: encodeMockJwt({
