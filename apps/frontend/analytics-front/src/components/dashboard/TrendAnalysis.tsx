@@ -43,7 +43,7 @@ export function TrendAnalysis() {
                       </Typography>
                     </Stack>
                     <Typography variant="body2" color="text.secondary">
-                      Engagement {w.current.avgEngagementRate}% ({w.deltaPercent > 0 ? '+' : ''}{w.deltaPercent}%)
+                      Engagement {w.current.avgEngagement}% ({w.deltaPercent > 0 ? '+' : ''}{w.deltaPercent}%)
                     </Typography>
                   </>
                 ) : (

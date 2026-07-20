@@ -10,6 +10,7 @@ import {
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
   getSocialAccount,
+  getSocialNetwork,
 } from '../../../../../../lib/mock-data';
 import type { MockCampaignPost } from '../../../../../../interfaces/interface';
 
@@ -26,7 +27,7 @@ export default function CampaignPostsPage() {
       header: 'Red',
       render: (p) => (
         <Typography variant="caption" color="text.secondary">
-          {getSocialAccount(p.brandProfileId)?.socialNetwork ?? '—'}
+          {getSocialNetwork(getSocialAccount(p.socialAccountId)?.socialNetworkId ?? '')?.label ?? '—'}
         </Typography>
       ),
     },

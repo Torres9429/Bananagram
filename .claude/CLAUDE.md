@@ -43,6 +43,24 @@ end-to-end todavía.
   **`.claude/INVENTORY.md`** — consúltalo antes de tareas puntuales tipo "agrega un endpoint a X",
   "crea un componente para Y", "conecta el front Z con el servicio W".
 
+## Modelo de datos vigente — `modelo.txt` (no el `schema.prisma` actual del backend)
+
+`docs/base/modelo.txt` es el schema de Prisma **estable y definitivo**, preparado para reemplazar
+`apps/backend/commons/prisma/schema.prisma` a futuro — introduce cambios de fondo respecto al schema
+actual: `Post` deja de ser 1:1 con una red social (ahora `PostSocialAccount` permite fan-out multi-red,
+con estados `parcial`/`error`/`cancelado` nuevos en `PostStatus`), `BrandUser` desaparece (ownership de
+marca es singular vía `Brand.ownerId`, CM/Diseñador se vinculan a través de `Campaign.cmId`/
+`CampaignDesigner`, no de la marca), y aparecen `PasswordResetToken`, `Media`/`PostMedia`, `UserStatus`.
+
+**El 2026-07-19 se realinearon los mocks/tipos de las 6 apps frontend (`apps/frontend/**`) a este modelo**
+— el backend real (`apps/backend/**`) **NO se tocó**, sigue usando el schema Prisma viejo, a propósito
+(se reescribirá después). Documentación de ese trabajo:
+- `docs/frontend-db-alignment.md` — análisis campo por campo + las 12 decisiones de producto que se tomaron.
+- `docs/frontend-db-alignment-implementation.md` — registro de la implementación (qué cambió, archivo por archivo).
+
+Si te piden tocar tipos/mocks del frontend relacionados con Post/Brand/Campaign/SocialAccount/Score/User,
+consulta esos 2 documentos primero — los shapes ya viven en `@repo/ui/types` siguiendo `modelo.txt`.
+
 ---
 
 ## Comandos

@@ -5,13 +5,14 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import { DataTable, type DataTableColumn } from '@repo/ui/ui';
+import { formatDate } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
 import { MOCK_AUDIT_LOG } from '../../lib/mock-data';
 import type { MockAuditEntry } from '../../interfaces/interface';
 
 export default function AuditLogPage() {
   const columns: DataTableColumn<MockAuditEntry>[] = [
-    { key: 'date', header: 'Fecha', width: 140, render: (e) => <Typography variant="caption" color="text.secondary">{e.date}</Typography> },
+    { key: 'createdAt', header: 'Fecha', width: 160, render: (e) => <Typography variant="caption" color="text.secondary">{formatDate(e.createdAt)}</Typography> },
     { key: 'actor', header: 'Usuario', render: (e) => <Typography variant="body2" fontWeight={600}>{e.actor}</Typography> },
     { key: 'action', header: 'Acción', render: (e) => <Typography variant="body2">{e.action}</Typography> },
     { key: 'entity', header: 'Entidad', render: (e) => <Typography variant="body2" color="text.secondary">{e.entity}</Typography> },

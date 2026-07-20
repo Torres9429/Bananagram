@@ -64,17 +64,17 @@ export function filterByDateRange(facts: SocialMetricFact[], range: DateRange): 
 
 export function computeKpis(facts: SocialMetricFact[]): AnalyticsKpis {
   if (facts.length === 0) {
-    return { totalReach: 0, totalImpressions: 0, totalInteractions: 0, avgEngagementRate: 0, followersGained: 0, postsCount: 0 };
+    return { totalReach: 0, totalViews: 0, totalInteractions: 0, avgEngagement: 0, followersGained: 0, postsCount: 0 };
   }
 
   const totalReach = sumBy(facts, (f) => f.reach);
-  const totalImpressions = sumBy(facts, (f) => f.impressions);
+  const totalViews = sumBy(facts, (f) => f.views ?? 0);
   const totalInteractions = sumBy(facts, (f) => f.likes + f.comments + f.shares);
   const followersGained = sumBy(facts, (f) => f.followersGained);
-  const avgEngagementRate = round1(sumBy(facts, (f) => f.engagementRate) / facts.length);
+  const avgEngagement = round1(sumBy(facts, (f) => f.engagement) / facts.length);
   const postsCount = new Set(facts.filter((f) => f.postId).map((f) => f.postId)).size;
 
-  return { totalReach, totalImpressions, totalInteractions, avgEngagementRate, followersGained, postsCount };
+  return { totalReach, totalViews, totalInteractions, avgEngagement, followersGained, postsCount };
 }
 
 export interface KpiComparison {
@@ -106,7 +106,7 @@ export function groupByCampaign(facts: SocialMetricFact[]): Record<string, Socia
   return groupBy(withCampaign, (f) => f.campaignId);
 }
 
-export type RankCriterion = 'reach' | 'engagementRate' | 'likes' | 'comments' | 'shares';
+export type RankCriterion = 'reach' | 'engagement' | 'likes' | 'comments' | 'shares';
 
 /** direction='asc' agregado en Fase 4 (default 'desc', mismo comportamiento de siempre para los llamadores existentes). */
 export function rankPosts(
@@ -195,12 +195,12 @@ export function computeNetworkKPIs(
 ): Record<string, number> {
   const universal: Record<string, number> = {
     reach: sumBy(facts, (f) => f.reach),
-    impressions: sumBy(facts, (f) => f.impressions),
+    views: sumBy(facts, (f) => f.views ?? 0),
     likes: sumBy(facts, (f) => f.likes),
     comments: sumBy(facts, (f) => f.comments),
     shares: sumBy(facts, (f) => f.shares),
     followers: sumBy(facts, (f) => f.followersGained),
-    engagementRate: facts.length > 0 ? round1(sumBy(facts, (f) => f.engagementRate) / facts.length) : 0,
+    engagement: facts.length > 0 ? round1(sumBy(facts, (f) => f.engagement) / facts.length) : 0,
   };
 
   const sums: Record<string, number> = {};
@@ -238,7 +238,7 @@ export function computeCampaignBreakdown(facts: SocialMetricFact[]): CampaignBre
 export function computeAudienceMetrics(facts: SocialMetricFact[]): NetworkAudienceMetrics {
   return {
     followersGained: sumBy(facts, (f) => f.followersGained),
-    activeProfiles: new Set(facts.map((f) => f.brandProfileId)).size,
+    activeProfiles: new Set(facts.map((f) => f.socialAccountId)).size,
     postsCount: new Set(facts.filter((f) => f.postId).map((f) => f.postId)).size,
   };
 }
@@ -260,7 +260,7 @@ export function buildNetworkDashboard(
     networkCode,
     metrics: fields.map((field) => ({ key: field.key, label: field.label, unit: field.unit, value: kpiValues[field.key] ?? 0 })),
     campaigns: computeCampaignBreakdown(facts),
-    topContent: rankPosts(facts, 'engagementRate', 5),
+    topContent: rankPosts(facts, 'engagement', 5),
     topContentLabel: NETWORK_TOP_CONTENT_LABEL[networkCode],
     audience: computeAudienceMetrics(facts),
   };
@@ -345,12 +345,12 @@ export function computeInsights(facts: SocialMetricFact[], hourByFactId: Record<
   }));
 
   if (networkKpis.length > 0) {
-    const best = [...networkKpis].sort((a, b) => b.kpis.avgEngagementRate - a.kpis.avgEngagementRate)[0];
+    const best = [...networkKpis].sort((a, b) => b.kpis.avgEngagement - a.kpis.avgEngagement)[0];
     insights.push({
       id: 'best-engagement-network',
       severity: 'success',
       title: `${best.networkCode} tiene el mayor engagement`,
-      description: `${best.kpis.avgEngagementRate}% de engagement promedio en el periodo analizado.`,
+      description: `${best.kpis.avgEngagement}% de engagement promedio en el periodo analizado.`,
     });
   }
 
@@ -415,15 +415,21 @@ export const HOUR_BUCKET_LABELS = ['00-02', '03-05', '06-08', '09-11', '12-14', 
 const CURRENT_WEEK_START = '2026-06-22';
 
 /**
- * Explica (no recalcula) el Score existente: decompone sus 4 componentes en
- * factores positivos/negativos (umbral 70/60) y señala qué red/campaña/posts
- * más influyeron — usando SIEMPRE datos ya calculados por otras funciones del engine.
+ * Explica (no recalcula) el Score existente: decompone sus 3 componentes que
+ * PONDERAN (consistency/engagement/frequency, Score = 0.30/0.40/0.30 — ver
+ * modelo.txt) en factores positivos/negativos (umbral 70/60) y señala qué
+ * red/campaña/posts más influyeron — usando SIEMPRE datos ya calculados por
+ * otras funciones del engine.
+ *
+ * `coverage` NO entra a `components`: es informativa, no un 4º factor que
+ * pondera igual que los otros tres (ver docs/frontend-db-alignment.md §1.4).
+ * Queda accesible directo en `score.coverage` para quien necesite mostrarla
+ * por separado (ver ScoreExplanationPanel.tsx).
  */
 export function buildScoreExplanation(score: ScoreSnapshot, facts: SocialMetricFact[]): ScoreExplanation {
-  const components: { key: 'consistency' | 'engagement' | 'coverage' | 'frequency'; label: string }[] = [
+  const components: { key: 'consistency' | 'engagement' | 'frequency'; label: string }[] = [
     { key: 'consistency', label: 'Consistencia' },
     { key: 'engagement', label: 'Engagement' },
-    { key: 'coverage', label: 'Cobertura' },
     { key: 'frequency', label: 'Frecuencia' },
   ];
   const positiveFactors = components.filter((c) => score[c.key] >= 70).map((c) => ({ key: c.key, label: c.label, value: score[c.key] }));
@@ -436,7 +442,7 @@ export function buildScoreExplanation(score: ScoreSnapshot, facts: SocialMetricF
   }));
   const topNetwork =
     networkKpis.length > 0
-      ? networkKpis.reduce((a, b) => (b.kpis.avgEngagementRate > a.kpis.avgEngagementRate ? b : a))
+      ? networkKpis.reduce((a, b) => (b.kpis.avgEngagement > a.kpis.avgEngagement ? b : a))
       : null;
 
   const campaigns = computeCampaignBreakdown(facts);
@@ -447,7 +453,7 @@ export function buildScoreExplanation(score: ScoreSnapshot, facts: SocialMetricF
     score,
     positiveFactors,
     negativeFactors,
-    topNetwork: topNetwork ? { networkCode: topNetwork.networkCode, engagementRate: topNetwork.kpis.avgEngagementRate } : null,
+    topNetwork: topNetwork ? { networkCode: topNetwork.networkCode, engagement: topNetwork.kpis.avgEngagement } : null,
     topCampaign: topCampaignEntry
       ? {
           campaignId: topCampaignEntry.campaignId,
@@ -456,8 +462,8 @@ export function buildScoreExplanation(score: ScoreSnapshot, facts: SocialMetricF
           sharePercent: totalFollowersGained > 0 ? round1((topCampaignEntry.kpis.followersGained / totalFollowersGained) * 100) : 0,
         }
       : null,
-    bestPosts: rankPosts(facts, 'engagementRate', 3, 'desc'),
-    worstPosts: rankPosts(facts, 'engagementRate', 3, 'asc'),
+    bestPosts: rankPosts(facts, 'engagement', 3, 'desc'),
+    worstPosts: rankPosts(facts, 'engagement', 3, 'asc'),
   };
 }
 
@@ -509,7 +515,7 @@ export function computeTrendAnalysis(facts: SocialMetricFact[], referenceDateIso
     const current = computeKpis(filterByDateRange(facts, currentRange));
     const previous = computeKpis(filterByDateRange(facts, previousRange));
     const hasData = current.postsCount > 0 || previous.postsCount > 0;
-    const deltaPercent = hasData ? percentChange(previous.avgEngagementRate, current.avgEngagementRate) : 0;
+    const deltaPercent = hasData ? percentChange(previous.avgEngagement, current.avgEngagement) : 0;
 
     return {
       days,
@@ -532,7 +538,7 @@ export function compareCampaigns(facts: SocialMetricFact[], campaignIdA: string 
       campaignId,
       campaignName: items[0].campaignName ?? campaignId,
       kpis: computeKpis(items),
-      topPosts: rankPosts(items, 'engagementRate', 3, 'desc'),
+      topPosts: rankPosts(items, 'engagement', 3, 'desc'),
     };
   }
 

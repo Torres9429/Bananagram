@@ -74,7 +74,7 @@ export default function ProfileCampaignsPage() {
       <CreateCampaignDialog
         open={createOpen}
         brandId={profile.id}
-        brandCategory={profile.category}
+        brandCategory={profile.categoryId}
         onClose={() => setCreateOpen(false)}
         onCreate={(campaign, team) => {
           assignTeamToCampaign(campaign.id, team);

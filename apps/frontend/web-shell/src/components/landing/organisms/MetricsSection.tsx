@@ -38,9 +38,9 @@ function breakdownColor(value: number) {
 
 // Mismas 3 redes que ya usamos en Campañas/Calendario, para no inventar canales nuevos.
 const NETWORK_ACTIVITY: NetworkActivity[] = [
-  { code: 'IG', name: 'Instagram', tone: 'primary', posts: 24, engagement: '5.2%', fill: 68 },
-  { code: 'TK', name: 'TikTok', tone: 'info', posts: 18, engagement: '9.8%', fill: 92 },
-  { code: 'LI', name: 'LinkedIn', tone: 'success', posts: 8, engagement: '7.4%', fill: 45 },
+  { code: 'instagram', name: 'Instagram', tone: 'primary', posts: 24, engagement: '5.2%', fill: 68 },
+  { code: 'tiktok', name: 'TikTok', tone: 'info', posts: 18, engagement: '9.8%', fill: 92 },
+  { code: 'linkedin', name: 'LinkedIn', tone: 'success', posts: 8, engagement: '7.4%', fill: 45 },
 ];
 
 const SCORE_TREND = [

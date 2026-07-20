@@ -26,10 +26,12 @@ import { ZONE_URLS } from '@repo/ui/config';
 import {
   MOCK_CAMPAIGNS,
   MOCK_POSTS_BY_CAMPAIGN,
-  MOCK_TEAM_BY_CAMPAIGN,
+  MOCK_CAMPAIGN_DESIGNERS,
   MOCK_PROFILES,
   CAMPAIGN_STATUS_LABEL,
+  getCampaignCM,
   getSocialAccount,
+  getSocialNetwork,
 } from '../../../../lib/mock-data';
 
 // Detalle operativo de campaña en /profile — mismo contenido que
@@ -56,13 +58,13 @@ export default function ProfileCampaignDetailPage() {
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === params.campaignId) ?? MOCK_CAMPAIGNS[0];
   const profile = MOCK_PROFILES.find((p) => p.id === campaign.brandId) ?? MOCK_PROFILES[0];
   const posts = MOCK_POSTS_BY_CAMPAIGN[campaign.id] ?? [];
-  const team = MOCK_TEAM_BY_CAMPAIGN[campaign.id] ?? [];
+  const cm = getCampaignCM(campaign.id);
+  const designers = MOCK_CAMPAIGN_DESIGNERS[campaign.id] ?? [];
+  const team = cm ? [cm, ...designers] : designers;
   const published = posts.filter((p) => p.status === 'publicado').length;
   const progress = posts.length ? Math.round((published / posts.length) * 100) : 0;
   const statusStyle = CAMPAIGN_STATUS_LABEL[campaign.status];
   const recentPosts = posts.slice(0, 3);
-  const cm = team.find((m) => m.role === 'Community Manager');
-  const designers = team.filter((m) => m.role !== 'Community Manager' && m.role !== 'Cliente');
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
@@ -204,7 +206,7 @@ export default function ProfileCampaignDetailPage() {
                   <Box>
                     <Typography variant="body2" fontWeight={600}>{p.title}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {getSocialAccount(p.brandProfileId)?.socialNetwork ?? '—'} · {p.scheduledAt}
+                      {getSocialNetwork(getSocialAccount(p.socialAccountId)?.socialNetworkId ?? '')?.label ?? '—'} · {p.scheduledAt}
                     </Typography>
                   </Box>
                   <Stack direction="row" gap={0.5} alignItems="center">
@@ -212,7 +214,7 @@ export default function ProfileCampaignDetailPage() {
                     <Tooltip title="Ver publicación">
                       <IconButton
                         size="small"
-                        onClick={() => { window.location.href = `${POSTS_FRONT_URL}/posts/${p.id}`; }}
+                        onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/${p.id}`; }}
                         sx={{ color: 'secondary.main' }}
                       >
                         <VisibilityOutlinedIcon fontSize="small" />

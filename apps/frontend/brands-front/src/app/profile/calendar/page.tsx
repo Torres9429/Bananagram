@@ -25,8 +25,8 @@ import { ZONE_URLS } from '@repo/ui/config';
 import {
   MOCK_CAMPAIGNS,
   MOCK_CALENDAR_EVENTS,
-  AVAILABLE_SOCIAL_NETWORKS,
   getSocialAccount,
+  getSocialNetwork,
   getSocialAccountsByProfile,
   getCurrentClientProfile,
 } from '../../../lib/mock-data';
@@ -86,7 +86,7 @@ export default function ProfileCalendarPage() {
 
   const campaigns = useMemo(() => MOCK_CAMPAIGNS.filter((c) => c.brandId === profile.id), [profile.id]);
   const socialAccounts = useMemo(() => getSocialAccountsByProfile(profile.id), [profile.id]);
-  const connectedNetworks = useMemo(() => Array.from(new Set(socialAccounts.map((a) => a.socialNetwork))), [socialAccounts]);
+  const connectedNetworks = useMemo(() => Array.from(new Set(socialAccounts.map((a) => a.socialNetworkId))), [socialAccounts]);
 
   // Estado local (no MOCK_CALENDAR_EVENTS directo) para poder aprobar/rechazar
   // un evento puntual desde el modal — mismo patrón ya usado en
@@ -113,7 +113,7 @@ export default function ProfileCalendarPage() {
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (campaignFilter && e.campaignId !== campaignFilter) return false;
-      if (networkFilter && getSocialAccount(e.brandProfileId)?.socialNetwork !== networkFilter) return false;
+      if (networkFilter && getSocialAccount(e.socialAccountId)?.socialNetworkId !== networkFilter) return false;
       if (statusFilter && e.status !== statusFilter) return false;
       if (dateFrom && e.start.slice(0, 10) < dateFrom) return false;
       if (dateTo && e.start.slice(0, 10) > dateTo) return false;
@@ -124,8 +124,8 @@ export default function ProfileCalendarPage() {
   const calendarEvents = useMemo<CalendarEventItem[]>(
     () =>
       filteredEvents.map((e) => {
-        const networkCode = getSocialAccount(e.brandProfileId)?.socialNetwork ?? 'IG';
-        const networkColor = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === networkCode)?.color ?? '#6B6B6B';
+        const networkCode = (getSocialAccount(e.socialAccountId)?.socialNetworkId ?? 'instagram') as SocialNetworkCode;
+        const networkColor = getSocialNetwork(networkCode)?.color ?? '#6B6B6B';
         return {
           id: e.id,
           title: e.title,
@@ -149,7 +149,7 @@ export default function ProfileCalendarPage() {
   const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
   const selectedCampaign = selectedEvent ? campaigns.find((c) => c.id === selectedEvent.campaignId) ?? null : null;
   const selectedNetworkLabel = selectedEvent
-    ? AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === getSocialAccount(selectedEvent.brandProfileId)?.socialNetwork)?.label
+    ? getSocialNetwork(getSocialAccount(selectedEvent.socialAccountId)?.socialNetworkId ?? '')?.label
     : undefined;
   const selectedScheduledAt = selectedEvent
     ? new Date(selectedEvent.start).toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -231,7 +231,7 @@ export default function ProfileCalendarPage() {
               <LabeledSelect label="Red social" displayEmpty value={networkFilter} onChange={(e) => setNetworkFilter(e.target.value as SocialNetworkCode | '')}>
                 <MenuItem value="">Todas las redes</MenuItem>
                 {connectedNetworks.map((code) => (
-                  <MenuItem key={code} value={code}>{code}</MenuItem>
+                  <MenuItem key={code} value={code}>{getSocialNetwork(code)?.label ?? code}</MenuItem>
                 ))}
               </LabeledSelect>
             </Grid>
@@ -269,12 +269,13 @@ export default function ProfileCalendarPage() {
           <Stack direction="row" gap={1} flexWrap="wrap" mb={2} alignItems="center">
             <Typography variant="caption" color="text.secondary" fontWeight={600}>Redes:</Typography>
             {connectedNetworks.map((code) => {
-              const color = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === code)?.color ?? '#6B6B6B';
+              const network = getSocialNetwork(code);
+              const color = network?.color ?? '#6B6B6B';
               return (
                 <Chip
                   key={code}
                   size="small"
-                  label={code}
+                  label={network?.label ?? code}
                   sx={{ bgcolor: `${color}18`, color, fontWeight: 700, height: 22, fontSize: 11 }}
                 />
               );

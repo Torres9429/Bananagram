@@ -4,36 +4,11 @@ import type { SidebarNavItem } from '@repo/ui/ui';
 import type { SocialNetworkCode } from '../lib/analytics/types';
 import type { store } from '../store';
 
-export interface MockEngagementPoint {
-  day: string;
-  engagement: number;
-  reach: number;
-}
-
 export interface MockBrandMetric {
   id: string;
   name: string;
   color: string;
   score: BrandScore;
-}
-
-// Espejo del modelo Brand → SocialAccount de brands-front/posts-front: un Post
-// pertenece a una SocialAccount (cuenta de una Marca en una red), nunca tiene
-// `brand`/`network` como campos propios.
-export interface SocialAccount {
-  id: string;
-  brandName: string;
-  socialNetwork: string;
-}
-
-export interface MockTopPost {
-  id: string;
-  title: string;
-  brandProfileId: string;
-  likes: number;
-  comments: number;
-  shares: number;
-  engagementRate: number;
 }
 
 export type RootState = ReturnType<typeof store.getState>;

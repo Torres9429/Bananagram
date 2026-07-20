@@ -2,19 +2,38 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import { PasswordField } from './PasswordField';
 
+// useSearchParams se usa SOLO para leer el token del enlace de reset (mismo
+// patrón que ActivateForm.tsx lee `?email=`) — no es sesión. El token
+// corresponde a PasswordResetToken.token (UUID enviado por correo), no al
+// JWT de sesión.
 export function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token') ?? '';
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  if (!token) {
+    return (
+      <Box sx={{ textAlign: 'center' }}>
+        <Typography variant="h5" fontWeight={700} color="error" mb={1}>Enlace inválido</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Este enlace para restablecer contraseña no es válido o ya fue utilizado. Solicita uno nuevo desde
+          la pantalla de inicio de sesión.
+        </Typography>
+      </Box>
+    );
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

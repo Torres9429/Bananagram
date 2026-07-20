@@ -178,9 +178,9 @@ export const selectSelectedPostDetail = createSelector(
 export const selectReachByNetworkData = createSelector([selectFilteredMetricFacts], reachByNetwork);
 
 export const selectEngagementTimeSeries = createSelector([selectFilteredMetricFacts], (facts) =>
-  prepareTimeSeries(facts, 'engagementRate'),
+  prepareTimeSeries(facts, 'engagement'),
 );
 
 export const selectTopPosts = createSelector([selectFilteredMetricFacts], (facts) =>
-  rankPosts(facts, 'engagementRate', 5),
+  rankPosts(facts, 'engagement', 5),
 );

@@ -28,7 +28,7 @@ export default function BrandOverviewPage() {
           </Avatar>
           <Box>
             <Typography variant="h5" fontWeight={700}>{brand.name}</Typography>
-            <Typography variant="body2" color="text.secondary">{brand.category}</Typography>
+            <Typography variant="body2" color="text.secondary">{brand.categoryId}</Typography>
           </Box>
         </Stack>
 

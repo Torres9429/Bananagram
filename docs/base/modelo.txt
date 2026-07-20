@@ -1,0 +1,526 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Identidad y acceso — RBAC dinámico ──────────────────────────────
+// Los privilegios viven en role_permissions (BD), nunca hardcodeados
+// en el código (ver CLAUDE.md). module.slug + action.slug + allowed.
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  users       User[]
+  permissions RolePermission[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("roles")
+}
+
+model Module {
+  id          String           @id @default(uuid())
+  slug        String           @unique
+  name        String
+  permissions RolePermission[]
+
+  @@map("modules")
+}
+
+model Action {
+  id          String           @id @default(uuid())
+  slug        String           @unique
+  name        String
+  permissions RolePermission[]
+
+  @@map("actions")
+}
+
+model RolePermission {
+  id       String  @id @default(uuid())
+  roleId   String
+  role     Role    @relation(fields: [roleId], references: [id])
+  moduleId String
+  module   Module  @relation(fields: [moduleId], references: [id])
+  actionId String
+  action   Action  @relation(fields: [actionId], references: [id])
+  allowed  Boolean @default(true)
+
+  @@unique([roleId, moduleId, actionId])
+  @@map("role_permissions")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("refresh_tokens")
+}
+
+// Bandeja de notificaciones (todos los roles).
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("notifications")
+}
+
+// ── Catálogos funcionales ──────────────────────────────────────────
+
+// Áreas temáticas: clasifican a usuarios operativos (CM/Diseñador),
+// campañas, y a la marca misma. Es el eje del sistema de matching.
+model Category {
+  id   String @id @default(uuid())
+  name String @unique
+
+  // Relaciones de uso (catálogo transversal)
+  userCategories     UserCategory[]
+  campaignCategories CampaignCategory[]
+  brands             Brand[] // back-relation: Brand.categoryId — categoría/industria de la marca
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("categories")
+}
+
+// Habilidades técnicas exclusivas de CM y Diseñador.
+// NO aplica a marcas ni campañas.
+model Specialty {
+  id   String @id @default(uuid())
+  name String @unique
+
+  userSpecialties UserSpecialty[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("specialties")
+}
+
+// Plataformas de publicación disponibles en el sistema.
+// Gestionado solo por Admin (un INSERT = nueva red, sin deploy).
+// baseEngagementRate alimenta el cron job de métricas simuladas.
+model SocialNetwork {
+  id                 String @id @default(uuid())
+  name               String
+  code               String @unique // 'instagram' | 'tiktok' | etc.
+  baseEngagementRate Float // % base para simulación de likes
+
+  socialAccounts SocialAccount[] // renombrado desde BrandProfile
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("social_networks")
+}
+
+// Opcional — implementar según tiempos. Por ahora todos nacen como active.
+enum UserStatus {
+  pending // invitado por Admin, aún sin contraseña
+  active // cuenta operativa
+  suspended // deshabilitado sin borrar (soft-disable)
+}
+
+model User {
+  id           String     @id @default(uuid())
+  name         String // nombre completo
+  email        String     @unique
+  passwordHash String
+  roleId       String // FK real en BD; role es el objeto ORM
+  role         Role       @relation(fields: [roleId], references: [id])
+  status       UserStatus @default(active)
+  avatarUrl    String?
+
+  // auth
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  // solo cuando role = cliente
+  ownedBrands Brand[] @relation("BrandOwner")
+
+  // perfil profesional — solo cuando role = cm | disenador
+  categories  UserCategory[]
+  specialties UserSpecialty[]
+
+  // bandeja de notificaciones (todos los roles)
+  notifications Notification[]
+
+  campaignsAsCM         Campaign[]         @relation("CampaignCM")
+  campaignDesignerships CampaignDesigner[] @relation("CampaignDesigners")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("users")
+}
+
+model UserCategory {
+  userId     String
+  categoryId String
+
+  user     User     @relation(fields: [userId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@id([userId, categoryId])
+  @@map("user_categories")
+}
+
+// Usuario ↔ Especialidad: expresa habilidades técnicas del usuario.
+// No aplica a marcas ni campañas.
+model UserSpecialty {
+  userId      String
+  specialtyId String
+
+  user      User      @relation(fields: [userId], references: [id])
+  specialty Specialty @relation(fields: [specialtyId], references: [id])
+
+  @@id([userId, specialtyId])
+  @@map("user_specialties")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique // UUID random enviado por correo
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+model Brand {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique // generado desde name, para URLs
+  profileType String? // "Marca" | "Empresa" | "Creador"… solo display
+
+  logoUrl      String?
+  primaryColor String?
+
+  // dueño — siempre un Cliente
+  ownerId String
+  owner   User   @relation("BrandOwner", fields: [ownerId], references: [id])
+
+  // industria/categoría de la marca (catálogo base, semilla por Admin)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  // Ayrshare: null hasta que el Cliente conecte sus redes en el onboarding
+  ayrshareProfileKey String? @unique
+
+  socialAccounts SocialAccount[] // antes llamado profiles / BrandProfile
+  media          Media[]
+  campaigns      Campaign[]
+  posts          Post[]
+  scores         BrandScore[]
+  reports        Report[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("brands")
+}
+
+model SocialAccount {
+  id              String        @id @default(uuid())
+  brandId         String
+  brand           Brand         @relation(fields: [brandId], references: [id])
+  socialNetworkId String
+  socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id])
+  handle          String? // @username en esa red
+
+  // métricas propias de esta cuenta (cada red tiene números distintos para la misma marca)
+  followers Int     @default(0)
+  active    Boolean @default(true) // false = la marca dejó de gestionar esta red
+
+  postSocialAccounts PostSocialAccount[] // fan-out de publicaciones hacia esta cuenta
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([brandId, socialNetworkId]) // una marca, una cuenta por red
+  @@map("social_accounts")
+}
+
+model Campaign {
+  id          String         @id @default(uuid())
+  brandId     String
+  brand       Brand          @relation(fields: [brandId], references: [id])
+  name        String
+  description String?
+  objective   String?
+  status      CampaignStatus @default(active)
+  startDate   DateTime?
+  endDate     DateTime?
+
+  // El CM vive directo aquí — FK única garantiza "solo un CM por campaña" en BD
+  cmId String
+  cm   User   @relation("CampaignCM", fields: [cmId], references: [id])
+
+  designers  CampaignDesigner[]
+  categories CampaignCategory[]
+  posts      Post[]
+
+  createdBy String // FK → users.id del Cliente que la creó
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("campaigns")
+}
+
+model CampaignDesigner {
+  campaignId String
+  userId     String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  user       User     @relation("CampaignDesigners", fields: [userId], references: [id])
+
+  @@id([campaignId, userId])
+  @@map("campaign_designers")
+}
+
+model CampaignCategory {
+  campaignId String
+  categoryId String
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@id([campaignId, categoryId])
+  @@map("campaign_categories")
+}
+
+enum CampaignStatus {
+  active
+  paused
+  finished
+}
+
+// ── Publicaciones ──────────────────────────────────────────────────
+
+// Estado único de la publicación: cubre tanto el flujo de aprobación
+// (borrador → en_revision → aprobado/rechazado) como el de publicación
+// multi-red (programado → publicando → publicado/parcial/error/cancelado).
+// post_status_history registra cada transición (actor, fecha, comentario).
+enum PostStatus {
+  borrador
+  en_revision // CM lo envió a revisión interna
+  aprobado // Cliente aprobó — listo para programar
+  rechazado // Cliente rechazó — regresa a borrador con comentario obligatorio
+  programado
+  publicando
+  publicado
+  parcial // al menos una red falló (ver PostSocialAccount)
+  error
+  cancelado
+}
+
+enum PostSocialAccountStatus {
+  pendiente
+  publicando
+  publicado
+  error
+  cancelado
+}
+
+// Capa 1 — La intención del usuario (independiente de la red)
+model Post {
+  id         String    @id @default(uuid())
+  brandId    String
+  brand      Brand     @relation(fields: [brandId], references: [id])
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+
+  content     String     @db.Text
+  status      PostStatus @default(borrador)
+  scheduledAt DateTime?
+  publishedAt DateTime?
+
+  createdBy String // FK → users.id (CM o Diseñador)
+
+  // null hasta que Ayrshare acepta el post
+  ayrsharePostId String? @unique
+
+  socialAccounts PostSocialAccount[]
+  statusHistory  PostStatusHistory[]
+  media          PostMedia[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("posts")
+}
+
+// Inmutable — historial de transiciones de estado del Post
+model PostStatusHistory {
+  id         BigInt      @id @default(autoincrement())
+  postId     String
+  post       Post        @relation(fields: [postId], references: [id])
+  fromStatus PostStatus? // null en la primera transición
+  toStatus   PostStatus
+  changedBy  String // FK → users.id
+  comment    String?     @db.Text // obligatorio si toStatus = rechazado o cancelado
+
+  createdAt DateTime @default(now())
+
+  @@map("post_status_history")
+}
+
+// Capa 2 — Publicación física por red social
+model PostSocialAccount {
+  id              String        @id @default(uuid())
+  postId          String
+  post            Post          @relation(fields: [postId], references: [id])
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  status       PostSocialAccountStatus @default(pendiente)
+  socialPostId String? // ID devuelto por la red (vía Ayrshare)
+  postUrl      String? // URL pública una vez publicado
+  publishedAt  DateTime?
+  errorMessage String?
+
+  metrics PostMetric[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([postId, socialAccountId])
+  @@map("post_social_accounts")
+}
+
+// Capa 3 — Snapshot de métricas por red (cron job)
+model PostMetric {
+  id                  String            @id @default(uuid())
+  postSocialAccountId String
+  postSocialAccount   PostSocialAccount @relation(fields: [postSocialAccountId], references: [id])
+
+  likes      Int?
+  comments   Int?
+  shares     Int?
+  views      Int?
+  reach      Int?
+  engagement Float? // tasa calculada: (likes+comments+shares) / reach
+
+  capturedAt DateTime @default(now())
+
+  @@map("post_metrics")
+}
+
+// ── Biblioteca de medios ─────────────────────────────────────────────
+// Un archivo se sube una vez y puede reutilizarse en varias publicaciones.
+model Media {
+  id         String @id @default(uuid())
+  brandId    String
+  brand      Brand  @relation(fields: [brandId], references: [id])
+  uploadedBy String // FK → users.id (CM o Diseñador)
+
+  fileName     String
+  originalName String
+  mimeType     String
+  url          String
+  size         Int
+  width        Int?
+  height       Int?
+  duration     Int? // solo video
+
+  postMedia PostMedia[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("media")
+}
+
+model PostMedia {
+  postId  String
+  mediaId String
+  order   Int
+
+  post  Post  @relation(fields: [postId], references: [id])
+  media Media @relation(fields: [mediaId], references: [id])
+
+  @@id([postId, mediaId])
+  @@map("post_media")
+}
+
+// ── Analítica ─────────────────────────────────────────────────────────
+// Score = (Consistencia×0.30) + (Engagement×0.40) + (Frecuencia×0.30) — ver CLAUDE.md.
+// `coverage` es informativa: NO entra al cálculo ponderado del score.
+model BrandScore {
+  id             String   @id @default(uuid())
+  brandId        String
+  brand          Brand    @relation(fields: [brandId], references: [id])
+  score          Float
+  consistency    Float
+  engagement     Float
+  frequency      Float
+  coverage       Float // informativa — no forma parte de la fórmula del score
+  classification String
+  snapshotDate   DateTime @default(now())
+
+  @@map("brand_scores")
+}
+
+enum ReportFormat {
+  csv
+  pdf
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  brandId     String
+  brand       Brand        @relation(fields: [brandId], references: [id])
+  format      ReportFormat
+  fileUrl     String?
+  requestedBy String // FK → users.id
+
+  createdAt DateTime @default(now())
+
+  @@map("reports")
+}
+
+// ── Auditoría ──────────────────────────────────────────────────────────
+// Inmutable: sin updatedAt, sin deletedAt, sin métodos de modificación
+// expuestos en el repositorio. PK BIGINT porque crece mucho.
+model AuditLog {
+  id          BigInt  @id @default(autoincrement())
+  tableName   String
+  recordId    String
+  action      String
+  before      Json?
+  after       Json?
+  performedBy String // FK → users.id
+  requestId   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("audit_log")
+}
+

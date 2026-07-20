@@ -1,22 +1,14 @@
 import type { SidebarNavItem } from '@repo/ui/ui';
+import type { AppRole, UserStatus } from '@repo/ui/types';
 import type { store } from '../store';
 
 export interface MockUser {
   id: string;
   name: string;
   email: string;
-  role: string;
-  brand: string | null;
-  status: 'activo' | 'inactivo';
+  role: AppRole;
+  status: UserStatus;
   lastLogin: string;
-}
-
-export interface MockRole {
-  id: string;
-  name: string;
-  description: string;
-  userCount: number;
-  permissions: Record<string, string[]>;
 }
 
 export interface MockAuditEntry {
@@ -24,7 +16,7 @@ export interface MockAuditEntry {
   actor: string;
   action: string;
   entity: string;
-  date: string;
+  createdAt: string;
 }
 
 export interface MockCatalogItem {

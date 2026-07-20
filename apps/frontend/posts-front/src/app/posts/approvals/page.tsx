@@ -23,6 +23,15 @@ import { CampaignDot } from '../../../components/CampaignDot';
 import { PostsTabs } from '../../../components/PostsTabs';
 import { RejectPostDialog } from '../../../components/RejectPostDialog';
 
+// Estas cards de kanban solo muestran la red "representativa" (la primera)
+// del post — el detalle completo por red vive únicamente en /posts/[id]
+// (decisión §3, docs/frontend-db-alignment.md): no se agregan mini-franjas
+// de estado por red aquí.
+function NetworkAvatarForPost({ post, size }: { post: MockPost; size?: number }) {
+  const { networkShort, networkBg, networkColor } = getPostNetworkInfo(post.socialAccounts[0]?.socialAccountId);
+  return <NetworkAvatar network={networkShort} networkBg={networkBg} networkColor={networkColor} size={size} />;
+}
+
 export default function PostsApprovalPage() {
   const router = useRouter();
   const { can, canAny } = usePermissions();
@@ -100,7 +109,7 @@ export default function PostsApprovalPage() {
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar {...getPostNetworkInfo(post)} size={32} />
+                    <NetworkAvatarForPost post={post} size={32} />
                     <Typography fontWeight={600}>{post.title}</Typography>
                     {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
                   </Stack>
@@ -150,7 +159,7 @@ export default function PostsApprovalPage() {
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar {...getPostNetworkInfo(post)} size={32} />
+                    <NetworkAvatarForPost post={post} size={32} />
                     <Typography fontWeight={600}>{post.title}</Typography>
                     {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
                   </Stack>
@@ -220,7 +229,7 @@ export default function PostsApprovalPage() {
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
                   <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar {...getPostNetworkInfo(post)} size={32} />
+                    <NetworkAvatarForPost post={post} size={32} />
                     <Typography fontWeight={600}>{post.title}</Typography>
                     {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
                   </Stack>

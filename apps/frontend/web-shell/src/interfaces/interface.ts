@@ -1,28 +1,8 @@
 import type { ReactNode } from 'react';
-import type { PostStatus } from '@repo/ui/types';
 import type { SidebarNavItem } from '@repo/ui/ui';
 import type { ChipProps as MuiChipProps } from '@mui/material/Chip';
 import type { ButtonProps } from '@mui/material/Button';
 import type { store } from '../store';
-
-export interface MockCampaignSummary {
-  id: string;
-  name: string;
-  color: string;
-  progress: number;
-}
-
-export interface SocialAccount {
-  id: string;
-  socialNetwork: string;
-}
-
-export interface MockRecentPost {
-  id: string;
-  title: string;
-  status: PostStatus;
-  brandProfileId: string;
-}
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

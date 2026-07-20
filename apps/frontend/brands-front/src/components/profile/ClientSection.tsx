@@ -29,11 +29,12 @@ import {
   MOCK_CATEGORIES,
   PROFILE_TYPE_LABELS,
   AVAILABLE_SOCIAL_NETWORKS,
+  getSocialNetwork,
   getSocialAccountsByProfile,
   getCurrentClientProfile,
   assignTeamToCampaign,
 } from '../../lib/mock-data';
-import type { MockCampaign, MockProfile, SocialAccount, SocialNetworkCode } from '../../interfaces/interface';
+import type { ProfileType, MockCampaign, MockProfile, SocialAccount, SocialNetworkCode } from '../../interfaces/interface';
 
 // Estructura de la sección Cliente en ProfilePage (§3 del rediseño de dominio).
 // Placeholder: usa el primer MockProfile como "el Perfil del Cliente" porque hoy
@@ -66,10 +67,10 @@ export function ClientSection() {
 
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editName, setEditName] = useState(profile.name);
-  const [editCategory, setEditCategory] = useState(profile.category);
+  const [editCategory, setEditCategory] = useState(profile.categoryId);
 
-  const connectedCodes = socialAccounts.map((a) => a.socialNetwork);
-  const availableNetworksToAdd = AVAILABLE_SOCIAL_NETWORKS.filter((n) => !connectedCodes.includes(n.code));
+  const connectedNetworkIds = socialAccounts.map((a) => a.socialNetworkId);
+  const availableNetworksToAdd = AVAILABLE_SOCIAL_NETWORKS.filter((n) => !connectedNetworkIds.includes(n.id));
 
   // Una SocialAccount no se puede desconectar si alguna campaña activa la usa
   // (MockCampaign.socialAccountIds) — evita romper una campaña en curso.
@@ -87,7 +88,7 @@ export function ClientSection() {
     if (!newNetworkCode || !newHandle.trim()) return;
     setSocialAccounts((prev) => [
       ...prev,
-      { id: `bp-new-${Date.now()}`, brandId: profile.id, socialNetwork: newNetworkCode, handle: newHandle.trim(), followers: 0, active: true },
+      { id: `bp-new-${Date.now()}`, brandId: profile.id, socialNetworkId: newNetworkCode, handle: newHandle.trim(), followers: 0, active: true },
     ]);
     setNewNetworkCode('');
     setNewHandle('');
@@ -96,14 +97,14 @@ export function ClientSection() {
 
   function openEditProfile() {
     setEditName(profile.name);
-    setEditCategory(profile.category);
+    setEditCategory(profile.categoryId);
     setEditProfileOpen(true);
   }
 
   // Mock: solo de sesión — no hay backend que persista el cambio.
   function handleEditProfile() {
     if (!editName.trim() || !editCategory) return;
-    setProfile((prev) => ({ ...prev, name: editName.trim(), category: editCategory }));
+    setProfile((prev) => ({ ...prev, name: editName.trim(), categoryId: editCategory }));
     setEditProfileOpen(false);
   }
 
@@ -121,8 +122,8 @@ export function ClientSection() {
             <Box>
               <Typography variant="h5" fontWeight={700}>{profile.name}</Typography>
               <Stack direction="row" gap={1} flexWrap="wrap" mt={0.75}>
-                <Chip size="small" label={PROFILE_TYPE_LABELS[profile.type]} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
-                <Chip size="small" label={profile.category} variant="outlined" />
+                <Chip size="small" label={PROFILE_TYPE_LABELS[profile.profileType as ProfileType] ?? profile.profileType ?? '—'} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
+                <Chip size="small" label={profile.categoryId} variant="outlined" />
               </Stack>
             </Box>
           </Stack>
@@ -169,12 +170,13 @@ export function ClientSection() {
           <Grid container spacing={2}>
             {socialAccounts.map((a) => {
               const locked = isSocialAccountInActiveCampaign(a.id);
-              const netColor = AVAILABLE_SOCIAL_NETWORKS.find((n) => n.code === a.socialNetwork)?.color ?? '#6B6B6B';
+              const network = getSocialNetwork(a.socialNetworkId);
+              const netColor = network?.color ?? '#6B6B6B';
               return (
                 <Grid item xs={12} sm={6} md={4} key={a.id}>
                   <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, height: '100%' }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
-                      <Chip size="small" label={a.socialNetwork} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700 }} />
+                      <Chip size="small" label={network?.label ?? a.socialNetworkId} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700 }} />
                       {locked && (
                         <Tooltip title="En uso por una campaña activa">
                           <Chip size="small" label="En uso" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 600 }} />
@@ -236,7 +238,7 @@ export function ClientSection() {
       <CreateCampaignDialog
         open={createCampaignOpen}
         brandId={profile.id}
-        brandCategory={profile.category}
+        brandCategory={profile.categoryId}
         onClose={() => setCreateCampaignOpen(false)}
         onCreate={(campaign, team) => {
           assignTeamToCampaign(campaign.id, team);

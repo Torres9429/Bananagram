@@ -20,12 +20,22 @@ import { NetworkAvatar } from '../../components/NetworkAvatar';
 import { CampaignDot } from '../../components/CampaignDot';
 import { PostsTabs } from '../../components/PostsTabs';
 
+// Cubre los 10 valores de PostStatus (antes solo 5) — ver
+// docs/frontend-db-alignment.md §1.3. 'publicando' es transitorio pero se
+// incluye igual: si un post mock queda en ese estado, debe poder filtrarse
+// (y StatusChip ya soporta los 10, no hay riesgo de fallback roto).
 const FILTERS: { key: 'all' | PostStatus; label: string }[] = [
   { key: 'all', label: 'Todos' },
+  { key: 'borrador', label: 'Borrador' },
   { key: 'en_revision', label: 'En revisión' },
+  { key: 'aprobado', label: 'Aprobado' },
   { key: 'rechazado', label: 'Rechazado' },
   { key: 'programado', label: 'Programado' },
+  { key: 'publicando', label: 'Publicando' },
   { key: 'publicado', label: 'Publicado' },
+  { key: 'parcial', label: 'Parcial' },
+  { key: 'error', label: 'Error' },
+  { key: 'cancelado', label: 'Cancelado' },
 ];
 
 // useSearchParams requiere un límite de Suspense en el App Router (si no,
@@ -58,7 +68,18 @@ function PostsListContent() {
   // opción extra para que el select nunca quede en blanco.
   const campaignOptions =
     campaignFilter && !MOCK_CAMPAIGNS.some((c) => c.id === campaignFilter)
-      ? [...MOCK_CAMPAIGNS, { id: campaignFilter, name: campaignName ?? campaignFilter, color: '#6B6B6B', brand: '' }]
+      ? [
+          ...MOCK_CAMPAIGNS,
+          {
+            id: campaignFilter,
+            name: campaignName ?? campaignFilter,
+            brandId: '',
+            status: 'active' as const,
+            cmId: '',
+            createdBy: '',
+            socialAccountIds: [],
+          },
+        ]
       : MOCK_CAMPAIGNS;
 
   const posts = MOCK_POSTS
@@ -82,29 +103,38 @@ function PostsListContent() {
       header: '',
       width: 48,
       render: (post) => {
-        const { network, networkBg, networkColor } = getPostNetworkInfo(post);
-        return <NetworkAvatar network={network} networkBg={networkBg} networkColor={networkColor} />;
+        // Fila de lista: solo representa la primera red del post (el
+        // detalle completo por red vive únicamente en /posts/[id], ver
+        // decisión §3 en docs/frontend-db-alignment.md — no se agregan
+        // mini-franjas de estado por red aquí).
+        const { networkShort, networkBg, networkColor } = getPostNetworkInfo(post.socialAccounts[0]?.socialAccountId);
+        return <NetworkAvatar network={networkShort} networkBg={networkBg} networkColor={networkColor} />;
       },
     },
     {
       key: 'info',
       header: 'Publicación',
-      render: (post) => (
-        <>
-          <Typography variant="body2" fontWeight={600}>
-            {post.title}
-          </Typography>
-          <Stack direction="row" gap={1} mt={0.5} alignItems="center" flexWrap="wrap">
-            {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
-            <Typography variant="caption" color="text.secondary">
-              · {getPostNetworkInfo(post).brand}
+      render: (post) => {
+        const { brand } = getPostNetworkInfo(post.socialAccounts[0]?.socialAccountId);
+        const extraNetworks = post.socialAccounts.length - 1;
+        return (
+          <>
+            <Typography variant="body2" fontWeight={600}>
+              {post.title}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              · {post.designer}
-            </Typography>
-          </Stack>
-        </>
-      ),
+            <Stack direction="row" gap={1} mt={0.5} alignItems="center" flexWrap="wrap">
+              {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
+              <Typography variant="caption" color="text.secondary">
+                · {brand}
+                {extraNetworks > 0 ? ` +${extraNetworks}` : ''}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                · {post.designer}
+              </Typography>
+            </Stack>
+          </>
+        );
+      },
     },
     {
       key: 'status',

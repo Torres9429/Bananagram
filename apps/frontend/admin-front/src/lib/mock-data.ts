@@ -1,64 +1,36 @@
-import type { MockUser, MockRole, MockAuditEntry, MockCatalogItem, Module, Action, PrivilegeMap } from '../interfaces/interface';
+import { AppRole } from '@repo/ui/types';
+import type { SocialNetwork } from '@repo/ui/types';
+import type { MockUser, MockAuditEntry, MockCatalogItem, Module, Action, PrivilegeMap } from '../interfaces/interface';
 
 // El Admin solo crea cuentas operativas (CM y Diseñador).
 // El Cliente se auto-registra públicamente.
-export const CREATABLE_ROLES = ['CM', 'Diseñador'];
+export const CREATABLE_ROLES = [AppRole.COMMUNITY_MANAGER, AppRole.DISENADOR];
 
 export function generateMockId(prefix: string): string {
   return `${prefix}${Date.now()}`;
 }
 
 export const USER_STATUS_STYLE: Record<MockUser['status'], { bg: string; color: string; label: string }> = {
-  activo: { bg: '#E8F5E9', color: '#2E7D32', label: 'Activo' },
-  inactivo: { bg: '#F5F5F5', color: '#616161', label: 'Inactivo' },
+  pending: { bg: '#FFF3E0', color: '#E65100', label: 'Pendiente' },
+  active: { bg: '#E8F5E9', color: '#2E7D32', label: 'Activo' },
+  suspended: { bg: '#F5F5F5', color: '#616161', label: 'Suspendido' },
 };
 
 export const MOCK_USERS: MockUser[] = [
-  { id: 'u1', name: 'Ana García', email: 'ana.garcia@bananagram.com', role: 'CM', brand: 'Zara MX', status: 'activo', lastLogin: 'Hoy 09:12' },
-  { id: 'u2', name: 'Alexa Delgado', email: 'alexa.delgado@bananagram.com', role: 'Diseñador', brand: 'Nike MX', status: 'activo', lastLogin: 'Hoy 08:40' },
-  { id: 'u3', name: 'Elías Bailón', email: 'elias.bailon@bananagram.com', role: 'Diseñador', brand: 'Zara MX', status: 'activo', lastLogin: 'Ayer 17:05' },
-  { id: 'u4', name: 'Rocío Rodríguez', email: 'rocio.rodriguez@zaramx.com', role: 'Cliente', brand: 'Zara MX', status: 'activo', lastLogin: 'Ayer 16:20' },
-  { id: 'u5', name: 'Marco Sosa', email: 'marco.sosa@bananagram.com', role: 'Admin', brand: null, status: 'activo', lastLogin: 'Hace 3 días' },
-  { id: 'u6', name: 'Diego Ferman', email: 'diego.ferman@bananagram.com', role: 'CM', brand: 'Spotify MX', status: 'inactivo', lastLogin: 'Hace 2 semanas' },
-];
-
-export const MOCK_ROLES: MockRole[] = [
-  {
-    id: 'r1',
-    name: 'Admin',
-    description: 'Acceso total a configuración, usuarios y catálogos.',
-    userCount: 1,
-    permissions: { publicaciones: ['crear', 'ver', 'editar', 'aprobar', 'publicar'], campanas: ['crear', 'ver', 'editar'], metricas: ['ver'], score: ['ver'], usuarios: ['crear', 'ver', 'editar'] },
-  },
-  {
-    id: 'r2',
-    name: 'CM',
-    description: 'Gestiona publicaciones y campañas de las marcas asignadas.',
-    userCount: 2,
-    permissions: { publicaciones: ['crear', 'ver', 'programar', 'publicar'], campanas: ['ver'], metricas: ['ver'], score: ['ver'] },
-  },
-  {
-    id: 'r3',
-    name: 'Diseñador',
-    description: 'Crea borradores de publicaciones para revisión del CM.',
-    userCount: 2,
-    permissions: { publicaciones: ['crear', 'ver'] },
-  },
-  {
-    id: 'r4',
-    name: 'Cliente',
-    description: 'Aprueba o rechaza publicaciones de su marca.',
-    userCount: 1,
-    permissions: { publicaciones: ['ver', 'aprobar'], metricas: ['ver'], score: ['ver'] },
-  },
+  { id: 'u1', name: 'Ana García', email: 'ana.garcia@bananagram.com', role: AppRole.COMMUNITY_MANAGER, status: 'active', lastLogin: 'Hoy 09:12' },
+  { id: 'u2', name: 'Alexa Delgado', email: 'alexa.delgado@bananagram.com', role: AppRole.DISENADOR, status: 'active', lastLogin: 'Hoy 08:40' },
+  { id: 'u3', name: 'Elías Bailón', email: 'elias.bailon@bananagram.com', role: AppRole.DISENADOR, status: 'active', lastLogin: 'Ayer 17:05' },
+  { id: 'u4', name: 'Rocío Rodríguez', email: 'rocio.rodriguez@zaramx.com', role: AppRole.CLIENTE, status: 'active', lastLogin: 'Ayer 16:20' },
+  { id: 'u5', name: 'Marco Sosa', email: 'marco.sosa@bananagram.com', role: AppRole.ADMINISTRADOR, status: 'active', lastLogin: 'Hace 3 días' },
+  { id: 'u6', name: 'Diego Ferman', email: 'diego.ferman@bananagram.com', role: AppRole.COMMUNITY_MANAGER, status: 'pending', lastLogin: 'Nunca' },
 ];
 
 export const MOCK_AUDIT_LOG: MockAuditEntry[] = [
-  { id: 'a1', actor: 'Rocío Rodríguez', action: 'Rechazó publicación', entity: 'Post p2 — Reel Nike 30 seg', date: '25 jun, 16:45' },
-  { id: 'a2', actor: 'Ana García', action: 'Envió a revisión', entity: 'Post p2 — Reel Nike 30 seg', date: '25 jun, 14:30' },
-  { id: 'a3', actor: 'Alexa Delgado', action: 'Creó borrador', entity: 'Post p2 — Reel Nike 30 seg', date: '25 jun, 10:00' },
-  { id: 'a4', actor: 'Marco Sosa', action: 'Editó permisos del rol', entity: 'Rol CM', date: '24 jun, 11:15' },
-  { id: 'a5', actor: 'Marco Sosa', action: 'Creó usuario', entity: 'Diego Ferman', date: '20 jun, 09:30' },
+  { id: 'a1', actor: 'Rocío Rodríguez', action: 'Rechazó publicación', entity: 'Post p2 — Reel Nike 30 seg', createdAt: '2026-06-25T16:45:00.000Z' },
+  { id: 'a2', actor: 'Ana García', action: 'Envió a revisión', entity: 'Post p2 — Reel Nike 30 seg', createdAt: '2026-06-25T14:30:00.000Z' },
+  { id: 'a3', actor: 'Alexa Delgado', action: 'Creó borrador', entity: 'Post p2 — Reel Nike 30 seg', createdAt: '2026-06-25T10:00:00.000Z' },
+  { id: 'a4', actor: 'Marco Sosa', action: 'Editó permisos del rol', entity: 'Rol CM', createdAt: '2026-06-24T11:15:00.000Z' },
+  { id: 'a5', actor: 'Marco Sosa', action: 'Creó usuario', entity: 'Diego Ferman', createdAt: '2026-06-20T09:30:00.000Z' },
 ];
 
 export const MOCK_CATEGORIES: MockCatalogItem[] = [
@@ -68,13 +40,15 @@ export const MOCK_CATEGORIES: MockCatalogItem[] = [
   { id: 'cat4', name: 'Entretenimiento', status: 'inactivo' },
 ];
 
-export const MOCK_SOCIAL_NETWORKS: MockCatalogItem[] = [
-  { id: 'sn1', name: 'Instagram', status: 'activo' },
-  { id: 'sn2', name: 'TikTok', status: 'activo' },
-  { id: 'sn3', name: 'Facebook', status: 'activo' },
-  { id: 'sn4', name: 'LinkedIn', status: 'activo' },
-  { id: 'sn5', name: 'X', status: 'activo' },
-  { id: 'sn6', name: 'YouTube', status: 'inactivo' },
+// Valores reales del seed del backend (baseEngagementRate alimenta el cron
+// job de métricas simuladas — ver modelo.txt) — ver SocialNetworkForm.tsx.
+export const MOCK_SOCIAL_NETWORKS: SocialNetwork[] = [
+  { id: 'sn1', name: 'Instagram', code: 'instagram', baseEngagementRate: 0.045 },
+  { id: 'sn2', name: 'TikTok', code: 'tiktok', baseEngagementRate: 0.09 },
+  { id: 'sn3', name: 'Facebook', code: 'facebook', baseEngagementRate: 0.02 },
+  { id: 'sn4', name: 'LinkedIn', code: 'linkedin', baseEngagementRate: 0.025 },
+  { id: 'sn5', name: 'X', code: 'x', baseEngagementRate: 0.015 },
+  { id: 'sn6', name: 'YouTube', code: 'youtube', baseEngagementRate: 0.03, deletedAt: '2026-05-01T00:00:00.000Z' },
 ];
 
 export const MOCK_SPECIALTIES: MockCatalogItem[] = [

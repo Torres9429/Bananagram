@@ -30,12 +30,12 @@ import type { TabValue } from '../../interfaces/interface';
 
 const TABS: { value: TabValue; label: string }[] = [
   { value: 'general', label: 'General' },
-  { value: 'IG', label: 'Instagram' },
-  { value: 'FB', label: 'Facebook' },
-  { value: 'TK', label: 'TikTok' },
-  { value: 'LI', label: 'LinkedIn' },
-  { value: 'X', label: 'X' },
-  { value: 'YT', label: 'YouTube' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'x', label: 'X' },
+  { value: 'youtube', label: 'YouTube' },
 ];
 
 export default function MetricsPage() {
