@@ -1,0 +1,448 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "asistente bananagram",
+      "intents": [
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
+        { "name": "AMAZON.YesIntent", "samples": [] },
+        { "name": "AMAZON.NoIntent", "samples": [] },
+        {
+          "name": "GetActiveCampaignsIntent",
+          "samples": [
+            "qué campañas tengo",
+            "lista mis campañas",
+            "muéstrame las campañas activas",
+            "cuales son mis campañas",
+            "que campañas hay disponibles"
+          ],
+          "slots": []
+        },
+        {
+          "name": "SelectCampaignIntent",
+          "samples": [
+            "{campaignName}",
+            "selecciona {campaignName}",
+            "quiero revisar {campaignName}",
+            "abrir campaña {campaignName}",
+            "cambia a {campaignName}",
+            "vamos con {campaignName}"
+          ],
+          "slots": [
+            { "name": "campaignName", "type": "LISTA_CAMPANAS" }
+          ]
+        },
+        {
+          "name": "GetCampaignMetricsIntent",
+          "samples": [
+            "como va esta campaña",
+            "dame las métricas",
+            "qué resultados tiene",
+            "cuales son los números de esta campaña",
+            "cómo está funcionando la campaña",
+            "cual es el engagement"
+          ],
+          "slots": []
+        },
+        {
+          "name": "GetTopContentIntent",
+          "samples": [
+            "cuál fue la mejor publicación",
+            "muéstrame el contenido con más interacción",
+            "que publicación funcionó mejor",
+            "cuál fue el mejor post en {networkName}",
+            "que público mejor esta {dateRange}",
+            "el mejor post de {networkName} {dateRange}"
+          ],
+          "slots": [
+            { "name": "networkName", "type": "LISTA_REDES" },
+            { "name": "dateRange", "type": "LISTA_PERIODOS" }
+          ]
+        },
+        {
+          "name": "GenerateContentIdeasIntent",
+          "samples": [
+            "dame ideas de contenido",
+            "que puedo publicar",
+            "genera contenido para esta campaña",
+            "sugiere {quantity} ideas",
+            "que puedo publicar en {networkName}",
+            "dame {quantity} ideas para {networkName}"
+          ],
+          "slots": [
+            { "name": "networkName", "type": "LISTA_REDES" },
+            { "name": "quantity", "type": "AMAZON.NUMBER" }
+          ]
+        },
+        {
+          "name": "SaveIdeaIntent",
+          "samples": [
+            "guarda la idea {ideaNumber}",
+            "guarda la numero {ideaNumber}",
+            "guárdala con el título {ideaTitle}"
+          ],
+          "slots": [
+            { "name": "ideaNumber", "type": "AMAZON.NUMBER" },
+            { "name": "ideaTitle", "type": "AMAZON.SearchQuery" }
+          ]
+        },
+        {
+          "name": "SaveCustomIdeaIntent",
+          "samples": [
+            "tengo una idea",
+            "guarda esta idea",
+            "anota una idea",
+            "quiero registrar una nota",
+            "guarda {ideaText}"
+          ],
+          "slots": [
+            { "name": "ideaText", "type": "AMAZON.SearchQuery" }
+          ]
+        },
+        {
+          "name": "GetSavedIdeasIntent",
+          "samples": [
+            "que ideas tengo guardadas",
+            "leeme mis ideas",
+            "muéstrame mis notas",
+            "cuales son mis ideas",
+            "cuantas ideas llevo guardadas"
+          ],
+          "slots": []
+        },
+        {
+          "name": "DeleteIdeaIntent",
+          "samples": [
+            "borra la idea {ideaTitle}",
+            "elimina la idea {ideaTitle}",
+            "quiero borrar una idea",
+            "borra la idea con título {ideaTitle}",
+            "elimina mi idea de {ideaTitle}"
+          ],
+          "slots": [
+            { "name": "ideaTitle", "type": "AMAZON.SearchQuery" }
+          ]
+        },
+        {
+          "name": "GetIdeaRecommendationsIntent",
+          "samples": [
+            "dame recomendaciones",
+            "qué recomiendas para esta campaña",
+            "recomiéndame contenido",
+            "cómo puedo mejorar esta campaña",
+            "qué sugieres para mejorar el engagement",
+            "dame ideas de mejora",
+            "qué me recomiendas",
+            "recomiéndame algo",
+            "dame consejos para esta campaña",
+            "qué debería mejorar",
+            "tienes alguna recomendación"
+          ],
+          "slots": []
+        },
+        {
+          "name": "GetCampaignSummaryIntent",
+          "samples": [
+            "dame un resumen",
+            "resume la campaña",
+            "cuéntame un resumen de la campaña",
+            "dame el resumen general",
+            "cómo va todo en esta campaña"
+          ],
+          "slots": []
+        },
+        {
+          "name": "ChangeCampaignIntent",
+          "samples": [
+            "cambiar de campaña",
+            "quiero cambiar de campaña",
+            "quiero trabajar con otra campaña",
+            "cambia de campaña a {campaignName}",
+            "otra campaña por favor"
+          ],
+          "slots": [
+            { "name": "campaignName", "type": "LISTA_CAMPANAS" }
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "LISTA_CAMPANAS",
+          "values": [
+            {
+              "id": "verano-2026",
+              "name": {
+                "value": "Verano 2026",
+                "synonyms": [
+                  "verano",
+                  "verano dos mil veintiséis",
+                  "verano veintiséis",
+                  "campaña de verano",
+                  "la de verano",
+                  "la campaña de verano",
+                  "temporada de verano",
+                  "vacaciones de verano"
+                ]
+              }
+            },
+            {
+              "id": "black-friday",
+              "name": {
+                "value": "Black Friday",
+                "synonyms": [
+                  "black friday",
+                  "blackfriday",
+                  "viernes negro",
+                  "el viernes negro",
+                  "la de black friday",
+                  "la campaña de black friday",
+                  "ofertas de black friday",
+                  "ofertas de noviembre"
+                ]
+              }
+            },
+            {
+              "id": "regreso-a-clases",
+              "name": {
+                "value": "Regreso a Clases",
+                "synonyms": [
+                  "regreso a clases",
+                  "vuelta a clases",
+                  "de vuelta a clases",
+                  "la de regreso a clases",
+                  "la campaña de regreso a clases",
+                  "inicio de clases",
+                  "back to school",
+                  "temporada escolar"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "LISTA_REDES",
+          "values": [
+            {
+              "id": "instagram",
+              "name": {
+                "value": "Instagram",
+                "synonyms": ["insta", "instagram", "ig", "la red instagram"]
+              }
+            },
+            {
+              "id": "tiktok",
+              "name": {
+                "value": "TikTok",
+                "synonyms": ["tik tok", "tiktok", "tik-tok", "la app de tiktok"]
+              }
+            },
+            {
+              "id": "facebook",
+              "name": {
+                "value": "Facebook",
+                "synonyms": ["face", "facebook", "fb", "la red facebook"]
+              }
+            },
+            {
+              "id": "linkedin",
+              "name": {
+                "value": "LinkedIn",
+                "synonyms": ["linked in", "linkedin", "link in", "la red linkedin"]
+              }
+            },
+            {
+              "id": "youtube",
+              "name": {
+                "value": "YouTube",
+                "synonyms": ["you tube", "youtube", "la red youtube", "you tub"]
+              }
+            },
+            {
+              "id": "x",
+              "name": {
+                "value": "X",
+                "synonyms": ["twitter", "equis", "la red equis", "la equis", "twitter equis"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "LISTA_PERIODOS",
+          "values": [
+            {
+              "name": {
+                "value": "semana",
+                "synonyms": [
+                  "esta semana",
+                  "la semana",
+                  "una semana",
+                  "por semana",
+                  "semanal",
+                  "los últimos siete días",
+                  "siete días"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "mes",
+                "synonyms": [
+                  "este mes",
+                  "un mes",
+                  "por mes",
+                  "mensual",
+                  "el último mes",
+                  "treinta días"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "campaña",
+                "synonyms": [
+                  "toda la campaña",
+                  "en toda la campaña",
+                  "campaña completa",
+                  "toda la campana",
+                  "desde el inicio",
+                  "todo el periodo",
+                  "en general"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "dialog": {
+      "intents": [
+        {
+          "name": "SelectCampaignIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "campaignName",
+              "type": "LISTA_CAMPANAS",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.campaignName" }
+            }
+          ]
+        },
+        {
+          "name": "SaveIdeaIntent",
+          "confirmationRequired": true,
+          "prompts": { "confirmation": "Confirm.Intent.SaveIdeaIntent" },
+          "slots": [
+            {
+              "name": "ideaNumber",
+              "type": "AMAZON.NUMBER",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.ideaNumber" }
+            },
+            {
+              "name": "ideaTitle",
+              "type": "AMAZON.SearchQuery",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.ideaTitle" }
+            }
+          ]
+        },
+        {
+          "name": "SaveCustomIdeaIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "ideaText",
+              "type": "AMAZON.SearchQuery",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.ideaText" }
+            }
+          ]
+        },
+        {
+          "name": "DeleteIdeaIntent",
+          "confirmationRequired": true,
+          "prompts": { "confirmation": "Confirm.Intent.DeleteIdeaIntent" },
+          "slots": [
+            {
+              "name": "ideaTitle",
+              "type": "AMAZON.SearchQuery",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.DeleteIdeaIntent.ideaTitle" }
+            }
+          ]
+        },
+        {
+          "name": "ChangeCampaignIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "campaignName",
+              "type": "LISTA_CAMPANAS",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": { "elicitation": "Elicit.Slot.campaignName" }
+            }
+          ]
+        }
+      ],
+      "delegationStrategy": "SKILL_RESPONSE"
+    },
+    "prompts": [
+      {
+        "id": "Elicit.Slot.campaignName",
+        "variations": [
+          { "type": "PlainText", "value": "Dime el nombre de la campaña que quieres revisar." },
+          { "type": "PlainText", "value": "Puedes decir el nombre de alguna campaña, por ejemplo Verano dos mil veintiséis." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.ideaNumber",
+        "variations": [
+          { "type": "PlainText", "value": "Dime qué número de idea quieres guardar, la uno, la dos o la tres." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.ideaTitle",
+        "variations": [
+          { "type": "PlainText", "value": "Dime con qué título quieres guardarla." }
+        ]
+      },
+      {
+        "id": "Confirm.Intent.SaveIdeaIntent",
+        "variations": [
+          { "type": "PlainText", "value": "Confirma que quieres guardar esta idea con el título {ideaTitle}, diciendo sí o no." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.ideaText",
+        "variations": [
+          { "type": "PlainText", "value": "Claro, dime la idea." }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.DeleteIdeaIntent.ideaTitle",
+        "variations": [
+          { "type": "PlainText", "value": "Dime el título de la idea que quieres borrar." }
+        ]
+      },
+      {
+        "id": "Confirm.Intent.DeleteIdeaIntent",
+        "variations": [
+          { "type": "PlainText", "value": "Confirma que quieres borrar la idea con título {ideaTitle}, diciendo sí o no." }
+        ]
+      }
+    ]
+  }
+}
