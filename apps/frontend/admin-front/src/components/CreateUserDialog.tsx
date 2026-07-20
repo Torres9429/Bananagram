@@ -18,27 +18,29 @@ import DialogActions from '@mui/material/DialogActions';
 import CloseIcon from '@mui/icons-material/Close';
 import { FormDialog, LabeledField, LabeledSelect, PrimaryButton } from '@repo/ui';
 import { ZONE_URLS } from '@repo/ui/config';
+import type { AppRole } from '@repo/ui/types';
 import type { MockUser, CreatedUser, CreateUserDialogProps } from '../interfaces/interface';
-import { CREATABLE_ROLES, generateMockId } from '../lib/mock-data';
+import { CREATABLE_ROLES, ROLE_LABELS, generateMockId } from '../lib/mock-data';
 
 export function CreateUserDialog({ open, onClose, onCreate }: CreateUserDialogProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('CM');
-  const [brand, setBrand] = useState('');
+  const [role, setRole] = useState<AppRole>(CREATABLE_ROLES[0]);
   const [confirmed, setConfirmed] = useState<CreatedUser | null>(null);
   const [copied, setCopied] = useState(false);
 
   function handleCreate() {
     if (!name.trim() || !email.trim()) return;
 
+    // status 'pending': el usuario no tiene contraseña hasta que activa la
+    // cuenta con el link de abajo — coincide exactamente con la semántica de
+    // UserStatus.pending (ver docs/frontend-db-alignment.md, decisión #4).
     const newUser: MockUser = {
       id: generateMockId('u'),
       name: name.trim(),
       email: email.trim(),
       role,
-      brand: brand.trim() || null,
-      status: 'activo',
+      status: 'pending',
       lastLogin: 'Nunca',
     };
     onCreate(newUser);
@@ -50,8 +52,7 @@ export function CreateUserDialog({ open, onClose, onCreate }: CreateUserDialogPr
     // Limpia el form para próximo uso.
     setName('');
     setEmail('');
-    setRole('CM');
-    setBrand('');
+    setRole(CREATABLE_ROLES[0]);
   }
 
   function handleClose() {
@@ -158,17 +159,11 @@ export function CreateUserDialog({ open, onClose, onCreate }: CreateUserDialogPr
         onChange={(e) => setEmail(e.target.value)}
         required
       />
-      <LabeledSelect label="Rol" value={role} onChange={(e) => setRole(e.target.value as string)}>
+      <LabeledSelect label="Rol" value={role} onChange={(e) => setRole(e.target.value as AppRole)}>
         {CREATABLE_ROLES.map((r) => (
-          <MenuItem key={r} value={r}>{r}</MenuItem>
+          <MenuItem key={r} value={r}>{ROLE_LABELS[r]}</MenuItem>
         ))}
       </LabeledSelect>
-      <LabeledField
-        label="Perfil asignado (opcional)"
-        placeholder="Ej. Zara MX"
-        value={brand}
-        onChange={(e) => setBrand(e.target.value)}
-      />
       <Typography variant="caption" color="text.secondary">
         El usuario recibirá un correo para activar su cuenta y establecer su contraseña.
         Los Clientes se registran de forma autónoma.

@@ -13,7 +13,7 @@ import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton } from 
 import { getInitials } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
 import { CreateUserDialog } from '../../components/CreateUserDialog';
-import { MOCK_USERS, USER_STATUS_STYLE } from '../../lib/mock-data';
+import { MOCK_USERS, USER_STATUS_STYLE, ROLE_LABELS } from '../../lib/mock-data';
 import type { MockUser } from '../../interfaces/interface';
 
 export default function UsersPage() {
@@ -36,8 +36,7 @@ export default function UsersPage() {
         </Stack>
       ),
     },
-    { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={u.role} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} /> },
-    { key: 'brand', header: 'Perfil', render: (u) => <Typography variant="body2">{u.brand ?? '—'}</Typography> },
+    { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={ROLE_LABELS[u.role] ?? u.role} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} /> },
     {
       key: 'status',
       header: 'Estado',
