@@ -20,7 +20,13 @@ export function decodeJwt(token: string): JwtPayload | null {
   }
 }
 
-const initialState: AuthState = { user: null, accessToken: null, permissions: {}, brandIds: [], isAuthenticated: false };
+const initialState: AuthState = {
+  user: null,
+  accessToken: null,
+  permissions: {},
+  ownedBrandIds: [],
+  isAuthenticated: false,
+};
 
 const authSlice = createSlice({
   name: 'auth',
@@ -30,9 +36,17 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       const payload = decodeJwt(action.payload.accessToken);
       if (payload) {
-        state.user = { id: payload.sub, email: payload.email, role: payload.role };
+        state.user = {
+          id: payload.sub,
+          email: payload.email,
+          name: payload.name,
+          role: payload.role,
+          status: payload.status,
+          avatarUrl: payload.avatarUrl ?? null,
+        };
         state.permissions = payload.permissions ?? {};
-        state.brandIds = payload.brandIds ?? [];
+        // Solo tiene sentido para Cliente — ver AuthState.ownedBrandIds.
+        state.ownedBrandIds = payload.ownedBrandIds ?? [];
         state.isAuthenticated = true;
       }
     },
@@ -44,5 +58,5 @@ export const { setCredentials, logout } = authSlice.actions;
 export const authReducer = authSlice.reducer;
 export const selectUser = (s: AuthRootState) => s.auth.user;
 export const selectPermissions = (s: AuthRootState) => s.auth.permissions;
-export const selectBrandIds = (s: AuthRootState) => s.auth.brandIds;
+export const selectOwnedBrandIds = (s: AuthRootState) => s.auth.ownedBrandIds;
 export const selectIsAuthenticated = (s: AuthRootState) => s.auth.isAuthenticated;

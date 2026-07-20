@@ -8,10 +8,13 @@ function encodeMockJwt(payload: object): string {
 
 export function buildTokenFromUser(user: MockUser): string {
   return encodeMockJwt({
-    sub: user.email,
+    sub: user.id,
     email: user.email,
+    name: user.name,
     role: user.role,
-    brandIds: user.brandIds,
+    status: user.status,
+    avatarUrl: user.avatarUrl ?? null,
+    ownedBrandIds: user.ownedBrandIds ?? [],
     permissions: user.permissions,
   });
 }
