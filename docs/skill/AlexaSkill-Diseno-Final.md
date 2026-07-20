@@ -29,21 +29,31 @@ A diferencia de las versiones anteriores (que dividían en "core" vs. "fuera de 
 
 ## 2. Origen real de cada dato — ya no hay `mockData.js`
 
+**Arquitectura de servicios (3, no 4)**: el backend son `auth-service`,
+`core-service` (fusiona lo que antes eran brands/content/analytics-service) y
+`alexa-service` (BFF de esta skill, sin base de datos propia — ver
+`docs/base/service-boundaries.md`). El Lambda **solo habla con dos hosts**:
+`alexa-service` para todo lo de campañas/métricas/ideas, y `auth-service`
+para el account-linking (§4). `alexa-service` resuelve internamente contra
+`core-service` (vía el circuit breaker `opossum` de
+`apps/backend/commons/circuit-breaker`) — el Lambda nunca llama a
+`core-service` directo.
+
 | Intent | De dónde viene el dato |
 |---|---|
-| `LaunchRequest` / `GetActiveCampaignsIntent` | `GET /campaigns/mine` (brands-service) — filtrado server-side por rol/ownership a partir del JWT (`Brand.ownerId`, `Campaign.cmId`, `CampaignDesigner.userId`) |
+| `LaunchRequest` / `GetActiveCampaignsIntent` | `GET /campaigns/mine` (alexa-service → core-service) — filtrado server-side por rol/ownership a partir del JWT (`Brand.ownerId`, `Campaign.cmId`, `CampaignDesigner.userId`) |
 | `SelectCampaignIntent` / `ChangeCampaignIntent` | Slot resuelto contra la lista sincronizada por **Dynamic Entities** (§4) en esa sesión, nunca contra un catálogo fijo |
-| `GetCampaignMetricsIntent` | `GET /campaigns/:campaignId/metrics-summary?period=` (analytics-service) |
-| `GetTopContentIntent` | `GET /campaigns/:campaignId/top-content?network=&period=` (analytics-service) |
+| `GetCampaignMetricsIntent` | `GET /campaigns/:campaignId/metrics-summary?period=` (alexa-service → core-service) |
+| `GetTopContentIntent` | `GET /campaigns/:campaignId/top-content?network=&period=` (alexa-service → core-service) |
 | `GenerateContentIdeasIntent` | Sin backend de Bananagram — Claude API directo desde el Lambda (§8), o `ideaTemplates.js` como banco de respaldo |
-| `SaveIdeaIntent` / `SaveCustomIdeaIntent` | `POST /campaigns/:campaignId/ideas` (content-service, `ContentIdea`) |
-| `GetSavedIdeasIntent` | `GET /campaigns/:campaignId/ideas` (content-service) |
-| `DeleteIdeaIntent` | `DELETE /ideas/:id` (content-service), resuelto por título contra el `GET` anterior |
-| `GetIdeaRecommendationsIntent` | `GET /campaigns/:campaignId/summary` (analytics-service) — reutiliza el mismo score que el resumen |
-| `GetCampaignSummaryIntent` | `GET /campaigns/:campaignId/summary` (analytics-service, compone métricas + top post + score en una sola llamada) + conteo de `GET /campaigns/:campaignId/ideas` |
+| `SaveIdeaIntent` / `SaveCustomIdeaIntent` | `POST /campaigns/:campaignId/ideas` (alexa-service → core-service, `ContentIdea`) |
+| `GetSavedIdeasIntent` | `GET /campaigns/:campaignId/ideas` (alexa-service → core-service) |
+| `DeleteIdeaIntent` | `DELETE /ideas/:id` (alexa-service → core-service), resuelto por título contra el `GET` anterior |
+| `GetIdeaRecommendationsIntent` | `GET /campaigns/:campaignId/summary` (alexa-service → core-service) — reutiliza el mismo score que el resumen |
+| `GetCampaignSummaryIntent` | `GET /campaigns/:campaignId/summary` (alexa-service → core-service, compone métricas + top post + score en una sola llamada) + conteo de `GET /campaigns/:campaignId/ideas` |
 | `AMAZON.HelpIntent` | Sin dependencia de backend |
 
-Todos los endpoints de Bananagram se llaman con `Authorization: Bearer <accessToken>`, donde `accessToken` es el que Alexa entrega tras el account-linking (§4) — nunca hace falta que el Lambda maneje login/password.
+Todos los endpoints se llaman con `Authorization: Bearer <accessToken>`, donde `accessToken` es el que Alexa entrega tras el account-linking (§4) — nunca hace falta que el Lambda maneje login/password.
 
 ## 3. Modelo de interacción
 
@@ -108,11 +118,12 @@ Si `accessToken` no está presente (cuenta no vinculada), el Lambda responde pid
 Las versiones anteriores (`AlexaSkill-Diseno-Avanzado.md`) persistían
 `savedIdeas` en DynamoDB, con el `userId` de Alexa como llave. **Esto se
 retira por completo**: las ideas guardadas ahora viven en `ContentIdea`
-(content-service, ver `docs/base/modelo2.txt`), asociadas al `User.id` real
+(core-service, ver `docs/base/modelo2.txt`), asociadas al `User.id` real
 de Bananagram (vía el JWT del account-linking), no al `userId` de Alexa.
 El Lambda ya no necesita `ask-sdk-dynamodb-persistence-adapter` ni
 `persistentAttributes` — cada operación de guardar/leer/borrar ideas es una
-llamada HTTP directa a content-service.
+llamada HTTP a alexa-service, que a su vez llama a core-service (alexa-service
+no persiste nada, es un puro consumidor de API).
 
 ### Dynamic Entities — lista de campañas real, no estática
 
@@ -197,7 +208,8 @@ Tabla completa (cambios respecto a `AlexaSkill-Diseno-Avanzado.md` marcados con 
 
 Se queda del lado del Lambda: llama a la API de Claude directo con
 `ANTHROPIC_API_KEY` como variable de entorno/secreto del propio Lambda (no
-se construye un `ai-service` — el proyecto se mantiene en 4 microservicios).
+se construye un `ai-service` — el proyecto se mantiene en 3 microservicios:
+auth-service, core-service, alexa-service).
 La regla de CLAUDE.md ("nunca exponer `ANTHROPIC_API_KEY` al frontend")
 protege el bundle del navegador; un Lambda de backend no es "el frontend".
 `ideaTemplates.js` se conserva como banco de respaldo si la llamada a
@@ -209,7 +221,7 @@ Claude falla o no está configurada.
    **Alexa**: "Bienvenido a Asistente Bananagram. Tienes 3 campañas activas: Verano 2026, Black Friday, Regreso a Clases. Di el nombre de la que quieras revisar para comenzar." *(lista real del usuario, vía Dynamic Entities)*
 2. **Usuario**: "Verano 2026"
    **Alexa**: "Listo. Entrando a Verano 2026. Esta campaña tiene 24 publicaciones. El score de Café Aurora, que cubre esta y otras campañas, es de 79.8 sobre 100. Puedes pedirme las métricas, ver la mejor publicación, generar ideas de contenido, o ver tus ideas guardadas. ¿Qué quieres hacer?"
-3. **Usuario**: "dame las métricas" → `GetCampaignMetricsIntent`, datos reales de analytics-service.
+3. **Usuario**: "dame las métricas" → `GetCampaignMetricsIntent`, datos reales de core-service (vía alexa-service).
 4. **Usuario**: "cuál fue la mejor publicación" → `GetTopContentIntent`, datos reales.
 5. **Usuario**: "dame un resumen" → `GetCampaignSummaryIntent`, composite real.
 6. **Usuario**: "dame recomendaciones" → `GetIdeaRecommendationsIntent`, score real.
@@ -225,8 +237,8 @@ Claude falla o no está configurada.
 ## 9. Checklist final
 
 - [ ] Account linking configurado en la consola de Alexa (OAuth2 contra `GET /oauth/authorize` / `POST /oauth/token` de auth-service).
-- [ ] `GET /campaigns/mine`, `GET/POST/DELETE .../ideas`, `GET .../metrics-summary`, `GET .../top-content`, `GET .../summary` implementados y desplegados en brands-service/content-service/analytics-service respectivamente.
-- [ ] `ContentIdea` migrado en `apps/backend/services/content-service` (a partir de `docs/base/modelo2.txt`, sección content-service).
+- [ ] `GET /campaigns/mine`, `GET/POST/DELETE .../ideas`, `GET .../metrics-summary`, `GET .../top-content`, `GET .../summary` implementados y desplegados en core-service, y consumidos por alexa-service (nunca directo desde el Lambda).
+- [ ] `ContentIdea` migrado en `apps/backend/services/core-service` (a partir de `docs/base/modelo2.txt`, sección core-service) — ya reflejado en el schema real `apps/backend/commons/prisma/schema.prisma`.
 - [ ] Dynamic Entities probado: campañas reales del usuario reemplazan el catálogo estático en `LaunchRequest`.
 - [ ] Los 12 intents + `LaunchRequest` responden con datos reales, ninguno cae en `FallbackIntentHandler` por error de nombre.
 - [ ] `AMAZON.YesIntent`/`AMAZON.NoIntent` declarados en ambos interaction models (ya corregido en `json-code/interaction-model-*.json`).

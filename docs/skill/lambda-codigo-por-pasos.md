@@ -4,16 +4,23 @@
 > `interaction-model-en-US.json` (mismo directorio). Este documento
 > **sustituye** a la versión anterior (100% mock, sin llamadas HTTP): esta
 > versión llama al backend real de Bananagram (account-linking + auth-service,
-> brands-service, content-service, analytics-service) y ya no usa
+> y campañas/métricas/ideas + alexa-service) y ya no usa
 > `mockData.js` ni DynamoDB. Es para copiar y pegar directo en el editor de
 > código de la consola (Code tab de tu Alexa-Hosted Skill), avanzando
 > checkpoint por checkpoint. Cada checkpoint es autocontenible: se puede
 > guardar (`Save`), hacer `Deploy` y probar en el simulador antes de seguir.
 >
+> **Arquitectura de servicios (3, no 4)**: el backend es `auth-service`,
+> `core-service` (fusiona lo que antes eran brands/content/analytics-service)
+> y `alexa-service` (BFF de esta skill, sin base de datos propia). El Lambda
+> **solo llama a dos hosts**: `alexa-service` (campañas, métricas, ideas) y
+> `auth-service` (account-linking) — nunca a `core-service` directo;
+> `alexa-service` resuelve internamente contra `core-service`.
+>
 > **Contrato con el backend**: los checkpoints 2 y 6-18 asumen que
-> brands-service, content-service y analytics-service ya exponen los
-> endpoints descritos en `docs/base/service-boundaries.md` y
-> `docs/base/modelo2.txt` (sección `ContentIdea`) — `GET /campaigns/mine`,
+> `alexa-service` ya expone los endpoints descritos en
+> `docs/base/service-boundaries.md` y `docs/base/modelo2.txt` (sección
+> `core-service`, modelo `ContentIdea`) — `GET /campaigns/mine`,
 > `GET /campaigns/:id/metrics-summary`, `GET /campaigns/:id/top-content`,
 > `GET /campaigns/:id/summary`, `POST/GET /campaigns/:id/ideas`,
 > `DELETE /ideas/:id` — y que `auth-service` expone
@@ -48,17 +55,18 @@ directo):
 
 ```
 AUTH_SERVICE_URL=http://localhost:3001
-BRANDS_SERVICE_URL=http://localhost:3002
-CONTENT_SERVICE_URL=http://localhost:3003
-ANALYTICS_SERVICE_URL=http://localhost:3005
+ALEXA_SERVICE_URL=http://localhost:3004
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-En producción, estas URLs apuntan a los hosts reales desplegados de cada
-microservicio — no hay gateway de por medio todavía (`api-gateway` sigue
-sin rutas activas, ver `docs/base/service-boundaries.md`), así que el
-Lambda llama a cada servicio directo, igual que ya hace hoy el frontend
-(`commons/src/api`) contra los puertos fijos de cada zona.
+En producción, estas URLs apuntan a los hosts reales desplegados — no hay
+gateway de por medio todavía (`api-gateway` sigue sin rutas activas, ver
+`docs/base/service-boundaries.md`), así que el Lambda llama a `auth-service`
+y `alexa-service` directo, igual que ya hace hoy el frontend
+(`commons/src/api`) contra los puertos fijos de cada zona. `alexa-service`
+no tiene base de datos propia — internamente reenvía estas llamadas a
+`core-service` (puerto 3002), pero eso es un detalle interno del backend que
+el Lambda no necesita conocer.
 
 Flujo de trabajo en cada checkpoint: pega el código → `Save` → `Deploy` →
 prueba en la pestaña **Test** → si funciona, sigue al siguiente checkpoint.
@@ -93,9 +101,7 @@ Todas las llamadas HTTP del Lambda pasan por aquí. Cada función recibe el
 
 ```js
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
-const BRANDS_SERVICE_URL = process.env.BRANDS_SERVICE_URL || 'http://localhost:3002';
-const CONTENT_SERVICE_URL = process.env.CONTENT_SERVICE_URL || 'http://localhost:3003';
-const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3005';
+const ALEXA_SERVICE_URL = process.env.ALEXA_SERVICE_URL || 'http://localhost:3004';
 
 async function callApi(baseUrl, path, token, options = {}) {
   const res = await fetch(`${baseUrl}${path}`, {
@@ -114,20 +120,20 @@ async function callApi(baseUrl, path, token, options = {}) {
   return res.json();
 }
 
-// GET /campaigns/mine (brands-service) — filtrado server-side por rol/ownership.
+// GET /campaigns/mine (alexa-service → core-service) — filtrado server-side por rol/ownership.
 // Respuesta esperada: [{ id, name, brandId, brandName, status }, ...]
 function getMyCampaigns(token) {
-  return callApi(BRANDS_SERVICE_URL, '/campaigns/mine', token);
+  return callApi(ALEXA_SERVICE_URL, '/campaigns/mine', token);
 }
 
-// GET /campaigns/:id/metrics-summary?period= (analytics-service)
+// GET /campaigns/:id/metrics-summary?period= (alexa-service → core-service)
 // Respuesta esperada: { totalPosts, reach, engagementAvg, followers, topNet }
 function getCampaignMetrics(token, campaignId, period) {
   const qs = period ? `?period=${encodeURIComponent(period)}` : '';
-  return callApi(ANALYTICS_SERVICE_URL, `/campaigns/${campaignId}/metrics-summary${qs}`, token);
+  return callApi(ALEXA_SERVICE_URL, `/campaigns/${campaignId}/metrics-summary${qs}`, token);
 }
 
-// GET /campaigns/:id/top-content?network=&period= (analytics-service)
+// GET /campaigns/:id/top-content?network=&period= (alexa-service → core-service)
 // Respuesta esperada: { matched, network, date, format, likes, comments, engagementRate, diff }
 // `matched: false` significa que el filtro pedido no tuvo resultados y el
 // backend cayó de vuelta a toda la campaña (equivalente a TOP_CONTENT_NO_MATCH).
@@ -136,36 +142,36 @@ function getCampaignTopContent(token, campaignId, { network, period } = {}) {
   if (network) params.set('network', network);
   if (period) params.set('period', period);
   const qs = params.toString() ? `?${params.toString()}` : '';
-  return callApi(ANALYTICS_SERVICE_URL, `/campaigns/${campaignId}/top-content${qs}`, token);
+  return callApi(ALEXA_SERVICE_URL, `/campaigns/${campaignId}/top-content${qs}`, token);
 }
 
-// GET /campaigns/:id/summary (analytics-service) — compone score (resuelto
-// campaña→marca), métricas, top post e ideas guardadas en una sola llamada.
+// GET /campaigns/:id/summary (alexa-service → core-service) — compone score
+// (resuelto campaña→marca), métricas, top post e ideas guardadas en una sola llamada.
 // Respuesta esperada:
 // { brandName, reach, engagementAvg, topPost: {network, date, engagementRate},
 //   savedIdeasCount, score: { score, consistency, engagement, coverage, frequency, classification } }
 function getCampaignSummary(token, campaignId) {
-  return callApi(ANALYTICS_SERVICE_URL, `/campaigns/${campaignId}/summary`, token);
+  return callApi(ALEXA_SERVICE_URL, `/campaigns/${campaignId}/summary`, token);
 }
 
-// POST /campaigns/:id/ideas (content-service, ContentIdea)
+// POST /campaigns/:id/ideas (alexa-service → core-service, ContentIdea)
 // body: { title: string|null, text: string, source: 'sugerida'|'propia' }
 function createIdea(token, campaignId, body) {
-  return callApi(CONTENT_SERVICE_URL, `/campaigns/${campaignId}/ideas`, token, {
+  return callApi(ALEXA_SERVICE_URL, `/campaigns/${campaignId}/ideas`, token, {
     method: 'POST',
     body: JSON.stringify(body),
   });
 }
 
-// GET /campaigns/:id/ideas (content-service)
+// GET /campaigns/:id/ideas (alexa-service → core-service)
 // Respuesta esperada: [{ id, title, text, source, createdAt }, ...]
 function listIdeas(token, campaignId) {
-  return callApi(CONTENT_SERVICE_URL, `/campaigns/${campaignId}/ideas`, token);
+  return callApi(ALEXA_SERVICE_URL, `/campaigns/${campaignId}/ideas`, token);
 }
 
-// DELETE /ideas/:id (content-service)
+// DELETE /ideas/:id (alexa-service → core-service)
 function deleteIdea(token, ideaId) {
-  return callApi(CONTENT_SERVICE_URL, `/ideas/${ideaId}`, token, { method: 'DELETE' });
+  return callApi(ALEXA_SERVICE_URL, `/ideas/${ideaId}`, token, { method: 'DELETE' });
 }
 
 module.exports = {
@@ -799,7 +805,7 @@ seleccionar campaña antes, debe responder `ERROR_NO_CAMPAIGN`.
 
 ## 10. `GetTopContentIntentHandler`
 
-El filtrado por red/fecha ahora lo hace analytics-service (query params
+El filtrado por red/fecha ahora lo hace core-service, vía alexa-service (query params
 `network`/`period`), no el Lambda. `network` se manda con el `id`
 normalizado del slot (`instagram`, `tiktok`, …), no con el nombre de
 display — es responsabilidad del backend traducirlo a lo que su propio
@@ -1236,8 +1242,9 @@ DynamoDB).
 
 ## 15. `GetIdeaRecommendationsIntentHandler`
 
-Ya no lee `campaign.score` de un mock — pide el resumen a
-analytics-service, que ya resuelve campaña→marca (§5 del diseño final).
+Ya no lee `campaign.score` de un mock — pide el resumen a alexa-service
+(que a su vez lo obtiene de core-service, ya resuelto campaña→marca — §5
+del diseño final).
 
 ```js
 const GetIdeaRecommendationsIntentHandler = {
@@ -1707,7 +1714,7 @@ listar campañas.
       URI, Client ID/Secret contra `GET /oauth/authorize`/`POST /oauth/token`
       de auth-service) y probado con una cuenta real vinculada.
 - [ ] Los 12 intents + `LaunchRequest` responden con datos reales de
-      brands-service/content-service/analytics-service, ninguno cae en
+      alexa-service (que a su vez los obtiene de core-service), ninguno cae en
       `FallbackIntentHandler` por error de nombre.
 - [ ] `AMAZON.YesIntent`/`AMAZON.NoIntent` están declarados en ambos
       interaction models (ya corregido en `interaction-model-*.json`).
