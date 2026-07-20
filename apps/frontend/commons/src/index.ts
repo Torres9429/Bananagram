@@ -14,3 +14,4 @@ export * from './utils';
 export * from './mocks/mock-tokens';
 export * from './mocks/mock-users';
 export * from './mocks/build-user-token';
+export * from './mocks/mock-world';
