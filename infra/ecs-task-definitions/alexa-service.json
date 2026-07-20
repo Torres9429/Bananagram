@@ -1,21 +1,20 @@
 {
-  "family": "posts-service",
+  "family": "alexa-service",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
   "containerDefinitions": [{
-    "name": "posts-service",
-    "image": "<ECR_REGISTRY>/posts-service:latest",
+    "name": "alexa-service",
+    "image": "<ECR_REGISTRY>/alexa-service:latest",
     "essential": true,
     "secrets": [
-      { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:us-east-1:<ACCOUNT>:secret:DATABASE_URL" },
       { "name": "JWT_SECRET",   "valueFrom": "arn:aws:secretsmanager:us-east-1:<ACCOUNT>:secret:JWT_SECRET" }
     ],
     "logConfiguration": {
       "logDriver": "awslogs",
       "options": {
-        "awslogs-group": "/ecs/posts-service",
+        "awslogs-group": "/ecs/alexa-service",
         "awslogs-region": "us-east-1",
         "awslogs-stream-prefix": "ecs"
       }

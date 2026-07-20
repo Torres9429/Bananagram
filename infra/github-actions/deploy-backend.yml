@@ -8,8 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [auth-service, brands-service, posts-service, campaigns-service,
-                  metrics-service, reports-service, notifications-service, ai-service, api-gateway]
+        service: [auth-service, core-service, alexa-service, api-gateway]
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4

@@ -1,12 +1,12 @@
 {
-  "family": "notifications-service",
+  "family": "core-service",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
   "containerDefinitions": [{
-    "name": "notifications-service",
-    "image": "<ECR_REGISTRY>/notifications-service:latest",
+    "name": "core-service",
+    "image": "<ECR_REGISTRY>/core-service:latest",
     "essential": true,
     "secrets": [
       { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:us-east-1:<ACCOUNT>:secret:DATABASE_URL" },
@@ -15,7 +15,7 @@
     "logConfiguration": {
       "logDriver": "awslogs",
       "options": {
-        "awslogs-group": "/ecs/notifications-service",
+        "awslogs-group": "/ecs/core-service",
         "awslogs-region": "us-east-1",
         "awslogs-stream-prefix": "ecs"
       }
