@@ -219,24 +219,19 @@ function PostsListContent() {
               <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
             ))}
           </Select>
-          {FILTERS.map((f) => {
-            const active = filter === f.key;
-            return (
-              <Chip
-                key={f.key}
-                label={f.label}
-                variant="outlined"
-                onClick={() => setFilter(f.key)}
-                sx={{
-                  cursor: 'pointer',
-                  bgcolor: active ? '#E0A800' : 'transparent',
-                  color: active ? 'primary.contrastTextMuted' : '#1A1A1A',
-                  borderColor: active ? '#D4AC40' : '#E8E8E8',
-                  fontWeight: active ? 600 : 400,
-                }}
-              />
-            );
-          })}
+          {/* Select de Estado — antes una fila de 11 chips (Todos + los 10
+              PostStatus), reemplazado por un dropdown por consistencia visual
+              con el select de Campaña de al lado. */}
+          <Select
+            size="small"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as 'all' | PostStatus)}
+            sx={{ minWidth: 180, bgcolor: '#fff', borderRadius: 1 }}
+          >
+            {FILTERS.map((f) => (
+              <MenuItem key={f.key} value={f.key}>{f.label}</MenuItem>
+            ))}
+          </Select>
         </Stack>
         <ProtectedAction module="post" action="create">
           <PrimaryButton onClick={() => router.push('/posts/new')}>
