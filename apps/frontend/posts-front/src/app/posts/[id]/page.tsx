@@ -13,13 +13,28 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
+import Avatar from '@mui/material/Avatar';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { findUserByEmail } from '@repo/ui';
-import { MOCK_POSTS, MOCK_STATUS_HISTORY, NETWORK_LABELS, addStatusHistoryEntry, getPostNetworkInfo } from '../../../lib/mock-data';
-import type { StatusHistoryItem } from '../../../interfaces/interface';
+import { MOCK_POSTS, MOCK_STATUS_HISTORY, addStatusHistoryEntry, getPostNetworkInfo, getMedia } from '../../../lib/mock-data';
+import type { PostSocialAccountStatus, StatusHistoryItem } from '../../../interfaces/interface';
 import { RejectPostDialog } from '../../../components/RejectPostDialog';
+
+// Estado POR RED (PostSocialAccountStatus) — distinto de PostStatus (el
+// estado agregado del post, cubierto por StatusChip de @repo/ui). Este mapa
+// es local a esta vista porque solo /posts/[id] expone el detalle por red
+// (ver docs/frontend-db-alignment.md decisión §3): la lista y el kanban solo
+// muestran el PostStatus agregado.
+const PSA_STATUS_STYLES: Record<PostSocialAccountStatus, { bg: string; color: string; label: string }> = {
+  pendiente: { bg: '#F5F5F5', color: '#616161', label: 'Pendiente' },
+  publicando: { bg: '#E1F5FE', color: '#0277BD', label: 'Publicando' },
+  publicado: { bg: '#E8F5E9', color: '#2E7D32', label: 'Publicado' },
+  error: { bg: '#FDE2E2', color: '#B71C1C', label: 'Error' },
+  cancelado: { bg: '#EEEEEE', color: '#757575', label: 'Cancelado' },
+};
 
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>();
@@ -30,7 +45,21 @@ export default function PostDetailPage() {
   const [history, setHistory] = useState<StatusHistoryItem[]>(() => MOCK_STATUS_HISTORY[post.id] ?? []);
   const [rejectOpen, setRejectOpen] = useState(false);
   const user = useSelector(selectUser);
-  const { network, networkBg, networkColor } = getPostNetworkInfo(post);
+
+  // Vista previa (columna derecha) y resumen: representan la primera red del
+  // post — el detalle completo de TODAS las redes vive en la sección de
+  // abajo ("Estado por red"), que es la que permite ver el caso `parcial`.
+  const primaryAccountId = post.socialAccounts[0]?.socialAccountId;
+  const { networkLabel, networkShort, networkBg, networkColor, brand } = getPostNetworkInfo(primaryAccountId);
+  const primaryAccount = post.socialAccounts[0];
+
+  // Media adjunta (PostMedia) — ordenada por MockPost.media[].order, resuelta
+  // contra MOCK_MEDIA_LIBRARY. Puede no haber ninguna (la mayoría de los
+  // MOCK_POSTS no tienen media todavía).
+  const postMedia = [...(post.media ?? [])]
+    .sort((a, b) => a.order - b.order)
+    .map((pm) => getMedia(pm.mediaId))
+    .filter((m): m is NonNullable<typeof m> => !!m);
 
   function handleApprove() {
     setPost((prev) => ({ ...prev, status: 'aprobado' }));
@@ -78,10 +107,14 @@ export default function PostDetailPage() {
             <Stack gap={1}>
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">
-                  Red social
+                  Redes
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network}
+                  {post.socialAccounts.length === 0
+                    ? 'Sin redes asignadas'
+                    : post.socialAccounts.length === 1
+                      ? networkLabel
+                      : `${post.socialAccounts.length} redes (ver detalle abajo)`}
                 </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
@@ -129,6 +162,37 @@ export default function PostDetailPage() {
               </Typography>
             </Box>
 
+            {/* Media adjunta (Media/PostMedia) — thumbnails simples, sin más
+                interacción que un link a la URL del archivo. */}
+            {postMedia.length > 0 && (
+              <Stack direction="row" gap={1} flexWrap="wrap" mt={1.5}>
+                {postMedia.map((m) => (
+                  <Box
+                    key={m.id}
+                    component="a"
+                    href={m.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    sx={{ position: 'relative', width: 72, height: 72, display: 'block' }}
+                  >
+                    <Box
+                      component="img"
+                      src={m.url}
+                      alt={m.originalName}
+                      sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1.5, border: '1px solid #E8E8E8' }}
+                    />
+                    {m.mimeType.startsWith('video') && (
+                      <Chip
+                        label="Video"
+                        size="small"
+                        sx={{ position: 'absolute', bottom: 2, left: 2, height: 16, fontSize: 8, bgcolor: 'rgba(0,0,0,0.65)', color: '#fff' }}
+                      />
+                    )}
+                  </Box>
+                ))}
+              </Stack>
+            )}
+
             <Stack direction="row" gap={1.5} mt={3} flexWrap="wrap">
               <ProtectedAction module="post" action="create">
                 <Button
@@ -167,6 +231,73 @@ export default function PostDetailPage() {
                 Ver campaña →
               </Button>
             </Stack>
+          </Paper>
+
+          {/* Estado por red — PostSocialAccount, una fila por red (ver
+              docs/frontend-db-alignment.md §1.1). Es lo único que hace visible
+              el caso `parcial` (una red publicada, otra con error). */}
+          <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, mb: 3 }}>
+            <Typography variant="subtitle2" color="text.secondary" mb={2}>
+              Estado por red
+            </Typography>
+            {post.socialAccounts.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Este post no tiene redes asignadas.
+              </Typography>
+            ) : (
+              <Stack gap={1.5}>
+                {post.socialAccounts.map((sa) => {
+                  const info = getPostNetworkInfo(sa.socialAccountId);
+                  const style = PSA_STATUS_STYLES[sa.status];
+                  return (
+                    <Box key={sa.id} sx={{ border: '1px solid #E8E8E8', borderRadius: 2, p: 1.5 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+                        <Stack direction="row" gap={1.5} alignItems="center">
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: info.networkBg, color: info.networkColor, fontSize: 11, fontWeight: 600 }}>
+                            {info.networkShort}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>
+                              {info.networkLabel}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {info.brand}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                        <Chip
+                          size="small"
+                          label={style.label}
+                          sx={{ bgcolor: style.bg, color: style.color, fontWeight: 600, fontSize: 10 }}
+                        />
+                      </Stack>
+                      {sa.postUrl && (
+                        <Stack direction="row" gap={0.5} alignItems="center" mt={1}>
+                          <OpenInNewIcon sx={{ fontSize: 14, color: '#1565C0' }} />
+                          <Typography
+                            component="a"
+                            href={sa.postUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            variant="caption"
+                            sx={{ color: '#1565C0', textDecoration: 'underline' }}
+                          >
+                            {sa.postUrl}
+                          </Typography>
+                        </Stack>
+                      )}
+                      {sa.errorMessage && (
+                        <Box mt={1} sx={{ bgcolor: '#FDE2E2', border: '1px solid #F5C2C2', borderRadius: 1.5, p: 1 }}>
+                          <Typography variant="caption" sx={{ color: '#B71C1C' }}>
+                            {sa.errorMessage}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
           </Paper>
 
           <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3 }}>
@@ -226,7 +357,7 @@ export default function PostDetailPage() {
               }}
             >
               <Typography variant="caption" sx={{ color: '#666' }}>
-                Video TikTok 9:16
+                {networkLabel !== '—' ? `Vista previa · ${networkLabel}` : 'Sin red asignada'}
               </Typography>
             </Box>
             <Divider sx={{ my: 2 }} />
@@ -235,15 +366,15 @@ export default function PostDetailPage() {
             </Typography>
             <Stack direction="row" gap={0.5} mt={1} alignItems="center">
               <Typography variant="caption" color="text.secondary">
-                TikTok
+                {brand}
               </Typography>
               <Typography variant="caption" fontWeight={500}>
-                @nikemx
+                {primaryAccount ? primaryAccount.socialAccountId : ''}
               </Typography>
             </Stack>
             <Chip
               size="small"
-              label={network}
+              label={networkShort}
               sx={{ bgcolor: networkBg, color: networkColor, fontWeight: 600, mt: 1 }}
             />
           </Paper>

@@ -17,41 +17,92 @@ import Alert from '@mui/material/Alert';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { PrimaryButton } from '@repo/ui/ui';
 import {
-  CHAR_LIMITS,
+  POST_CHAR_LIMIT,
   MOCK_CAMPAIGNS,
   NETWORK_LABELS,
   MOCK_AI_SUGGESTIONS,
   MOCK_TIME_SLOTS,
+  MOCK_MEDIA_LIBRARY,
   getSocialAccountsForCampaign,
+  getPostNetworkInfo,
+  getMedia,
+  getMediaLibraryByBrand,
+  getBrand,
 } from '../../../lib/mock-data';
 import type { SocialAccount } from '../../../interfaces/interface';
 
 export default function NewPostPage() {
   const router = useRouter();
   const [campaignId, setCampaignId] = useState('c1');
-  const [brandProfileId, setBrandProfileId] = useState('bp1');
+  // Multi-select: un post puede publicarse en varias redes a la vez (fan-out
+  // multi-red, ver docs/frontend-db-alignment.md §1.1 y decisión §5/§9). Antes
+  // era un único brandProfileId con selección exclusiva.
+  const [socialAccountIds, setSocialAccountIds] = useState<string[]>(() =>
+    getSocialAccountsForCampaign('c1').map((p) => p.id),
+  );
   const [content, setContent] = useState('');
   const [datetime, setDatetime] = useState('');
+  // Media adjunta (PostMedia) — orden = orden de selección, se usa al
+  // construir el post (ver buildMediaPayload). Sin backend real, es mock.
+  const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
 
   const profiles: SocialAccount[] = getSocialAccountsForCampaign(campaignId);
-  const selectedProfile = profiles.find((p) => p.id === brandProfileId) ?? profiles[0] ?? null;
+  const selectedAccounts = profiles.filter((p) => socialAccountIds.includes(p.id));
+  const selectedMedia = selectedMediaIds.map((id) => getMedia(id)).filter((m): m is NonNullable<typeof m> => !!m);
 
-  const network = selectedProfile?.socialNetwork ?? 'IG';
-  const limit = CHAR_LIMITS[network] ?? 2200;
+  // Biblioteca del picker: filtrada por la marca de la campaña activa (si
+  // hay una seleccionada) — no tiene sentido ofrecer archivos de otra marca.
+  const currentCampaign = MOCK_CAMPAIGNS.find((c) => c.id === campaignId);
+  const mediaLibrary = currentCampaign ? getMediaLibraryByBrand(currentCampaign.brandId) : MOCK_MEDIA_LIBRARY;
+
+  // Límite de caracteres único, sin importar cuántas ni cuáles redes estén
+  // seleccionadas (decisión de producto — no se toma el mínimo entre redes).
+  const limit = POST_CHAR_LIMIT;
   const charCount = content.length;
   const nearLimit = charCount > limit * 0.9;
   const hashtags = content.match(/#\S+/g) ?? [];
   const previewText = content.length > 140 ? `${content.slice(0, 140)}...` : content;
 
+  function toggleSocialAccount(id: string) {
+    setSocialAccountIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleMedia(id: string) {
+    setSelectedMediaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function buildMediaPayload() {
+    // order = orden de selección (mock, sin persistencia real).
+    return selectedMediaIds.map((mediaId, order) => ({ mediaId, order }));
+  }
+
   function handleCampaignChange(e: SelectChangeEvent) {
     const newCampaignId = e.target.value;
     setCampaignId(newCampaignId);
-    // Reseteamos al primer perfil disponible de la nueva campaña.
+    // Reseteamos a las cuentas disponibles de la nueva campaña — no dejamos
+    // ids de la campaña anterior colgando en la selección.
     const newProfiles = getSocialAccountsForCampaign(newCampaignId);
-    setBrandProfileId(newProfiles[0]?.id ?? '');
+    setSocialAccountIds(newProfiles.map((p) => p.id));
+  }
+
+  function buildSocialAccountsPayload() {
+    // Al enviar, cada red seleccionada arranca en 'pendiente' — recién se
+    // publicará después (sigue sin persistir de verdad, es mock).
+    return socialAccountIds.map((id, i) => ({
+      id: `psa-new-${i}`,
+      socialAccountId: id,
+      status: 'pendiente' as const,
+    }));
   }
 
   return (
@@ -81,16 +132,16 @@ export default function NewPostPage() {
               {MOCK_CAMPAIGNS.map((c) => (
                 <MenuItem key={c.id} value={c.id}>
                   <Stack direction="row" gap={1} alignItems="center">
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: c.color, flexShrink: 0 }} />
-                    {c.name} — {c.brand}
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: getBrand(c.brandId)?.primaryColor ?? '#6B6B6B', flexShrink: 0 }} />
+                    {c.name} — {getBrand(c.brandId)?.name ?? '—'}
                   </Stack>
                 </MenuItem>
               ))}
               <MenuItem value="none"><em>Sin campaña</em></MenuItem>
             </Select>
 
-            {/* SocialAccount (red social de la marca) */}
-            <Typography variant="subtitle2" color="text.secondary" mb={1}>Perfil de publicación</Typography>
+            {/* SocialAccounts (redes de la marca) — multi-select por toggle */}
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>Redes de publicación</Typography>
             {profiles.length === 0 ? (
               <Alert severity="info" sx={{ mb: 2.5, borderRadius: 2 }}>
                 Esta campaña no tiene perfiles de red social configurados aún.
@@ -98,17 +149,20 @@ export default function NewPostPage() {
             ) : (
               <Stack direction="row" gap={1} flexWrap="wrap" mb={2.5}>
                 {profiles.map((p) => {
-                  const active = brandProfileId === p.id;
+                  const active = socialAccountIds.includes(p.id);
+                  const { network } = getPostNetworkInfo(p.id);
                   return (
                     <Chip
                       key={p.id}
                       label={
                         <Stack direction="row" gap={0.5} alignItems="center">
-                          <Typography variant="caption" fontWeight={700}>{p.socialNetwork}</Typography>
+                          <Typography variant="caption" fontWeight={700}>
+                            {NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network}
+                          </Typography>
                           <Typography variant="caption" color="inherit" sx={{ opacity: 0.75 }}>{p.handle}</Typography>
                         </Stack>
                       }
-                      onClick={() => setBrandProfileId(p.id)}
+                      onClick={() => toggleSocialAccount(p.id)}
                       sx={{
                         cursor: 'pointer',
                         height: 32,
@@ -128,19 +182,64 @@ export default function NewPostPage() {
               multiline
               minRows={5}
               fullWidth
-              placeholder={`Escribe el copy para ${selectedProfile ? NETWORK_LABELS[selectedProfile.socialNetwork] ?? selectedProfile.socialNetwork : 'la red'}…`}
+              placeholder="Escribe el copy para las redes seleccionadas…"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
             <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5} mb={2}>
               <Typography variant="caption" color="text.secondary">
-                Límite {NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network}: {limit.toLocaleString()} caracteres
+                Límite de caracteres: {limit.toLocaleString()} (mismo límite para todas las redes)
               </Typography>
               <Typography variant="caption" sx={{ color: nearLimit ? '#C62828' : '#6B6B6B', fontWeight: nearLimit ? 700 : 400 }}>
                 {charCount.toLocaleString()} / {limit.toLocaleString()}
               </Typography>
             </Stack>
+
+            {/* Media adjunta (Media/PostMedia) — picker mock sobre la
+                biblioteca de la marca de la campaña activa. */}
+            <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" mb={selectedMedia.length > 0 ? 1 : 2}>
+              <Chip
+                icon={<AttachFileIcon fontSize="small" />}
+                label="Adjuntar media"
+                onClick={() => setMediaPickerOpen(true)}
+                sx={{ cursor: 'pointer', bgcolor: '#F7F7F7', border: '1px solid #E8E8E8', fontWeight: 600 }}
+              />
+              {selectedMedia.length > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  {selectedMedia.length} {selectedMedia.length === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}
+                </Typography>
+              )}
+            </Stack>
+
+            {selectedMedia.length > 0 && (
+              <Stack direction="row" gap={1} flexWrap="wrap" mb={2}>
+                {selectedMedia.map((m) => (
+                  <Box key={m.id} sx={{ position: 'relative', width: 64, height: 64 }}>
+                    <Box
+                      component="img"
+                      src={m.url}
+                      alt={m.originalName}
+                      sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1.5, border: '1px solid #E8E8E8', display: 'block' }}
+                    />
+                    {m.mimeType.startsWith('video') && (
+                      <Chip
+                        label="Video"
+                        size="small"
+                        sx={{ position: 'absolute', bottom: 2, left: 2, height: 16, fontSize: 8, bgcolor: 'rgba(0,0,0,0.65)', color: '#fff' }}
+                      />
+                    )}
+                    <IconButton
+                      size="small"
+                      onClick={() => toggleMedia(m.id)}
+                      sx={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFEBEE' } }}
+                    >
+                      <CloseIcon sx={{ fontSize: 12 }} />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Stack>
+            )}
 
             {nearLimit && (
               <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
@@ -174,7 +273,7 @@ export default function NewPostPage() {
                     <Chip size="small" label="Alto" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32' }} />
                   </Stack>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    vs benchmark {NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network} 3.5%
+                    vs benchmark de las redes seleccionadas 3.5%
                   </Typography>
                 </Box>
                 <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: '#E0A800', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -205,13 +304,22 @@ export default function NewPostPage() {
               <Button
                 variant="outlined"
                 sx={{ borderColor: '#E8E8E8', color: '#6B6B6B' }}
-                onClick={() => router.push('/posts')}
+                onClick={() => {
+                  // Mock: sin persistencia real — solo navega, mismo comportamiento de antes.
+                  buildSocialAccountsPayload();
+                  buildMediaPayload();
+                  router.push('/posts');
+                }}
               >
                 Guardar borrador
               </Button>
               <PrimaryButton
-                disabled={!content.trim() || !selectedProfile}
-                onClick={() => router.push('/posts/approvals')}
+                disabled={!content.trim() || socialAccountIds.length === 0}
+                onClick={() => {
+                  buildSocialAccountsPayload();
+                  buildMediaPayload();
+                  router.push('/posts/approvals');
+                }}
               >
                 Enviar a revisión →
               </PrimaryButton>
@@ -219,46 +327,111 @@ export default function NewPostPage() {
           </Paper>
         </Grid>
 
-        {/* Columna derecha — vista previa */}
+        {/* Columna derecha — vista previa: una card por cada red seleccionada */}
         <Grid item xs={12} md={6}>
           <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, position: 'sticky', top: 24 }}>
-            <Typography variant="subtitle2" color="text.secondary" mb={2}>Vista previa</Typography>
-            <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
-              {selectedProfile ? (
-                <>
-                  <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
-                    <Avatar sx={{ bgcolor: '#E0A800', color: 'primary.contrastTextMuted', width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
-                      {selectedProfile.handle.replace('@', '').slice(0, 2).toUpperCase()}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>{selectedProfile.handle}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {NETWORK_LABELS[selectedProfile.socialNetwork] ?? selectedProfile.socialNetwork} · Ahora
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <Box sx={{ bgcolor: '#E0E0E0', borderRadius: 1.5, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
-                    <Typography variant="caption" sx={{ color: '#9E9E9E' }}>Imagen adjunta</Typography>
-                  </Box>
-                  <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 1 }}>
-                    {previewText || <span style={{ color: '#9E9E9E' }}>El copy aparecerá aquí…</span>}
-                  </Typography>
-                  <Stack direction="row" gap={0.75} mt={0.5} flexWrap="wrap">
-                    {hashtags.map((tag, i) => (
-                      <Chip key={i} size="small" label={tag} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontSize: 10, height: 20 }} />
-                    ))}
-                  </Stack>
-                  <Chip size="small" label="BORRADOR" sx={{ bgcolor: '#F5F5F5', color: '#616161', fontWeight: 600, mt: 1.5 }} />
-                </>
-              ) : (
+            <Typography variant="subtitle2" color="text.secondary" mb={2}>
+              Vista previa {selectedAccounts.length > 0 && `(${selectedAccounts.length} ${selectedAccounts.length === 1 ? 'red' : 'redes'})`}
+            </Typography>
+            {selectedAccounts.length === 0 ? (
+              <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Selecciona una campaña con perfiles configurados para ver la vista previa.
+                  Selecciona al menos una red para ver la vista previa.
                 </Typography>
-              )}
-            </Box>
+              </Box>
+            ) : (
+              <Stack gap={2}>
+                {selectedAccounts.map((account) => {
+                  const { networkLabel, networkBg, networkColor } = getPostNetworkInfo(account.id);
+                  // Solo la primera imagen (no video) representa la card —
+                  // el resto de los adjuntos se ven en la lista de chips de
+                  // arriba, no hace falta duplicar el carrusel aquí.
+                  const previewImage = selectedMedia.find((m) => m.mimeType.startsWith('image'));
+                  return (
+                    <Box key={account.id} sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
+                      <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
+                        <Avatar sx={{ bgcolor: networkBg, color: networkColor, width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
+                          {account.handle.replace('@', '').slice(0, 2).toUpperCase()}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>{account.handle}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {networkLabel} · Ahora
+                          </Typography>
+                        </Box>
+                      </Stack>
+                      <Box sx={{ bgcolor: '#E0E0E0', borderRadius: 1.5, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, overflow: 'hidden' }}>
+                        {previewImage ? (
+                          <Box component="img" src={previewImage.url} alt={previewImage.originalName} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <Typography variant="caption" sx={{ color: '#9E9E9E' }}>Sin imagen adjunta</Typography>
+                        )}
+                      </Box>
+                      <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 1 }}>
+                        {previewText || <span style={{ color: '#9E9E9E' }}>El copy aparecerá aquí…</span>}
+                      </Typography>
+                      <Stack direction="row" gap={0.75} mt={0.5} flexWrap="wrap">
+                        {hashtags.map((tag, i) => (
+                          <Chip key={i} size="small" label={tag} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontSize: 10, height: 20 }} />
+                        ))}
+                      </Stack>
+                      <Chip size="small" label="BORRADOR" sx={{ bgcolor: '#F5F5F5', color: '#616161', fontWeight: 600, mt: 1.5 }} />
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Picker de media — biblioteca mock filtrada por marca de la campaña
+          activa (ver getMediaLibraryByBrand en lib/mock-data.ts). */}
+      <Dialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Adjuntar media</DialogTitle>
+        <DialogContent>
+          {mediaLibrary.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Esta marca no tiene archivos en su biblioteca todavía.
+            </Typography>
+          ) : (
+            <Grid container spacing={1.5}>
+              {mediaLibrary.map((m) => {
+                const active = selectedMediaIds.includes(m.id);
+                return (
+                  <Grid item xs={4} key={m.id}>
+                    <Box
+                      onClick={() => toggleMedia(m.id)}
+                      sx={{
+                        cursor: 'pointer',
+                        position: 'relative',
+                        borderRadius: 1.5,
+                        overflow: 'hidden',
+                        aspectRatio: '1 / 1',
+                        border: active ? '2px solid #E0A800' : '1px solid #E8E8E8',
+                      }}
+                    >
+                      <Box component="img" src={m.url} alt={m.originalName} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      {m.mimeType.startsWith('video') && (
+                        <Chip
+                          label="Video"
+                          size="small"
+                          sx={{ position: 'absolute', bottom: 4, left: 4, height: 18, fontSize: 9, bgcolor: 'rgba(0,0,0,0.65)', color: '#fff' }}
+                        />
+                      )}
+                    </Box>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMediaPickerOpen(false)} sx={{ color: 'secondary.main' }}>
+            Listo
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
