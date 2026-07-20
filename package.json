@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:infra": "docker compose up -d",
-    "dev:backend": "turbo run dev --filter=@repo/api-gateway --filter=@repo/auth-service --filter=@repo/brands-service --filter=@repo/content-service --filter=@repo/analytics-service",
+    "dev:backend": "turbo run dev --filter=@repo/api-gateway --filter=@repo/auth-service --filter=@repo/core-service --filter=@repo/alexa-service",
     "dev:web": "turbo run dev --filter=@repo/web-shell",
     "dev:frontend": "turbo run dev --filter=@repo/web-shell --filter=@repo/admin-front --filter=@repo/analytics-front --filter=@repo/auth-front --filter=@repo/brands-front --filter=@repo/posts-front",
     "build": "turbo run build",

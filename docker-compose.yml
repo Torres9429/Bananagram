@@ -27,26 +27,19 @@ services:
     ports: ["3001:3001"]
     depends_on: [postgres]
 
-  brands-service:
+  core-service:
     profiles: ["full"]
-    build: ./apps/backend/services/brands-service
+    build: ./apps/backend/services/core-service
     env_file: .env
     ports: ["3002:3002"]
     depends_on: [postgres]
 
-  content-service:
+  alexa-service:
     profiles: ["full"]
-    build: ./apps/backend/services/content-service
+    build: ./apps/backend/services/alexa-service
     env_file: .env
-    ports: ["3003:3003"]
-    depends_on: [postgres]
-
-  analytics-service:
-    profiles: ["full"]
-    build: ./apps/backend/services/analytics-service
-    env_file: .env
-    ports: ["3005:3005"]
-    depends_on: [postgres]
+    ports: ["3004:3004"]
+    depends_on: [core-service, auth-service]
 
   api-gateway:
     profiles: ["full"]
@@ -55,9 +48,8 @@ services:
     ports: ["4000:4000"]
     depends_on:
       - auth-service
-      - brands-service
-      - content-service
-      - analytics-service
+      - core-service
+      - alexa-service
 
   web-shell:
     profiles: ["full"]

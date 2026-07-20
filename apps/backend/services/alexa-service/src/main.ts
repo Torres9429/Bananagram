@@ -9,14 +9,16 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const config = new DocumentBuilder()
-    .setTitle('metrics-service')
-    .setDescription('Métricas simuladas y score digital')
+    .setTitle('alexa-service')
+    .setDescription(
+      'Consumidor de API para la Alexa Skill: traduce intents de voz a llamadas HTTP contra core-service y auth-service',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
 
-  await app.listen(3005);
-  console.log(`🚀 metrics-service corriendo en puerto 3005`);
+  await app.listen(3004);
+  console.log(`🚀 alexa-service corriendo en puerto 3004`);
 }
 bootstrap();
