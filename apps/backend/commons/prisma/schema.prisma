@@ -198,6 +198,7 @@ model Campaign {
   team        CampaignTeam[]
   categories  CampaignCategory[]
   posts       Post[]
+  ideas       ContentIdea[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   deletedAt   DateTime?
@@ -340,4 +341,23 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime @default(now())
   @@map("notifications")
+}
+
+// ── Ideas de contenido (Alexa Skill) ─────────────────────────────────
+model ContentIdea {
+  id          String            @id @default(uuid())
+  campaign    Campaign          @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  source      ContentIdeaSource
+  title       String
+  description String?           @db.Text
+  createdBy   String
+  createdAt   DateTime          @default(now())
+  deletedAt   DateTime?
+  @@map("content_ideas")
+}
+
+enum ContentIdeaSource {
+  sugerida
+  propia
 }

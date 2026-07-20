@@ -9,14 +9,14 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const config = new DocumentBuilder()
-    .setTitle('posts-service')
-    .setDescription('Publicaciones, máquina de estados y calendario')
+    .setTitle('core-service')
+    .setDescription('Marcas, campañas, publicaciones, analítica e ideas de contenido')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
 
-  await app.listen(3003);
-  console.log(`🚀 posts-service corriendo en puerto 3003`);
+  await app.listen(3002);
+  console.log(`🚀 core-service corriendo en puerto 3002`);
 }
 bootstrap();

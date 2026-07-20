@@ -1,5 +1,5 @@
 {
-  "name": "@repo/content-service",
+  "name": "@repo/core-service",
   "version": "1.0.0",
   "scripts": {
     "build": "nest build",

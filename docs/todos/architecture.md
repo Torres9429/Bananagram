@@ -6,9 +6,8 @@
 |-----------------------|--------|-----------------------------------------------------------|
 | api-gateway           | 4000   | Único punto de entrada HTTP externo                        |
 | auth-service          | 3001   | Login, refresh, usuarios, roles, permisos                  |
-| brands-service        | 3002   | Marcas, perfiles por red, brand_users, campañas y equipo    |
-| content-service       | 3003   | Publicaciones, máquina de estados, calendario, cron         |
-| analytics-service     | 3005   | Métricas simuladas, score digital y reportes (PDF/CSV)      |
+| core-service          | 3002   | Marcas, redes sociales, campañas y equipo, publicaciones, máquina de estados, calendario, cron, medios, métricas simuladas, score digital, reportes (PDF/CSV) e ideas de contenido (fusiona lo que antes eran brands/content/analytics-service) |
+| alexa-service         | 3004   | BFF de la Alexa Skill, sin base de datos propia — consume las APIs de core-service y auth-service |
 
 ## ADRs
 
