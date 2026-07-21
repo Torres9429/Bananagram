@@ -147,51 +147,7 @@ model Notification {
   @@map("notifications")
 }
 
-// ── Catálogos ─────────────────────────────────────────────────────────
 
-// Áreas temáticas: clasifican a usuarios operativos (CM/Diseñador),
-// campañas (core-service) y marcas (core-service). Es el eje del
-// sistema de matching (orientativo, no restrictivo — regla de negocio #8).
-//
-// NOTA — llamada de juicio, no hecho cerrado: Category se queda aquí en
-// auth-service junto a Role/Module/Action, reutilizando una dependencia
-// que casi todo servicio ya necesita hacia auth. La alternativa
-// (core-service, mayor consumidor real vía Brand+Campaign) es igual de
-// defendible — ver docs/base/service-boundaries.md. Cambiarlo es mover
-// esta sección, no rediseñar el archivo.
-model Category {
-  id   String @id @default(uuid())
-  name String @unique
-
-  userCategories UserCategory[] // uso local (mismo servicio)
-
-  // Consumido cruzado (sin @relation posible — otra BD):
-  // core-service.Campaign.categoryId, core-service.Brand.categoryId
-  // → FK → auth-service.Category.id (sin constraint; resolver vía HTTP si
-  //   se necesita el nombre, aunque en la mayoría de vistas basta el id)
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@map("categories")
-}
-
-// Habilidades técnicas exclusivas de CM y Diseñador. NO aplica a marcas ni
-// campañas — por eso no tiene ningún consumidor cruzado, a diferencia de
-// Category.
-model Specialty {
-  id   String @id @default(uuid())
-  name String @unique
-
-  userSpecialties UserSpecialty[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@map("specialties")
-}
 
 // Opcional — implementar según tiempos. Por ahora todos nacen como active.
 enum UserStatus {
@@ -201,64 +157,23 @@ enum UserStatus {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  name         String
-  email        String     @unique
-  passwordHash String
-  roleId       String
-  role         Role       @relation(fields: [roleId], references: [id])
-  status       UserStatus @default(active)
-  avatarUrl    String?
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String
+  roleId              String
+  role                Role      @relation(fields: [roleId], references: [id])
+  status              UserStatus @default(active)
 
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
-  categories          UserCategory[]
-  specialties         UserSpecialty[]
   notifications       Notification[]
+  profile             UserProfile?
 
-  // Consumido cruzado (sin @relation posible — otra BD), todos "referencia
-  // por id únicamente", resueltos vía HTTP GET /internal/users/:id o un
-  // bulk GET /internal/users?ids=... cuando la vista necesita nombre/email:
-  //   core-service.Brand.ownerId
-  //   core-service.Campaign.cmId            (Community Manager)
-  //   core-service.Campaign.createdBy       (Cliente que la creó)
-  //   core-service.CampaignDesigner.userId  (Diseñador)
-  //   core-service.Post.createdBy
-  //   core-service.PostStatusHistory.changedBy
-  //   core-service.Media.uploadedBy
-  //   core-service.Report.requestedBy
-  //   core-service.ContentIdea.createdBy
-  // Nota: el equipo de campaña (CM/Diseñador) vive exclusivamente en
-  // Campaign/CampaignDesigner (core-service) — nunca se denormaliza aquí
-  // (ya establecido en docs/frontend-db-alignment.md).
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   @@map("users")
-}
-
-model UserCategory {
-  userId     String
-  categoryId String
-
-  user     User     @relation(fields: [userId], references: [id])
-  category Category @relation(fields: [categoryId], references: [id])
-
-  @@id([userId, categoryId])
-  @@map("user_categories")
-}
-
-model UserSpecialty {
-  userId      String
-  specialtyId String
-
-  user      User      @relation(fields: [userId], references: [id])
-  specialty Specialty @relation(fields: [specialtyId], references: [id])
-
-  @@id([userId, specialtyId])
-  @@map("user_specialties")
 }
 
 model PasswordResetToken {
@@ -333,6 +248,94 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL_CORE")
+}
+
+
+// CORE
+model UserProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+
+  name          String
+  avatarUrl     String?
+
+  categories    UserProfileCategory[]
+  specialties   UserProfileSpecialty[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@map("user_profiles")
+}
+
+model UserProfileCategory {
+  userProfileId String
+  categoryId    String
+
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
+  category      Category    @relation(fields: [categoryId], references: [id])
+
+  @@id([userProfileId, categoryId])
+  @@map("user_profile_categories")
+}
+
+model UserProfileSpecialty {
+  userProfileId String
+  specialtyId   String
+
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
+  specialty     Specialty   @relation(fields: [specialtyId], references: [id])
+
+  @@id([userProfileId, specialtyId])
+  @@map("user_profile_specialties")
+}
+
+// ── Catálogos ─────────────────────────────────────────────────────────
+
+// Áreas temáticas: clasifican a usuarios operativos (CM/Diseñador),
+// campañas (core-service) y marcas (core-service). Es el eje del
+// sistema de matching (orientativo, no restrictivo — regla de negocio #8).
+//
+// NOTA — llamada de juicio, no hecho cerrado: Category se queda aquí en
+// auth-service junto a Role/Module/Action, reutilizando una dependencia
+// que casi todo servicio ya necesita hacia auth. La alternativa
+// (core-service, mayor consumidor real vía Brand+Campaign) es igual de
+// defendible — ver docs/base/service-boundaries.md. Cambiarlo es mover
+// esta sección, no rediseñar el archivo.
+model Category {
+  id   String @id @default(uuid())
+  name String @unique
+
+  userCategories UserCategory[] // uso local (mismo servicio)
+
+  // Consumido cruzado (sin @relation posible — otra BD):
+  // core-service.Campaign.categoryId, core-service.Brand.categoryId
+  // → FK → auth-service.Category.id (sin constraint; resolver vía HTTP si
+  //   se necesita el nombre, aunque en la mayoría de vistas basta el id)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("categories")
+}
+
+// Habilidades técnicas exclusivas de CM y Diseñador. NO aplica a marcas ni
+// campañas — por eso no tiene ningún consumidor cruzado, a diferencia de
+// Category.
+model Specialty {
+  id   String @id @default(uuid())
+  name String @unique
+
+  userSpecialties UserSpecialty[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("specialties")
 }
 
 // Plataformas de publicación disponibles en el sistema. Gestionado solo
