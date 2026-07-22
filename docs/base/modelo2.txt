@@ -57,7 +57,7 @@
 
 // ══════════════════════════════════════════════════════════════════════
 // SERVICE: auth-service (puerto 3001)
-// Dueño de: identidad, RBAC, catálogos de Category/Specialty, Notification
+// Dueño de: identidad, RBAC, Notification
 // Sin cambios respecto a la versión anterior de este archivo.
 // ══════════════════════════════════════════════════════════════════════
 
@@ -233,7 +233,8 @@ model AuditLog {
 //
 // Lo único que sigue siendo una FK cruzada real es hacia auth-service
 // (identidad: ownerId, cmId, createdBy, changedBy, uploadedBy,
-// requestedBy, ContentIdea.createdBy → User; categoryId → Category).
+// requestedBy, ContentIdea.createdBy → User). Category, Specialty y
+// SocialNetwork ya son catálogos locales de core-service.
 //
 // Nota histórica: antes había que decidir si Campaign vivía en
 // brands-service o content-service (ver docs/architecture.md vs.

@@ -33,8 +33,8 @@ La llamada HTTP entre servicios **no es el mecanismo por defecto** — es el
 
 | Servicio | Modelos (fuente de verdad) |
 |---|---|
-| **auth-service** (3001) | `Role`, `Module`, `Action`, `RolePermission`, `RefreshToken`, `Notification`, `Category`, `Specialty`, `User`, `UserCategory`, `UserSpecialty`, `PasswordResetToken` |
-| **core-service** (3002) | `SocialNetwork`, `Brand`, `SocialAccount`, `Campaign`, `CampaignDesigner`, `CampaignCategory`, `Post`, `PostStatusHistory`, `PostSocialAccount`, `Media`, `PostMedia`, `ContentIdea`, `PostMetric`, `BrandScore`, `Report` |
+| **auth-service** (3001) | `Role`, `Module`, `Action`, `RolePermission`, `RefreshToken`, `Notification`, `User`, `PasswordResetToken` |
+| **core-service** (3002) | `Category`, `Specialty`, `SocialNetwork`, `UserProfile`, `UserProfileCategory`, `UserProfileSpecialty`, `Brand`, `SocialAccount`, `Campaign`, `CampaignDesigner`, `CampaignCategory`, `Post`, `PostStatusHistory`, `PostSocialAccount`, `Media`, `PostMedia`, `ContentIdea`, `PostMetric`, `BrandScore`, `Report` |
 | **alexa-service** (3004) | **ninguno** — sin schema/DB propio. Consume: |
 | | ↳ de **core-service**: `GET /campaigns/mine`, `GET /campaigns/:id/metrics-summary`, `GET /campaigns/:id/top-content`, `GET /campaigns/:id/summary`, `POST/GET /campaigns/:id/ideas`, `DELETE /ideas/:id` |
 | | ↳ de **auth-service**: `GET /oauth/authorize`, `POST /oauth/token` (account-linking de la Alexa Skill) |
@@ -73,7 +73,7 @@ identidad (auth-service ↔ core-service):
 | 1 | `Brand.ownerId → User` | core → auth | FK sin constraint. Validar propiedad = comparar `ownerId` contra el `userId` del JWT (sin llamada). Mostrar nombre/email del dueño = HTTP GET puntual. | ADR-0002 ya embebe identidad en el JWT; solo el *display* necesita una lectura en vivo, y es de bajo volumen (vistas de detalle de marca). |
 | 2 | `Campaign.cmId`, `CampaignDesigner.userId`, `Campaign.createdBy → User` | core → auth | FK sin constraint + HTTP en ambas direcciones: (i) resolver nombres para mostrar, (ii) core-service pide a auth-service la lista de CM/Diseñadores elegibles por categoría al armar el equipo. | `docs/docs-front/frontend-db-alignment.md` ya estableció que el equipo de campaña vive en `Campaign`/`CampaignDesigner`, nunca denormalizado en `User` — este es el equivalente a nivel de backend de esa misma regla. |
 | 3 | `Post.createdBy`, `PostStatusHistory.changedBy`, `Media.uploadedBy`, `Report.requestedBy`, `ContentIdea.createdBy → User` | core → auth | Escritura: FK poblada desde el JWT, sin llamada. Lectura: **endpoint nuevo** `GET /internal/users?ids=...` (bulk) en auth-service, para evitar N+1 al renderizar listas. | El camino de escritura es gratis; el de lectura requiere una pieza nueva — se deja marcado como trabajo real, no se asume que ya existe. |
-| 4 | `Brand.categoryId`, `Campaign→CampaignCategory.categoryId → Category` | core → auth | FK sin constraint; resolver vía HTTP si la vista necesita el nombre de la categoría. | Ver nota de `Category` en la sección auth-service de `modelo2.txt` — llamada de juicio, no hecho cerrado (punto 6 más abajo). |
+| 4 | `Brand.categoryId`, `Campaign→CampaignCategory.categoryId → Category` | core → core | Ya no es FK cruzada: categorías viven en core-service junto con brand/campaign. |
 | 5 | `AuditLog.performedBy → User` | auth-service y core-service → auth | FK sin constraint, poblada desde el JWT al escribir (sin llamada). Lectura de nombre reutiliza el mismo bulk endpoint de la cadena #3, si algún día se construye una vista unificada. | Cubierto por la decisión de `AuditLog` en la sección 4. |
 
 Y la relación de **alexa-service** con los otros dos, que no es una FK sino
@@ -117,9 +117,9 @@ skill.
   propio documento difiere su alineación de backend a una
   **"Fase G (futura), si se decide"** — se anota aquí como antecedente a
   vigilar; `modelo2.txt` sigue el modelo Brand vigente de `docs/base/modelo.txt`.
-- Aún no se decide si `Category` es dueño de auth-service o core-service
-  (ver sección 4, punto 6) — es la única llamada de juicio genuinamente
-  abierta de este análisis.
+- `Category`, `Specialty` y `SocialNetwork` ya se consideran catálogo base
+   de `core-service`; `auth-service` queda como dueño solo de identidad y
+   acceso.
 
 ## 4. Decisiones de arquitectura confirmadas
 
@@ -150,9 +150,6 @@ skill.
    cruzada para escribir. Una vista unificada de auditoría, si se necesita,
    queda como trabajo futuro de lectura/agregación, no como problema de
    propiedad hoy.
-6. **`Category`** (única llamada de juicio abierta): se propone dueño
-   **auth-service**, junto a `Role`/`Module`/`Action`, porque reutiliza una
-   dependencia que casi todo servicio ya necesita hacia auth. La alternativa
-   —core-service, mayor consumidor real vía `Brand` + `Campaign`— es igual
-   de defendible. Cambiar esta decisión es mover una sección de
-   `docs/base/modelo2.txt`, no rediseñar el archivo.
+6. **Catálogos base**: `Category`, `Specialty` y `SocialNetwork` viven en
+   `core-service`, no en `auth-service`. Esto hace coherente el primer slice
+   del dominio y evita cruzar la misma dependencia por HTTP.

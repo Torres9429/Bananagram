@@ -1,4 +1,4 @@
-import { PostStatus } from '../../../../../commons/types/post-status.enum';
+import { PostStatus } from '../../types/post-status.enum';
 
 export const VALID_TRANSITIONS: Record<PostStatus, PostStatus[]> = {
   [PostStatus.BORRADOR]:    [PostStatus.EN_REVISION],
