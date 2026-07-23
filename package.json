@@ -12,10 +12,11 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "seed": "pnpm --filter seed run start",
-    "db:generate": "npx prisma generate --schema=apps/backend/commons/prisma/schema.prisma",
-    "db:migrate": "npx prisma migrate dev --schema=apps/backend/commons/prisma/schema.prisma",
-    "db:migrate:prod": "npx prisma migrate deploy --schema=apps/backend/commons/prisma/schema.prisma",
-    "db:studio": "npx prisma studio --schema=apps/backend/commons/prisma/schema.prisma"
+    "db:generate": "pnpm --filter @repo/auth-service run db:generate && pnpm --filter @repo/core-service run db:generate",
+    "db:migrate": "pnpm --filter @repo/auth-service run db:migrate && pnpm --filter @repo/core-service run db:migrate",
+    "db:migrate:prod": "pnpm --filter @repo/auth-service run db:migrate:prod && pnpm --filter @repo/core-service run db:migrate:prod",
+    "db:studio:auth": "prisma studio --schema=apps/backend/services/auth-service/prisma/schema.prisma",
+    "db:studio:core": "prisma studio --schema=apps/backend/services/core-service/prisma/schema.prisma"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

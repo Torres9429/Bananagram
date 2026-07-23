@@ -296,25 +296,23 @@ model UserProfileSpecialty {
 // ── Catálogos ─────────────────────────────────────────────────────────
 
 // Áreas temáticas: clasifican a usuarios operativos (CM/Diseñador),
-// campañas (core-service) y marcas (core-service). Es el eje del
-// sistema de matching (orientativo, no restrictivo — regla de negocio #8).
+// campañas y marcas. Es el eje del sistema de matching (orientativo, no
+// restrictivo — regla de negocio #8).
 //
-// NOTA — llamada de juicio, no hecho cerrado: Category se queda aquí en
-// auth-service junto a Role/Module/Action, reutilizando una dependencia
-// que casi todo servicio ya necesita hacia auth. La alternativa
-// (core-service, mayor consumidor real vía Brand+Campaign) es igual de
-// defendible — ver docs/base/service-boundaries.md. Cambiarlo es mover
-// esta sección, no rediseñar el archivo.
+// Catálogo base de core-service — decisión ya cerrada (ver
+// docs/base/service-boundaries.md §4.6 y `feat/catalogos-base`, mergeada a
+// develop): Category, Specialty y SocialNetwork viven aquí, no en
+// auth-service. auth-service ya no es dueño de ningún catálogo, solo de
+// identidad/RBAC (Role/Module/Action/User).
 model Category {
   id   String @id @default(uuid())
   name String @unique
 
-  userCategories UserCategory[] // uso local (mismo servicio)
-
-  // Consumido cruzado (sin @relation posible — otra BD):
-  // core-service.Campaign.categoryId, core-service.Brand.categoryId
-  // → FK → auth-service.Category.id (sin constraint; resolver vía HTTP si
-  //   se necesita el nombre, aunque en la mayoría de vistas basta el id)
+  // Consumo 100% local (misma sección/BD que Brand y CampaignCategory,
+  // ver @relation en ambos modelos más abajo) — ya no es FK cruzada.
+  userProfileCategories UserProfileCategory[]
+  brands                Brand[]
+  campaignCategories    CampaignCategory[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -324,13 +322,12 @@ model Category {
 }
 
 // Habilidades técnicas exclusivas de CM y Diseñador. NO aplica a marcas ni
-// campañas — por eso no tiene ningún consumidor cruzado, a diferencia de
-// Category.
+// campañas.
 model Specialty {
   id   String @id @default(uuid())
   name String @unique
 
-  userSpecialties UserSpecialty[]
+  userProfileSpecialties UserProfileSpecialty[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -375,9 +372,10 @@ model Brand {
   // vía HTTP GET /internal/users/:id si la vista necesita nombre/email —
   // para validar propiedad basta comparar contra el userId del JWT, sin llamada)
 
-  // industria/categoría de la marca (catálogo base, semilla por Admin)
-  categoryId String? // FK → auth-service.Category.id (ver nota de Category
-  // en la sección auth-service — llamada de juicio, no hecho cerrado)
+  // industria/categoría de la marca (catálogo base, semilla por Admin).
+  // Relación local — Category vive en core-service, no hay cruce de servicio.
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
 
   // Ayrshare: null hasta que el Cliente conecte sus redes en el onboarding
   ayrshareProfileKey String? @unique
@@ -460,9 +458,10 @@ model CampaignDesigner {
 
 model CampaignCategory {
   campaignId String
-  categoryId String // FK → auth-service.Category.id (sin constraint de BD)
+  categoryId String // relación local — Category vive en core-service
 
   campaign Campaign @relation(fields: [campaignId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
 
   @@id([campaignId, categoryId])
   @@map("campaign_categories")

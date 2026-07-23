@@ -1,8 +1,13 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CatalogsService } from './catalogs.service';
 import { CreateSocialNetworkDto } from './dto/create-social-network.dto';
 import { UpdateSocialNetworkDto } from './dto/update-social-network.dto';
 
+@ApiTags('catalogs')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('catalogs/social-networks')
 export class SocialNetworksController {
   constructor(private readonly catalogs: CatalogsService) {}

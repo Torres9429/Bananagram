@@ -29,8 +29,6 @@ export class CatalogsService {
   }
 
   async createCategory(dto: CreateCategoryDto) {
-    this.assertNonEmptyString(dto.name, 'name');
-
     return this.runWithUniqueGuard(
       () =>
         prisma.category.create({
@@ -43,7 +41,6 @@ export class CatalogsService {
   async updateCategory(id: string, dto: UpdateCategoryDto) {
     await this.getCategory(id);
     this.assertAtLeastOneProvided(dto, ['name']);
-    this.assertOptionalNonEmptyString(dto.name, 'name');
 
     return this.runWithUniqueGuard(
       () =>
@@ -84,8 +81,6 @@ export class CatalogsService {
   }
 
   async createSpecialty(dto: CreateSpecialtyDto) {
-    this.assertNonEmptyString(dto.name, 'name');
-
     return this.runWithUniqueGuard(
       () =>
         prisma.specialty.create({
@@ -98,7 +93,6 @@ export class CatalogsService {
   async updateSpecialty(id: string, dto: UpdateSpecialtyDto) {
     await this.getSpecialty(id);
     this.assertAtLeastOneProvided(dto, ['name']);
-    this.assertOptionalNonEmptyString(dto.name, 'name');
 
     return this.runWithUniqueGuard(
       () =>
@@ -139,17 +133,13 @@ export class CatalogsService {
   }
 
   async createSocialNetwork(dto: CreateSocialNetworkDto) {
-    this.assertNonEmptyString(dto.name, 'name');
-    this.assertNonEmptyString(dto.code, 'code');
-    const baseEngagementRate = this.parseFiniteNumber(dto.baseEngagementRate, 'baseEngagementRate');
-
     return this.runWithUniqueGuard(
       () =>
         prisma.socialNetwork.create({
           data: {
             name: dto.name,
             code: dto.code,
-            baseEngagementRate,
+            baseEngagementRate: dto.baseEngagementRate,
           },
         }),
       'code',
@@ -159,12 +149,6 @@ export class CatalogsService {
   async updateSocialNetwork(id: string, dto: UpdateSocialNetworkDto) {
     await this.getSocialNetwork(id);
     this.assertAtLeastOneProvided(dto, ['name', 'code', 'baseEngagementRate']);
-    this.assertOptionalNonEmptyString(dto.name, 'name');
-    this.assertOptionalNonEmptyString(dto.code, 'code');
-    const baseEngagementRate =
-      dto.baseEngagementRate === undefined
-        ? undefined
-        : this.parseFiniteNumber(dto.baseEngagementRate, 'baseEngagementRate');
 
     return this.runWithUniqueGuard(
       () =>
@@ -173,7 +157,7 @@ export class CatalogsService {
           data: {
             name: dto.name,
             code: dto.code,
-            baseEngagementRate,
+            baseEngagementRate: dto.baseEngagementRate,
           },
         }),
       'code',
@@ -205,20 +189,8 @@ export class CatalogsService {
     return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
   }
 
-  private assertNonEmptyString(value: unknown, fieldName: string): void {
-    if (typeof value !== 'string' || value.trim().length === 0) {
-      throw new BadRequestException(`${fieldName} es obligatorio`);
-    }
-  }
-
-  private assertOptionalNonEmptyString(value: unknown, fieldName: string): void {
-    if (value === undefined) {
-      return;
-    }
-
-    this.assertNonEmptyString(value, fieldName);
-  }
-
+  // Regla cross-field que class-validator no cubre solo con decoradores por
+  // campo: un PATCH sin ningún campo no tiene nada que actualizar.
   private assertAtLeastOneProvided(dto: object, fieldNames: string[]): void {
     const hasAnyValue = fieldNames.some((fieldName) => {
       const value = (dto as Record<string, unknown>)[fieldName];
@@ -228,15 +200,5 @@ export class CatalogsService {
     if (!hasAnyValue) {
       throw new BadRequestException(`Debes enviar al menos un campo para actualizar`);
     }
-  }
-
-  private parseFiniteNumber(value: unknown, fieldName: string): number {
-    const parsedValue = typeof value === 'number' ? value : Number(value);
-
-    if (Number.isNaN(parsedValue) || !Number.isFinite(parsedValue) || parsedValue < 0) {
-      throw new BadRequestException(`${fieldName} debe ser un número mayor o igual a 0`);
-    }
-
-    return parsedValue;
   }
 }

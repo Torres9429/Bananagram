@@ -4,5 +4,9 @@ export enum PostStatus {
   APROBADO = 'aprobado',
   RECHAZADO = 'rechazado',
   PROGRAMADO = 'programado',
+  PUBLICANDO = 'publicando',
   PUBLICADO = 'publicado',
+  PARCIAL = 'parcial',
+  ERROR = 'error',
+  CANCELADO = 'cancelado',
 }

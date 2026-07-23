@@ -14,7 +14,9 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: gestor_redes
     ports: ["5433:5432"]
-    volumes: [postgres_data:/var/lib/postgresql/data]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
 
   adminer:
     image: adminer
@@ -22,28 +24,44 @@ services:
 
   auth-service:
     profiles: ["full"]
-    build: ./apps/backend/services/auth-service
+    build:
+      context: .
+      dockerfile: apps/backend/services/auth-service/Dockerfile
     env_file: .env
+    environment:
+      # el .env de la raíz trae localhost:5433 (para pnpm dev en el host);
+      # dentro de la red de compose, postgres se resuelve por su nombre de
+      # servicio en el puerto interno 5432 — este override tiene prioridad
+      # sobre env_file para la misma variable.
+      DATABASE_URL_AUTH: postgresql://postgres:postgres@postgres:5432/gestor_redes_auth
     ports: ["3001:3001"]
     depends_on: [postgres]
 
   core-service:
     profiles: ["full"]
-    build: ./apps/backend/services/core-service
+    build:
+      context: .
+      dockerfile: apps/backend/services/core-service/Dockerfile
     env_file: .env
+    environment:
+      DATABASE_URL_CORE: postgresql://postgres:postgres@postgres:5432/gestor_redes_core
     ports: ["3002:3002"]
     depends_on: [postgres]
 
   alexa-service:
     profiles: ["full"]
-    build: ./apps/backend/services/alexa-service
+    build:
+      context: .
+      dockerfile: apps/backend/services/alexa-service/Dockerfile
     env_file: .env
     ports: ["3004:3004"]
     depends_on: [core-service, auth-service]
 
   api-gateway:
     profiles: ["full"]
-    build: ./apps/backend/gateway
+    build:
+      context: .
+      dockerfile: apps/backend/gateway/Dockerfile
     env_file: .env
     ports: ["4000:4000"]
     depends_on:
