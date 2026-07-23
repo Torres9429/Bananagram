@@ -46,18 +46,37 @@ end-to-end todavía.
   **`.claude/INVENTORY.md`** — consúltalo antes de tareas puntuales tipo "agrega un endpoint a X",
   "crea un componente para Y", "conecta el front Z con el servicio W".
 
-## Modelo de datos vigente — `modelo.txt` (no el `schema.prisma` actual del backend)
+## Modelo de datos vigente — `modelo2.txt` (ya implementado en el backend real)
 
-`docs/base/modelo.txt` es el schema de Prisma **estable y definitivo**, preparado para reemplazar
-`apps/backend/commons/prisma/schema.prisma` a futuro — introduce cambios de fondo respecto al schema
-actual: `Post` deja de ser 1:1 con una red social (ahora `PostSocialAccount` permite fan-out multi-red,
-con estados `parcial`/`error`/`cancelado` nuevos en `PostStatus`), `BrandUser` desaparece (ownership de
-marca es singular vía `Brand.ownerId`, CM/Diseñador se vinculan a través de `Campaign.cmId`/
-`CampaignDesigner`, no de la marca), y aparecen `PasswordResetToken`, `Media`/`PostMedia`, `UserStatus`.
+`docs/base/modelo.txt` es el schema de Prisma maestro/de referencia (intacto, no se toca).
+`docs/base/modelo2.txt` es el mismo modelo repartido en 2 secciones (auth-service/core-service) y es la
+versión **ya implementada** en `apps/backend/services/{auth,core}-service/prisma/schema.prisma` — **el
+2026-07-23 se separaron las bases de datos**: `auth-service` y `core-service` dejaron de compartir un
+único Postgres/schema.prisma (el viejo `apps/backend/commons/prisma/` se eliminó), y ahora cada uno tiene
+su propio `schema.prisma`, su propia base (`gestor_redes_auth` / `gestor_redes_core`, mismo contenedor
+Postgres, 2 bases lógicas) y su propio Prisma Client generado con `output` personalizado (necesario:
+ambos servicios declaran la misma versión de `@prisma/client`, y pnpm resuelve versiones idénticas al
+mismo folder físico en su store — sin `output` propio, el `generate` de un servicio pisa el del otro).
+Cambios de fondo respecto al schema viejo: `Post` deja de ser 1:1 con una red social (ahora
+`PostSocialAccount` permite fan-out multi-red, con estados `publicando`/`parcial`/`error`/`cancelado`
+nuevos en `PostStatus`, 10 valores en total), `BrandUser` desaparece (ownership de marca es singular vía
+`Brand.ownerId`, CM/Diseñador se vinculan a través de `Campaign.cmId`/`CampaignDesigner`, no de la marca),
+`User.firstName`/`lastName` desaparecen de auth-service (el nombre para mostrar vive en
+`UserProfile.name`, en core-service — servicios distintos, sin `@relation` real entre sí, solo
+`userId` compartido), y aparecen `PasswordResetToken`, `Media`/`PostMedia`, `UserStatus`.
 
-**El 2026-07-19 se realinearon los mocks/tipos de las 6 apps frontend (`apps/frontend/**`) a este modelo**
-— el backend real (`apps/backend/**`) **NO se tocó**, sigue usando el schema Prisma viejo, a propósito
-(se reescribirá después). Documentación de ese trabajo:
+**`brandIds` del JWT — decisión ya tomada (2026-07-23):** `AuthService.login()` ya no puede resolverlo
+con un join local (Brand/Campaign viven en la BD de core-service) y emite `brandIds: []` siempre, a
+propósito — nada lo lee. `BrandAccessGuard` se movió a vivir dentro de `core-service`
+(`apps/backend/services/core-service/src/guards/brand-access.guard.ts`) y valida acceso con una consulta
+LOCAL contra su propia BD (`Brand.ownerId` o `Campaign.cmId`/`CampaignDesigner.userId` para el `brandId`
+del request) usando `payload.sub` (userId) — sin llamada HTTP, sin depender del JWT para esto. Existe y
+compila, pero **todavía no está aplicado a ningún endpoint** (no hay endpoints de `campaigns`/`brands`
+reales aún) — aplíquese con `@UseGuards(BrandAccessGuard)` cuando se construya el primero.
+
+**El 2026-07-19 se habían realineado los mocks/tipos de las 6 apps frontend (`apps/frontend/**`) a este
+modelo** — el frontend sigue en modo mock, sin conectar al backend real todavía. Documentación de ese
+trabajo:
 - `docs/frontend-db-alignment.md` — análisis campo por campo + las 12 decisiones de producto que se tomaron.
 - `docs/frontend-db-alignment-implementation.md` — registro de la implementación (qué cambió, archivo por archivo).
 
@@ -73,8 +92,8 @@ Todo se orquesta con pnpm + Turborepo desde la raíz.
 ```bash
 pnpm install                  # instala dependencias (workspace completo)
 docker compose up -d          # solo postgres (5433) + adminer (8080) — uso diario recomendado
-pnpm db:generate               # prisma generate
-pnpm db:migrate                 # prisma migrate dev (schema único en apps/backend/commons/prisma)
+pnpm db:generate               # prisma generate (auth-service + core-service, cada uno su propio schema)
+pnpm db:migrate                 # prisma migrate dev (ídem — 2 bases separadas, ver sección Arquitectura)
 pnpm seed                      # carga datos demo (packages/seed)
 
 pnpm dev                       # todo (backend + fronts) vía turbo
@@ -119,10 +138,9 @@ pnpm lint                      # turbo run lint
 
 `apps/backend/`
 - `gateway/` — único punto de entrada HTTP externo (puerto 4000). Usa `http-proxy-middleware` para enrutar a cada servicio; también aplica `CorrelationIdMiddleware` (propaga `X-Request-ID`) a todas las rutas.
-- `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes, ideas de contenido) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill y **no tiene base de datos propia** (solo consume las APIs de core-service y auth-service). `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **comparten un único schema de Prisma** (no hay DB-per-service).
-- `commons/` — código compartido importado por **path relativo** (no es un workspace package con alias corto), p.ej. `../../../../../commons/types/post-status.enum`:
-  - `prisma/schema.prisma` — schema único para todos los servicios (18 tablas, ver `.agents/database.md`)
-  - `guards/` — `JwtAuthGuard`, `BrandAccessGuard` (valida `brandId` del recurso contra `brandIds[]` del JWT), `PermissionGuard`
+- `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes, ideas de contenido) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill y **no tiene base de datos propia** (solo consume las APIs de core-service y auth-service). `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **desde 2026-07-23 cada uno con su propio `prisma/schema.prisma` y su propia base de datos** (`gestor_redes_auth`/`gestor_redes_core`, ver `docs/base/modelo2.txt`) — ya no hay schema ni BD compartida entre ellos. Cada uno genera su Prisma Client con `output` propio (`node_modules/.prisma-client`, ver comentario en su `schema.prisma`) para evitar que pnpm resuelva ambos al mismo folder por compartir versión de `@prisma/client`.
+- `commons/` — código compartido importado por **path relativo** (no es un workspace package con alias corto), p.ej. `../../../../../commons/types/post-status.enum`. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases; `auth-service`/`core-service` además ya duplican localmente en su propio `src/` sus copias de `JwtAuthGuard`/`CurrentUser`/`PostStatus` en vez de importarlas de aquí — decisión tomada para que cada servicio sea desplegable solo, ver `feat/catalogos-base`):
+  - `guards/` — `JwtAuthGuard`, `PermissionGuard` (`BrandAccessGuard` ya no vive aquí — se movió a `core-service/src/guards/`, ver nota de `brandIds` arriba)
   - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)`
   - `interceptors/` — `AuditInterceptor` (escribe en `audit_log`), `LoggingInterceptor`
   - `filters/` — `HttpExceptionFilter`
@@ -139,7 +157,7 @@ Convenciones (`.agents/backend.md`, `agents/conventions.md`):
 - Multi-tenancy por row-level: toda tabla de negocio tiene `brand_id UUID NOT NULL` FK → `brands` (ADR-0001); los guards validan pertenencia, no hay schema-per-tenant.
 - Soft delete universal (`deleted_at`), `created_at`/`updated_at` en todas las tablas.
 - UUID como PK excepto `audit_log` y `post_status_history` (BIGINT autoincrement, inmutables — solo INSERT).
-- Auth: JWT HS256 stateless, sin Redis/OIDC; access token 15 min, refresh token 7 días de un solo uso con rotación (tabla `refresh_tokens`) (ADR-0002). Payload del JWT: `userId, email, role, brandIds[], permissions{}`.
+- Auth: JWT HS256 stateless, sin Redis/OIDC; access token 15 min, refresh token 7 días de un solo uso con rotación (tabla `refresh_tokens`) (ADR-0002). Payload del JWT: `userId, email, role, brandIds[], permissions{}` — `brandIds` hoy siempre `[]` (ver nota en "Modelo de datos vigente": ya no se puede resolver con join local, Brand vive en la BD de core-service).
 
 ### Frontend: Next.js Multi-Zones (no monolito, no Module Federation)
 

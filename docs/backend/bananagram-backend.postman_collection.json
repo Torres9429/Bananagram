@@ -1,0 +1,274 @@
+{
+  "info": {
+    "name": "Bananagram - Backend (auth-service + core-service catalogos)",
+    "_postman_id": "b4n4n4gr4m-0000-0000-0000-000000000001",
+    "description": "Colección para probar en local auth-service (3001) y los endpoints de catálogos de core-service (3002) que trae la rama feat/catalogos-base ya mergeada a develop. El login guarda accessToken/refreshToken en variables de colección automáticamente (ver script de test en 'Login'). Auth Bearer configurado a nivel de colección (usa {{accessToken}}) — cualquier request nueva que agregues hereda el token automáticamente sin que tengas que poner el header a mano; solo Login y Refresh lo desactivan explícitamente (auth: noauth) porque no los necesitan.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "authBaseUrl", "value": "http://localhost:3001/api" },
+    { "key": "coreBaseUrl", "value": "http://localhost:3002/api" },
+    { "key": "adminEmail", "value": "20233tn102@utez.edu.mx" },
+    { "key": "adminPassword", "value": "admin123" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "specialtyId", "value": "" },
+    { "key": "socialNetworkId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "auth-service",
+      "item": [
+        {
+          "name": "Login (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.accessToken) { pm.collectionVariables.set('accessToken', body.accessToken); }",
+                  "// OJO: auth.service.ts login() devuelve el registro completo de refresh_tokens,",
+                  "// no el string — el campo real a mandar a /auth/refresh es refreshToken.token.",
+                  "if (body.refreshToken && body.refreshToken.token) { pm.collectionVariables.set('refreshToken', body.refreshToken.token); }",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            },
+            "url": { "raw": "{{authBaseUrl}}/auth/login", "host": ["{{authBaseUrl}}"], "path": ["auth", "login"] },
+            "description": "Requiere que packages/seed ya haya corrido (pnpm seed) contra la BD local — el usuario admin sembrado usa adminEmail/adminPassword. No lleva token (auth: noauth) — todavía no existe accessToken en este punto."
+          }
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{authBaseUrl}}/auth/refresh", "host": ["{{authBaseUrl}}"], "path": ["auth", "refresh"] },
+            "description": "No lleva token Bearer (auth: noauth) — la identidad aquí viene del refreshToken en el body, no del header Authorization."
+          }
+        },
+        {
+          "name": "Me (perfil del JWT)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{authBaseUrl}}/auth/me", "host": ["{{authBaseUrl}}"], "path": ["auth", "me"] },
+            "description": "Hereda el Bearer {{accessToken}} del auth de la colección — no necesita header propio."
+          }
+        },
+        {
+          "name": "GET /me/permissions",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{authBaseUrl}}/me/permissions", "host": ["{{authBaseUrl}}"], "path": ["me", "permissions"] },
+            "description": "Fuente de verdad del menú dinámico del frontend (usePermissions()). Hereda el Bearer {{accessToken}} del auth de la colección."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{authBaseUrl}}/auth/logout", "host": ["{{authBaseUrl}}"], "path": ["auth", "logout"] },
+            "description": "Hereda el Bearer {{accessToken}} del auth de la colección — no necesita header propio."
+          }
+        }
+      ]
+    },
+    {
+      "name": "core-service - catalogos",
+      "item": [
+        {
+          "name": "Categories",
+          "item": [
+            {
+              "name": "List categories",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/categories", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "categories"] }
+              }
+            },
+            {
+              "name": "Create category",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const body = pm.response.json();",
+                      "if (body.id) { pm.collectionVariables.set('categoryId', body.id); }"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Categoría de prueba\"\n}" },
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/categories", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "categories"] }
+              }
+            },
+            {
+              "name": "Get category by id",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/categories/{{categoryId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "categories", "{{categoryId}}"] }
+              }
+            },
+            {
+              "name": "Update category",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Categoría de prueba (editada)\"\n}" },
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/categories/{{categoryId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "categories", "{{categoryId}}"] }
+              }
+            },
+            {
+              "name": "Delete category (soft delete)",
+              "request": {
+                "method": "DELETE",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/categories/{{categoryId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "categories", "{{categoryId}}"] }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Specialties",
+          "item": [
+            {
+              "name": "List specialties",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/specialties", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "specialties"] }
+              }
+            },
+            {
+              "name": "Create specialty",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const body = pm.response.json();",
+                      "if (body.id) { pm.collectionVariables.set('specialtyId', body.id); }"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Especialidad de prueba\"\n}" },
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/specialties", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "specialties"] }
+              }
+            },
+            {
+              "name": "Get specialty by id",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/specialties/{{specialtyId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "specialties", "{{specialtyId}}"] }
+              }
+            },
+            {
+              "name": "Update specialty",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Especialidad de prueba (editada)\"\n}" },
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/specialties/{{specialtyId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "specialties", "{{specialtyId}}"] }
+              }
+            },
+            {
+              "name": "Delete specialty (soft delete)",
+              "request": {
+                "method": "DELETE",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/specialties/{{specialtyId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "specialties", "{{specialtyId}}"] }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Social Networks",
+          "item": [
+            {
+              "name": "List social networks",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/social-networks", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "social-networks"] }
+              }
+            },
+            {
+              "name": "Create social network",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const body = pm.response.json();",
+                      "if (body.id) { pm.collectionVariables.set('socialNetworkId', body.id); }"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Red de prueba\",\n  \"code\": \"red-prueba\",\n  \"baseEngagementRate\": 0.05\n}"
+                },
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/social-networks", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "social-networks"] }
+              }
+            },
+            {
+              "name": "Get social network by id",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/social-networks/{{socialNetworkId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "social-networks", "{{socialNetworkId}}"] }
+              }
+            },
+            {
+              "name": "Update social network",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"baseEngagementRate\": 0.08\n}" },
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/social-networks/{{socialNetworkId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "social-networks", "{{socialNetworkId}}"] }
+              }
+            },
+            {
+              "name": "Delete social network (soft delete)",
+              "request": {
+                "method": "DELETE",
+                "url": { "raw": "{{coreBaseUrl}}/catalogs/social-networks/{{socialNetworkId}}", "host": ["{{coreBaseUrl}}"], "path": ["catalogs", "social-networks", "{{socialNetworkId}}"] }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

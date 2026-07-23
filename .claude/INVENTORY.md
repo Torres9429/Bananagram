@@ -9,18 +9,22 @@ paquete del monorepo. Se generó leyendo el código fuente completo (no se infie
 para Y", "consume tal servicio desde tal front", "elimina/cambia el flujo de Z" — así no hay que re-explorar
 el árbol de archivos correspondiente.
 
-**Última actualización**: 2026-07-19. Si el código diverge de lo aquí descrito, confía en el código y
-actualiza este archivo.
+**Última actualización**: sección 1 (Backend) actualizada 2026-07-23; sección 2 (Frontend) sigue en su
+estado de 2026-07-19. Si el código diverge de lo aquí descrito, confía en el código y actualiza este archivo.
 
 **⚠️ 2026-07-19 — Alineación de mocks/tipos del frontend a `modelo.txt`**: la sección 2 (Frontend) de este
-documento ya refleja el frontend **post-alineación** (tipos/mocks de `@repo/ui` y las 6 apps reescritos
-para seguir el nuevo schema estable en `docs/base/modelo.txt`, no el schema
-Prisma viejo que todavía usa el backend real). La sección 1 (Backend) sigue describiendo el backend TAL
-CUAL ESTÁ HOY — el backend **no fue tocado** en esa alineación (decisión explícita: se reescribirá a
-futuro) y su Prisma schema sigue siendo el antiguo (`Post.brandProfileId`, `BrandUser`, `BrandProfile`,
-`PostStatus` de 6 valores, etc. — ver §1.7). Ver `docs/frontend-db-alignment.md` (análisis + 12 decisiones
-de producto) y `docs/frontend-db-alignment-implementation.md` (registro de la implementación, archivo por
-archivo) para el detalle completo de qué cambió y por qué.
+documento refleja el frontend **post-alineación** (tipos/mocks de `@repo/ui` y las 6 apps reescritos para
+seguir el schema estable en `docs/base/modelo.txt`) — el frontend sigue en modo mock, sin conectar al
+backend real. Ver `docs/frontend-db-alignment.md` (análisis + 12 decisiones de producto) y
+`docs/frontend-db-alignment-implementation.md` (registro de la implementación) para el detalle.
+
+**⚠️ 2026-07-23 — el backend SÍ se tocó de fondo** (la nota anterior de esta sección decía lo contrario,
+ya no aplica): se separaron las bases de datos de `auth-service`/`core-service` adoptando
+`docs/base/modelo2.txt` completo (2 schemas, 2 bases — `gestor_redes_auth`/`gestor_redes_core`), se
+wireó `AuthModule`+`PermissionsModule` en `auth-service` y `CatalogsModule` en `core-service` (ambos
+`AppModule` dejaron de estar vacíos), se arregló el bug de `AuthService.refresh()`, y se protegieron los
+endpoints de catálogos con `JwtAuthGuard` + DTOs con `class-validator`. Detalle completo abajo en cada
+subsección — ya NO hay bandera de "STALE" porque se reescribió.
 
 ---
 
@@ -30,47 +34,48 @@ Este proyecto está en etapa de **scaffold**: la estructura de carpetas/módulos
 convenciones (`agents/conventions.md`), pero la mayoría de las piezas todavía no están conectadas entre sí.
 Antes de asumir que algo "ya funciona", verifica contra esta lista:
 
-### Backend — nada expone rutas de negocio todavía
-- **Los 3 microservicios (`auth`, `core`, `alexa`) tienen `AppModule` con `imports: []`**
-  y un comentario `// TODO: importar módulos de dominio`. Es decir: `AuthModule`, `PermissionsModule`,
-  `CampaignsModule`, `ReportsModule`, `IdeasModule` existen como clases pero **no están registrados** — al
-  levantar cualquiera de estos servicios hoy, no responden en ninguna ruta de negocio (solo Swagger vacío
-  en `/docs` y el prefijo global `api`). `core-service` fusiona lo que antes eran brands/content/analytics
-  -service (una sola carpeta, un solo `main.ts`/puerto/package.json); `alexa-service` es nuevo, BFF de la
-  Alexa Skill, sin base de datos propia (ver `docs/base/service-boundaries.md`).
-- **El gateway no proxea nada.** `http-proxy-middleware` está en `package.json` pero no se usa en ningún
-  archivo. `apps/backend/gateway/src/app.module.ts` solo registra `HealthController` (`GET /health`) +
-  `CorrelationIdMiddleware`. No hay ruta que reenvíe a los microservicios.
-- **`core-service/campaigns`** (controller/service/module/DTOs) son clases completamente vacías —
-  `@Controller('campaigns') export class CampaignsController {}`, sin métodos, sin lógica.
-- **`core-service/reports`** — mismo caso: `ReportsController`/`ReportsService`/`ReportsModule`
-  vacíos, `CreateReportDto` vacío.
-- **`core-service/ideas`** y **`alexa-service/campaigns`+`alexa-service/ideas`** — mismo patrón de stub
-  vacío, nuevos con la reorganización a 3 microservicios (`ContentIdea`, pensado originalmente para un
-  servicio dedicado a Alexa, se queda en `core-service`; `alexa-service` solo tendrá el wiring HTTP hacia
-  `core-service`/`auth-service`, sin lógica ni tablas propias).
-- **La parte de `core-service` que viene de lo que era `content-service` no tiene ningún controller** —
-  solo existe la lógica de dominio sin exponer: `post-state-machine.ts` + `transitions.map.ts` (válido,
-  real), `char-limits.map.ts` (real), `PostSchedulerService` (cron real, `@Cron('* * * * *')`, publica
-  posts `programado`→`publicado`, pero no es alcanzable por HTTP).
-- **Lo que SÍ es lógica de negocio real y completa** (aunque inalcanzable por HTTP hoy):
-  - `core-service` (parte antes `content-service`): máquina de estados de posts, límites de caracteres por red.
-  - `core-service/score/score.service.ts` (antes en `analytics-service`): `ScoreService.calculate(brandId)`
-    — **calcula y persiste** en `brand_scores`. Fórmula real:
-    `score = consistency×0.30 + engagement×0.40 + coverage×0.20 + frequency×0.10`
-    — **esto difiere del texto en `CLAUDE.md`** (`Consistencia×0.30 + Engagement×0.40 + Frecuencia×0.30`,
-    sin término de cobertura). Si te piden tocar el score, confirma con el usuario cuál fórmula es la
-    vigente antes de asumir.
-  - `core-service/cron/metrics-cron.service.ts` (antes en `analytics-service`, `@Cron('0 */6 * * *')`) +
-    `metrics/decay-simulator.ts` — generan métricas simuladas con decaimiento exponencial, real y funcional.
-  - `auth-service`: `AuthController`/`AuthService`/`AuthRepository` completos (login, refresh, logout, me),
-    `PermissionsController` (`GET /me/permissions`) — todos con código real, solo falta el `imports` en
-    `AppModule` para quedar accesibles.
-  - **Bug conocido**: `AuthService.refresh()` re-llama `this.login({ email, password: '' })` con contraseña
-    vacía (`// TODO: refactor` en el propio código) — el `bcrypt.compare` fallará siempre. No es apto para
-    producción tal cual está.
-- Ningún controller usa `PermissionGuard` ni `BrandAccessGuard` todavía (solo `JwtAuthGuard` en
-  `auth-service`). Los guards existen y son correctos, pero no están aplicados con `@UseGuards(...)`.
+### Backend — solo auth-service y core-service responden hoy, y no todo su dominio
+- **`auth-service` y `core-service` ya tienen su `AppModule` wireado** (desde 2026-07-23) —
+  `auth-service` importa `AuthModule` (login/refresh/logout/me) + `PermissionsModule`
+  (`GET /me/permissions`); `core-service` importa `CatalogsModule` (CRUD de categories/specialties/
+  social-networks, protegido con `JwtAuthGuard`). **`alexa-service` sigue con `imports: []`** y el
+  comentario `// TODO: importar módulos de dominio` — no se tocó en esta ronda.
+- **El gateway sigue sin proxear nada.** `http-proxy-middleware` está en `package.json` pero no se usa en
+  ningún archivo. `apps/backend/gateway/src/app.module.ts` solo registra `HealthController` (`GET /health`)
+  + `CorrelationIdMiddleware`. No hay ruta que reenvíe a los microservicios.
+- **`core-service/campaigns`, `core-service/reports`, `core-service/ideas`** siguen siendo clases
+  completamente vacías (`@Controller('campaigns') export class CampaignsController {}`, sin métodos) — no
+  se tocaron. **`alexa-service/campaigns`+`alexa-service/ideas`** — mismo patrón de stub vacío.
+- **La máquina de estados de posts sigue sin ningún controller que la exponga** — `post-state-machine.ts`
+  + `transitions.map.ts` (real, ahora con los 10 valores de `PostStatus` — ver §1.6), `char-limits.map.ts`
+  (real), `PostSchedulerService` (cron real, publica posts `programado`→`publicado`, sin cambios porque no
+  tocaba campos removidos del schema).
+- **Lo que SÍ es lógica de negocio real y completa** (aunque inalcanzable por HTTP salvo lo de auth/catalogs):
+  - `auth-service`: `AuthController`/`AuthService`/`AuthRepository`/`PermissionsController` — **wireados y
+    verificados en vivo** (login, refresh, `/me`, `/me/permissions`, contra su propia BD `gestor_redes_auth`).
+  - `core-service/catalogs/` — CRUD completo de `Category`/`Specialty`/`SocialNetwork`, **wireado,
+    protegido con `JwtAuthGuard` y validado con `class-validator`** (2026-07-23) — verificado en vivo contra
+    `gestor_redes_core`.
+  - `core-service/score/score.service.ts`: `ScoreService.calculate(brandId)` — calcula y persiste en
+    `brand_scores`. Fórmula real: `score = consistency×0.30 + engagement×0.40 + coverage×0.20 +
+    frequency×0.10` — **difiere del texto en `CLAUDE.md`** (3 factores, sin cobertura); confirma con el
+    usuario cuál es la vigente antes de tocarlo. Reescrito 2026-07-23 para el nuevo shape (opera sobre
+    `PostSocialAccount`/`SocialAccount`, ya no `BrandProfile` — ver §1.6).
+  - `core-service/cron/metrics-cron.service.ts` + `metrics/decay-simulator.ts` — métricas simuladas con
+    decaimiento exponencial; reescrito 2026-07-23 para generar `PostMetric` sobre `PostSocialAccount`
+    (antes sobre `Post`+`BrandProfile` directo) y agregó el campo `views`.
+  - **Bug de `AuthService.refresh()` corregido** (2026-07-23) — antes re-llamaba `login()` con
+    `password: ''`, lo cual siempre fallaba; ahora arma el JWT directo desde el usuario del refresh token
+    (método privado `issueTokens()`, compartido con `login()`).
+- **Guards**: `JwtAuthGuard` se usa en `auth-service` (rutas propias) y ahora también en `core-service`
+  (catálogos) — `core-service` tuvo que ganar su propia infraestructura JWT
+  (`src/guards/jwt-auth.guard.ts`, `src/strategies/jwt.strategy.ts`, `src/auth/jwt-auth.module.ts`, todo
+  nuevo 2026-07-23) porque no tenía nada de esto antes (solo `auth-service` hacía login). `PermissionGuard`
+  sigue sin usarse en ningún lado. `BrandAccessGuard` **ya no vive en `commons/`** — se reescribió en
+  `core-service/src/guards/brand-access.guard.ts` (valida acceso a una marca con una consulta LOCAL contra
+  `Brand.ownerId`/`Campaign.cmId`/`CampaignDesigner.userId` usando el `sub` del JWT, sin depender de
+  `brandIds[]` — ver §1.4 y el gap de `brandIds` en `CLAUDE.md`). Existe y compila, pero **todavía no está
+  aplicado a ningún endpoint** (no hay endpoints de `campaigns`/`brands` reales).
 - `AuditInterceptor` tiene un `// TODO: escribir en audit_log con before/after, actor, requestId` — el
   interceptor detecta requests mutantes pero no escribe nada aún.
 
@@ -122,85 +127,143 @@ correspondiente con endpoints reales y reemplazar el `useState`/mock-data por ho
 - `src/middleware/correlation-id.middleware.ts` — genera/propaga `X-Request-Id` (uuid) en cada request.
 - Dependencia `http-proxy-middleware` presente pero **sin uso** (ver §0).
 
-### 1.2 `commons` compartido por auth-service y core-service (`apps/backend/commons/`, paquete `@repo/prisma`, se importa por **ruta relativa**, no por nombre de paquete). `alexa-service` no lo usa — no tiene Prisma ni acceso a la BD.
-- `prisma/schema.prisma` — schema único, 19 tablas (ver `.agents/database.md` y sección 1.6 abajo).
-- `prisma/client.ts` — instancia compartida de `PrismaClient` (`export const prisma = new PrismaClient()`), usada directamente en repositories/services (no hay capa repository formal en todos los servicios — `auth-service` sí tiene `AuthRepository`, el resto llama `prisma.*` directo en el service).
-- `guards/jwt-auth.guard.ts` — `JwtAuthGuard extends AuthGuard('jwt')`.
-- `guards/permission.guard.ts` — lee metadata `@RequirePermission(module, action)`, valida `user.permissions[module].includes(action)`, si no `ForbiddenException`.
-- `guards/brand-access.guard.ts` — valida `request.params.brandId ?? request.params.id` contra `user.brandIds[]`.
-- `decorators/current-user.decorator.ts` — `@CurrentUser()` → `request.user`.
-- `decorators/require-permission.decorator.ts` — `@RequirePermission(module, action)` (SetMetadata).
+### 1.2 `commons` (`apps/backend/commons/`) — ya NO incluye Prisma, y va perdiendo piezas conforme cada servicio se vuelve autocontenido
+Desde `feat/catalogos-base` (mergeada) + la separación de bases del 2026-07-23, cada servicio duplica
+localmente lo que necesita en vez de importarlo de aquí (para ser desplegable solo) — `commons/` queda
+como lo que TODAVÍA no se ha duplicado en ningún lado:
+- ~~`prisma/`~~ — **eliminado 2026-07-23** (schema único + client.ts + migrations). Cada servicio tiene
+  ahora el suyo, ver §1.3/§1.4.
+- ~~`guards/brand-access.guard.ts`~~ — **eliminado 2026-07-23**, reescrito en `core-service/src/guards/`
+  (ya no depende de `brandIds[]` del JWT, ver §1.4).
+- `guards/jwt-auth.guard.ts`, `decorators/current-user.decorator.ts` — siguen aquí, pero **tanto
+  `auth-service` como `core-service` ya tienen su propia copia local** (`src/guards/jwt-auth.guard.ts`,
+  `src/decorators/current-user.decorator.ts` en auth-service; solo el guard en core-service) — nadie
+  importa ya la de `commons/` por path relativo.
+- `guards/permission.guard.ts` — lee metadata `@RequirePermission(module, action)`, valida
+  `user.permissions[module].includes(action)`, si no `ForbiddenException`. Sin duplicar todavía, sin uso.
+- `decorators/require-permission.decorator.ts` — `@RequirePermission(module, action)` (SetMetadata). Sin uso.
 - `interceptors/audit.interceptor.ts` — detecta POST/PUT/PATCH/DELETE, **TODO sin implementar** (no escribe en `audit_log` aún).
 - `interceptors/logging.interceptor.ts` — loguea `METHOD url — Nms` con `Logger('HTTP')`.
 - `filters/http-exception.filter.ts` — formatea `HttpException` a `{statusCode, timestamp, path, message}`.
-- `circuit-breaker/opossum.factory.ts` — `createCircuitBreaker(fn, options)` con defaults `timeout:5000, errorThresholdPercentage:50, resetTimeout:30000`. No hay ningún caller todavía (REST síncrono entre servicios aún no implementado, ADR-0003).
-- `types/jwt-payload.type.ts` — `JwtPayload { sub, email, role, brandIds: string[], permissions: Record<string,string[]> }`.
-- `types/roles.enum.ts` — `Role { ADMINISTRADOR='administrador', COMMUNITY_MANAGER='community_manager', DISENADOR='disenador', CLIENTE='cliente' }`.
-- `types/modules.enum.ts` — `AppModule { MARCAS, PUBLICACIONES, CALENDARIO, CAMPANAS, METRICAS, SCORE, REPORTES, USUARIOS, PRIVILEGIOS }` (slugs en español, distinto del enum de módulos del frontend que usa slugs en inglés — ver §2.1).
-- `types/actions.enum.ts` — `AppAction { VER, CREAR, EDITAR, ELIMINAR, APROBAR, RECHAZAR, EXPORTAR, CONFIGURAR, ASIGNAR }` (también en español, distinto del frontend).
-- `types/post-status.enum.ts` — `PostStatus { BORRADOR, EN_REVISION, APROBADO, RECHAZADO, PROGRAMADO, PUBLICADO }`.
+- `circuit-breaker/opossum.factory.ts` — `createCircuitBreaker(fn, options)` con defaults `timeout:5000, errorThresholdPercentage:50, resetTimeout:30000`. Sin caller todavía (ADR-0003).
+- `types/jwt-payload.type.ts` — `JwtPayload { sub, email, role, brandIds: string[], permissions: Record<string,string[]> }` — `brandIds` siempre `[]` en la práctica, ver §1.3/§1.4.
+- `types/roles.enum.ts`, `types/modules.enum.ts`, `types/actions.enum.ts` — slugs en español (distinto del frontend, que usa inglés — ver §2.1).
+- `types/post-status.enum.ts` — **ya no se usa** para el enum real; `core-service` tiene su propia copia local en `src/types/post-status.enum.ts` con los 10 valores nuevos (ver §1.4/§1.6).
 
-### 1.3 `auth-service` (puerto 3001, paquete `@repo/auth-service`)
-**Módulo NO registrado en `AppModule`** (ver §0), pero el código es real y completo:
-- `POST auth/login` — `LoginDto { email (IsEmail), password (IsString, MinLength(6)) }` → `{accessToken, refreshToken}`. Valida contra `prisma.user` (bcrypt), arma `permissions` desde `role_permissions`, `brandIds` desde `brand_users`.
-- `POST auth/refresh` — `RefreshDto { refreshToken: string }` → **bug**: re-llama login con password vacía (ver §0).
+### 1.3 `auth-service` (puerto 3001, paquete `@repo/auth-service`) — wireado y verificado en vivo 2026-07-23
+- **`app.module.ts` importa `AuthModule` + `PermissionsModule`** — ya no está vacío.
+- `POST auth/login` — `LoginDto { email (IsEmail), password (IsString, MinLength(6)) }` →
+  `{accessToken, refreshToken}` (`refreshToken` es el registro completo de `refresh_tokens`, no un
+  string — el campo real a mandar a `/auth/refresh` es `refreshToken.token`). Valida contra `prisma.user`
+  (bcrypt) — el `User` de este servicio **ya no tiene `firstName`/`lastName`** (ver §1.6), ni `brandUsers`
+  (`BrandUser` ya no existe). `permissions` se arma desde `role_permissions`; `brandIds` siempre `[]`
+  (Brand vive en la BD de `core-service` — ver `CLAUDE.md` para el detalle de por qué y cómo se resolvió
+  vía `BrandAccessGuard` en core-service en vez de esto).
+- `POST auth/refresh` — `RefreshDto { refreshToken: string }` → **bug corregido 2026-07-23** (antes
+  re-llamaba `login()` con `password: ''`, siempre fallaba). Ahora `AuthService.issueTokens(user)` es un
+  método privado compartido por `login()` y `refresh()` que arma el JWT directo, sin volver a checar contraseña.
 - `POST auth/logout` — requiere `JwtAuthGuard`, revoca todos los refresh tokens del usuario.
 - `GET auth/me` — requiere `JwtAuthGuard`, devuelve el payload del JWT tal cual.
-- `GET me/permissions` (`PermissionsController`) — requiere `JwtAuthGuard`, devuelve `{ permissions, brandIds }` del JWT. **Esta es la ruta que el frontend consulta como fuente de verdad del menú** (`GET /me/permissions`, documentado en `CLAUDE.md`).
-- `PermissionsService.updateRolePermission(roleId, moduleId, actionId, allowed)` — lógica de upsert en `role_permissions` lista, pero **sin controller/endpoint que la exponga** todavía (no hay `PATCH /roles/privileges` ni similar — el frontend `admin-front/roles` ya tiene el UI mock listo para consumir algo así, ver §2.4).
-- Refresh tokens: 7 días, single-use, `usedAt` marca consumo (`AuthRepository.markTokenUsed`).
-- `JwtStrategy` — extrae Bearer token, secret `JWT_SECRET` env (fallback `'supersecret'`), `validate(payload) { return payload }` (sin verificación adicional de usuario existente).
+- `GET me/permissions` (`PermissionsController`) — requiere `JwtAuthGuard`, devuelve `{ permissions, brandIds }` del JWT. **Esta es la ruta que el frontend consulta como fuente de verdad del menú.**
+- `PermissionsService.updateRolePermission(...)` — lógica de upsert lista, sin controller/endpoint que la exponga todavía.
+- Refresh tokens: 7 días, single-use, `usedAt` marca consumo.
+- `JwtStrategy`/`JwtAuthGuard`/`CurrentUser` — copias **locales** en `src/strategies/`, `src/guards/`, `src/decorators/` (ya no se importan de `commons/`).
+- **BD propia**: `apps/backend/services/auth-service/prisma/schema.prisma`, base `gestor_redes_auth`. Prisma Client con `output` personalizado en `node_modules/.prisma-client` (ver comentario en el schema — necesario para no chocar con el de `core-service`).
 
-### 1.4 `core-service` (puerto 3002, paquete `@repo/core-service`) — fusiona lo que antes eran brands-service + content-service + analytics-service
-- **`campaigns/`** (antes brands-service) — controller/service/module/DTOs **totalmente vacíos** (ver §0). No hay nada más del dominio "marcas" (no hay módulo de `brands`/`brand-profiles`/`brand-users` pese a que el schema Prisma sí los define).
-- **Parte "posts" (antes content-service), sin ningún controller.** Solo lógica de dominio pura:
-  - `posts/state-machine/transitions.map.ts` — `VALID_TRANSITIONS`: `borrador→en_revision→{aprobado|rechazado}`, `aprobado→programado→publicado`, `rechazado→borrador`, `publicado→[]` (terminal).
-  - `posts/state-machine/post-state-machine.ts` — `validateTransition(from, to, comment?, createdBy?, userId?)`: transición inválida → `422`; `to=rechazado` sin `comment` → `400`; `to=aprobado` con `createdBy===userId` → `403` (regla "el creador no puede aprobar", ver `CLAUDE.md`).
-  - `char-limits/char-limits.map.ts` — `CHAR_LIMITS`: x=280, instagram=2200, linkedin=3000, facebook=63206, tiktok=2200, youtube=5000.
-  - `scheduler/post-scheduler.service.ts` — `@Cron('* * * * *')`, cada minuto publica posts `programado` cuyo `scheduledAt<=now` → `publicado` + `publishedAt`. Real y funcional en cron, pero sin HTTP.
-- **Parte "analítica" (antes analytics-service)**:
-  - `reports/` — controller/service/module/DTO **totalmente vacíos** (ver §0).
-  - `score/score.service.ts` — `ScoreService.calculate(brandId)`: real, calcula y persiste en `brand_scores`. Componentes: `consistency` (% posts en horario pico 9/12/18/20h), `engagement` (curva por tramos sobre `engagementRate` promedio), `coverage` (% redes activas con ≥1 post), `frequency` (100 − desviación estándar de días entre posts ×10). **Fórmula: `score = consistency×0.30 + engagement×0.40 + coverage×0.20 + frequency×0.10`** — ver discrepancia con `CLAUDE.md` en §0. `classification`: ≤40 'bajo', ≤70 'medio', si no 'alto'.
-  - `cron/metrics-cron.service.ts` — `@Cron('0 */6 * * *')`, genera `post_metrics` simuladas para posts publicados en los últimos 7 días.
-  - `metrics/decay-simulator.ts` — `simulateMetrics(followers, baseEngagementRate, publishedAt)`: `likes = followers × baseEngagementRate × e^(-horasDesdePublicado/48) × random[0.8,1.2]`, deriva `comments`/`shares`/`reach`/`engagementRate`.
-- **`ideas/`** (nuevo, dominio `ContentIdea` para la Alexa Skill) — controller/service/module/DTO **totalmente vacíos**, mismo patrón que `campaigns/`/`reports/`. Endpoints previstos (sin implementar): `POST/GET /campaigns/:id/ideas`, `DELETE /ideas/:id` — ver `docs/base/modelo2.txt` sección core-service.
+### 1.4 `core-service` (puerto 3002, paquete `@repo/core-service`) — fusiona brands+content+analytics-service; único módulo de dominio wireado hoy: catálogos
+- **`catalogs/`** (`CategoriesController`, `SpecialtiesController`, `SocialNetworksController`, todos bajo
+  `catalogs/*`) — CRUD completo de `Category`/`Specialty`/`SocialNetwork`, **wireado en `AppModule`**,
+  **protegido con `JwtAuthGuard`** (2026-07-23 — antes no tenía ningún guard) y **DTOs con
+  `class-validator`** (`@IsString`/`@IsNotEmpty`/`@IsNumber`/`@Min(0)`, antes eran clases vacías con
+  validación a mano). `core-service` no tenía ninguna infraestructura JWT propia — se creó
+  `src/guards/jwt-auth.guard.ts`, `src/strategies/jwt.strategy.ts`, `src/auth/jwt-auth.module.ts` (valida
+  el mismo `JWT_SECRET` que emite `auth-service`, no hace login propio).
+- **`campaigns/`, `reports/`, `ideas/`** — controller/service/module/DTOs **totalmente vacíos**, sin tocar.
+- **`posts/state-machine/`** — sin controller. `transitions.map.ts` cubre ahora 10 estados (antes 6, ver
+  §1.6): `borrador→en_revision→{aprobado|rechazado}`, `rechazado→borrador`, `aprobado→programado`,
+  `programado→{publicando|cancelado}`, `publicando→{publicado|parcial|error|cancelado}` (el tramo nuevo es
+  traducción directa del comentario ya escrito en `docs/base/modelo2.txt`, no lógica de negocio nueva).
+  `post-state-machine.ts` (`validateTransition`) sin cambios estructurales.
+- `char-limits/char-limits.map.ts` — sin cambios.
+- `scheduler/post-scheduler.service.ts` — sin cambios (no tocaba campos removidos del schema).
+- `score/score.service.ts` — `ScoreService.calculate(brandId)`: real, calcula y persiste en
+  `brand_scores`. **Reescrito 2026-07-23** para el nuevo shape: antes leía `Post.metrics`/`BrandProfile`
+  directo; ahora un `Post` puede fan-out a varias redes (`PostSocialAccount`), así que agrega
+  `post.socialAccounts.flatMap(sa => sa.metrics)` para engagement, y cuenta `SocialAccount` (no
+  `BrandProfile`) para cobertura. Misma fórmula: `score = consistency×0.30 + engagement×0.40 +
+  coverage×0.20 + frequency×0.10` — sigue difiriendo del texto de `CLAUDE.md` (3 factores).
+- `cron/metrics-cron.service.ts` — **reescrito 2026-07-23**: antes generaba `PostMetric` sobre
+  `Post`+`BrandProfile` directo; ahora consulta `PostSocialAccount` (`status: 'publicado'`) y crea
+  `PostMetric` con `postSocialAccountId` (antes `postId`+`brandProfileId`).
+- `metrics/decay-simulator.ts` — `simulateMetrics(...)` ahora también devuelve `views` (campo nuevo del
+  schema) y renombró `engagementRate`→`engagement` (mismo nombre que el campo real de `PostMetric`).
+- **Guards nuevos en `src/guards/`**: `jwt-auth.guard.ts` (ver arriba) y `brand-access.guard.ts`
+  (**reescrito** desde la versión vieja de `commons/` — ya no depende de `user.brandIds[]`, valida con una
+  consulta LOCAL a su propia BD: `Brand.ownerId` o `Campaign.cmId`/`CampaignDesigner.userId` para el
+  `brandId` del request, usando `user.sub`. Existe y compila, **sin aplicar a ningún endpoint todavía**).
+- **BD propia**: `apps/backend/services/core-service/prisma/schema.prisma`, base `gestor_redes_core`. Mismo mecanismo de `output` personalizado que auth-service.
 
-### 1.5 `alexa-service` (puerto 3004, paquete `@repo/alexa-service`) — nuevo, BFF de la Alexa Skill
-- **Sin base de datos propia** — no tiene Prisma, no importa `commons/prisma`. Su única razón de ser es
-  traducir los intents del Lambda de la skill en llamadas HTTP a `core-service` (campañas, métricas,
-  ideas) y `auth-service` (account-linking/identidad).
-- `campaigns/` e `ideas/` — controller/service/module **totalmente vacíos**, mismo patrón de stub que el
-  resto del repo. Cuando se implemente, cada método hará un `fetch`/circuit-breaker hacia el endpoint
-  equivalente de `core-service`, no lógica de negocio propia.
-- Ver `docs/skill/AlexaSkill-Diseno-Final.md` y `docs/skill/lambda-codigo-por-pasos.md` para el contrato
-  completo de endpoints que este servicio debe exponer al Lambda.
+### 1.5 `alexa-service` (puerto 3004, paquete `@repo/alexa-service`) — nuevo, BFF de la Alexa Skill. Sin cambios en esta ronda.
+- **Sin base de datos propia** — no tiene Prisma. Su única razón de ser es traducir los intents del Lambda
+  de la skill en llamadas HTTP a `core-service` (campañas, métricas, ideas) y `auth-service`
+  (account-linking/identidad).
+- `campaigns/` e `ideas/` — controller/service/module **totalmente vacíos**. `AppModule` sigue con
+  `imports: []` — no se tocó en la sesión del 2026-07-23 (alcance era solo auth-service/core-service).
+- Ver `docs/skill/AlexaSkill-Diseno-Final.md` y `docs/skill/lambda-codigo-por-pasos.md` para el contrato completo.
 
-### 1.6 Modelo de datos (`apps/backend/commons/prisma/schema.prisma`) — resumen de tablas
-Identidad/acceso: `Role`, `Module`, `Action`, `RolePermission` (RBAC dinámico), `User`, `RefreshToken`.
-Catálogos: `Category`, `Specialty`, `SocialNetwork`, `UserCategory`, `UserSpecialty`.
-Marcas: `Brand` (`type: brand|profile`), `BrandProfile` (una fila por red social de una marca), `BrandUser`.
-Contenido: `Campaign`, `CampaignTeam`, `CampaignCategory`, `Post`, `PostStatusHistory` (BIGINT, inmutable), `ContentIdea` (nuevo, ideas de contenido de la Alexa Skill).
-Analítica: `PostMetric`, `BrandScore`, `Report`.
-Auditoría: `AuditLog` (BIGINT, inmutable), `Notification`.
-Todas las tablas de negocio: `deletedAt` (soft delete), `createdAt`/`updatedAt`, UUID PK excepto `AuditLog`/`PostStatusHistory` (BIGINT autoincrement).
+### 1.6 Modelo de datos — 2 schemas separados desde 2026-07-23 (antes 1 solo, `commons/prisma/schema.prisma`, ya eliminado)
+`docs/base/modelo2.txt` es la fuente de verdad; copiado tal cual a
+`apps/backend/services/{auth,core}-service/prisma/schema.prisma`.
+
+**auth-service** (`gestor_redes_auth`): `Role`, `Module`, `Action`, `RolePermission` (RBAC dinámico),
+`User` (ya **sin** `firstName`/`lastName`), `RefreshToken`, `PasswordResetToken` (nuevo), `Notification`,
+`AuditLog` (BIGINT, inmutable). `UserStatus` enum nuevo (`pending`/`active`/`suspended`, todos nacen `active`).
+
+**core-service** (`gestor_redes_core`): `Category`/`Specialty`/`SocialNetwork` (catálogos, dueño
+core-service, ya no auth-service), `UserProfile` (nuevo — `name`/`avatarUrl`, vinculado a `User` por
+`userId` **sin `@relation` real** porque son bases distintas) + `UserProfileCategory`/
+`UserProfileSpecialty` (reemplazan a `UserCategory`/`UserSpecialty`, que desaparecieron), `Brand`
+(**ya sin `type: brand|profile`**, campo `profileType` en su lugar; **`BrandUser` desapareció** —
+ownership singular vía `Brand.ownerId`), `SocialAccount` (reemplaza a `BrandProfile`), `Campaign`
+(**`CampaignTeam` desapareció** — CM vía `Campaign.cmId` directo, Diseñadores vía `CampaignDesigner`),
+`CampaignCategory`, `Post` (ya no 1:1 con una red — fan-out vía `PostSocialAccount`), `PostStatusHistory`
+(BIGINT, inmutable), `PostSocialAccount` (nuevo, capa 2: publicación física por red), `Media`/`PostMedia`
+(nuevo, biblioteca de medios), `ContentIdea`, `PostMetric` (ahora cuelga de `PostSocialAccount`, no de
+`Post` directo; campos `likes/comments/shares/views/reach` todos opcionales, campo `engagement` en vez de
+`engagementRate`), `BrandScore`, `Report`, `AuditLog` (BIGINT, inmutable, copia local igual que auth-service).
+
+`PostStatus` pasó de 6 a 10 valores: `borrador`, `en_revision`, `aprobado`, `rechazado`, `programado`,
+**`publicando`** (nuevo), `publicado`, **`parcial`**, **`error`**, **`cancelado`** (los últimos 3 nuevos,
+cubren el resultado del fan-out multi-red). `PostSocialAccountStatus` es un enum nuevo y separado
+(`pendiente`/`publicando`/`publicado`/`error`/`cancelado`) para el estado de cada red individual.
+
+Todas las tablas de negocio: `deletedAt` (soft delete), `createdAt`/`updatedAt`, UUID PK excepto
+`AuditLog`/`PostStatusHistory` (BIGINT autoincrement).
 
 ### 1.7 Seed / credenciales demo (`packages/seed/src/index.js`)
-Corre con `pnpm seed`. Crea (idempotente, `upsert`):
-- 9 módulos / 9 acciones (mismos slugs que `commons/types/modules.enum.ts` / `actions.enum.ts`).
-- 4 roles con matriz de permisos: `administrador` (acceso total a todo), `community_manager`
-  (`publicaciones: ver/crear/editar`, `calendario: ver/crear/editar`, `campanas: ver/crear/editar/asignar`,
-  `metricas/score/reportes: ver`), `disenador` (`publicaciones: ver/crear`, `calendario: ver`, `campanas: ver`),
-  `cliente` (`publicaciones: ver/aprobar/rechazar`, `calendario: ver`, `campanas: ver/crear`,
-  `metricas/score: ver`, `reportes: ver/exportar`).
-- **5 usuarios demo** (mismas credenciales que el modo mock del frontend — ver §2.1):
+Corre con `pnpm seed`. **Reescrito 2026-07-23** para escribir en las 2 bases (antes una sola): usa 2
+Prisma Clients (`authPrisma`/`corePrisma`), importados directo desde
+`apps/backend/services/{auth,core}-service/node_modules/.prisma-client` (no hay paquete `@repo/prisma`
+compartido — se eliminó junto con `commons/prisma/`). Crea (idempotente, `upsert`):
+- 9 módulos / 9 acciones (mismos slugs que `commons/types/modules.enum.ts` / `actions.enum.ts`), en `authPrisma`.
+- 4 roles con matriz de permisos, en `authPrisma` — sin cambios en la matriz.
+- **5 usuarios demo**, en `authPrisma` (ya sin `firstName`/`lastName` — el nombre se compone y se guarda
+  aparte en `UserProfile.name`, en `corePrisma`, vinculado por `userId`):
   | Email | Password | Rol |
   |---|---|---|
-  | admin@bananagram.mx | admin123 | administrador |
+  | 20233tn102@utez.edu.mx | admin123 | administrador |
   | cm@bananagram.mx | cm123456 | community_manager |
   | disenador@bananagram.mx | diseno123 | disenador |
   | cliente@bananagram.mx | cliente123 | cliente |
   | alex@bananagram.mx | alex12345 | cliente |
-- Catálogos: 8 categorías, 7 especialidades, 6 redes sociales (IG/TK/FB/X/LI/YT con `baseEngagementRate`).
+  (el admin ya no es `admin@bananagram.mx` — se cambió al correo real del usuario a pedido suyo; esto
+  desincroniza ese usuario específico de `apps/frontend/commons/src/mocks/mock-users.ts`, que sigue
+  usando el email viejo — nadie lo actualizó ahí, el frontend sigue en modo mock sin conectar al backend real).
+- **`seedCatalogs()` se eliminó del seed** (2026-07-23, a pedido del usuario, para poder probar el CRUD de
+  catálogos desde cero vía Postman/API en vez de datos precargados) — el seed **ya no crea**
+  categorías/especialidades/redes sociales. Si hace falta data de catálogos para probar algo, hay que
+  crearla a mano vía `POST /api/catalogs/*` (ahora protegido con `JwtAuthGuard`, ver §1.4) o volver a
+  agregar esa función si se decide revertir esto.
 
 ---
 
