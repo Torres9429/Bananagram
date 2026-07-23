@@ -1,8 +1,13 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CatalogsService } from './catalogs.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
+@ApiTags('catalogs')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('catalogs/categories')
 export class CategoriesController {
   constructor(private readonly catalogs: CatalogsService) {}

@@ -24,15 +24,6 @@ importers:
         specifier: ^2.0.0
         version: 2.10.0
 
-  apps/backend/commons:
-    dependencies:
-      '@prisma/client':
-        specifier: ^5.0.0
-        version: 5.22.0(prisma@5.22.0)
-      prisma:
-        specifier: ^5.0.0
-        version: 5.22.0
-
   apps/backend/gateway:
     dependencies:
       '@nestjs/common':
@@ -212,6 +203,9 @@ importers:
       '@nestjs/testing':
         specifier: ^10.0.0
         version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22)(@nestjs/platform-express@10.4.22)
+      '@types/passport-jwt':
+        specifier: ^4.0.0
+        version: 4.0.1
       jest:
         specifier: ^29.0.0
         version: 29.7.0(@types/node@20.19.43)(babel-plugin-macros@3.1.0)
