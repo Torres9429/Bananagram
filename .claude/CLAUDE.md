@@ -35,7 +35,19 @@ end-to-end todavía.
   máquina de estados de posts, score, cron de métricas, ahora todo dentro de core-service) es real.
   `core-service` fusiona lo que antes eran brands/content/analytics-service; `alexa-service` es nuevo,
   BFF de la Alexa Skill, sin base de datos propia (ver `docs/base/service-boundaries.md`).
-- **El gateway no proxea nada** — `http-proxy-middleware` está instalado pero sin usar; solo expone `/health`.
+  `auth-service` ya registra `AuthModule`+`PermissionsModule` y `core-service` ya registra
+  `CatalogsModule` (desde 2026-07-23) — la afirmación de arriba ya no aplica a esos dos, solo a
+  `alexa-service`.
+- **El gateway ya proxea de verdad** (desde 2026-07-23): `/api/auth/*` y `/api/me/*` →
+  `AUTH_SERVICE_URL`, `/api/catalogs/*` → `CORE_SERVICE_URL` (env vars, con split host/Docker igual que
+  `DATABASE_URL_AUTH`/`CORE`). `main.ts` crea la app con `{ bodyParser: false }` — necesario para que
+  `http-proxy-middleware` reciba el stream del body sin consumir (si Nest lo parseara antes, los
+  POST/PATCH llegarían vacíos al servicio destino). Montado con `app.use(createProxyMiddleware(...))`
+  **sin** pasar el path como argumento de `app.use()` — Express recorta ese prefijo de `req.url` antes de
+  pasarlo al middleware si se hace así, rompiendo el proxy; se usa `pathFilter` en su lugar, que matchea
+  sobre la URL completa sin tocarla. Verificado con `docker run` real, contenedores separados
+  comunicándose por nombre de servicio en la red de Docker. Sigue faltando agregar rutas nuevas
+  (`/api/campaigns/*`, etc.) conforme se construyan esos módulos.
 - `core-service/campaigns`, `core-service/reports` y `core-service/ideas` son stubs vacíos (sin métodos),
   igual que `alexa-service/campaigns` y `alexa-service/ideas`.
 - **Todo el frontend corre en modo mock**: login/registro/sesión usan JWTs sin firmar generados en

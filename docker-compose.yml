@@ -63,6 +63,12 @@ services:
       context: .
       dockerfile: apps/backend/gateway/Dockerfile
     env_file: .env
+    environment:
+      # el .env de la raíz trae localhost:3001/3002 (para pnpm dev en el
+      # host); dentro de la red de compose, cada servicio se resuelve por
+      # su nombre — mismo patrón que DATABASE_URL_AUTH/CORE.
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CORE_SERVICE_URL: http://core-service:3002
     ports: ["4000:4000"]
     depends_on:
       - auth-service
