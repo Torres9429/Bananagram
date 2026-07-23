@@ -14,7 +14,7 @@ no tiene tablas propias — consume las APIs de los otros dos.
 | Dominio           | Tablas                                                          |
 |-------------------|-----------------------------------------------------------------|
 | Identidad/acceso  | users, roles, actions, modules, role_permissions, refresh_tokens|
-| Catálogos         | categories, specialties, social_networks                        |
+| Catálogos         | categories, specialties, social_networks, user_profiles, user_profile_categories, user_profile_specialties |
 | Pivotes usuario   | user_categories, user_specialties                               |
 | Marcas            | brands, brand_profiles, brand_users                             |
 | Contenido         | campaigns, campaign_team, campaign_categories, posts, post_status_history, content_ideas |

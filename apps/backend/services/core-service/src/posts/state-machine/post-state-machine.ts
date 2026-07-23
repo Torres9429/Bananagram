@@ -1,5 +1,5 @@
 import { UnprocessableEntityException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { PostStatus } from '../../../../../commons/types/post-status.enum';
+import { PostStatus } from '../../types/post-status.enum';
 import { VALID_TRANSITIONS } from './transitions.map';
 
 export function validateTransition(from: PostStatus, to: PostStatus, comment?: string, createdBy?: string, userId?: string) {

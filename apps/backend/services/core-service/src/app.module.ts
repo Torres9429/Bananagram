@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
-// TODO: importar módulos de dominio
-@Module({ imports: [] })
+import { CatalogsModule } from './catalogs/catalogs.module';
+
+@Module({ imports: [CatalogsModule] })
 export class AppModule {}
