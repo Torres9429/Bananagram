@@ -7,9 +7,12 @@ export class ScoreService {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
+    // Post (Capa 1) ya no es 1:1 con una red — el fan-out multi-red vive en
+    // PostSocialAccount (Capa 2), y las métricas cuelgan de ahí (ver
+    // docs/base/modelo2.txt). Un post puede publicarse en varias redes.
     const posts = await prisma.post.findMany({
       where: { brandId, status: 'publicado', publishedAt: { gte: thirtyDaysAgo }, deletedAt: null },
-      include: { metrics: true, brandProfile: true },
+      include: { socialAccounts: { include: { metrics: true } } },
     });
 
     // Consistencia (30%): posts en horarios pico / total posts
@@ -17,18 +20,21 @@ export class ScoreService {
     const peakPosts = posts.filter(p => p.publishedAt && peakHours.includes(new Date(p.publishedAt).getHours()));
     const consistency = posts.length > 0 ? (peakPosts.length / posts.length) * 100 : 0;
 
-    // Engagement (40%)
-    const avgEngagement = posts.length > 0
-      ? posts.reduce((sum, p) => sum + (p.metrics[0]?.engagementRate ?? 0), 0) / posts.length
+    // Engagement (40%): promedio de las métricas de todas las redes en las
+    // que se publicó cada post (antes había una sola red por post; ahora
+    // puede haber varias vía PostSocialAccount).
+    const allMetrics = posts.flatMap(p => p.socialAccounts.flatMap(sa => sa.metrics));
+    const avgEngagement = allMetrics.length > 0
+      ? allMetrics.reduce((sum, m) => sum + (m.engagement ?? 0), 0) / allMetrics.length
       : 0;
     const engagement = avgEngagement <= 2 ? (avgEngagement / 2) * 50
       : avgEngagement <= 5 ? 50 + ((avgEngagement - 2) / 3) * 30
       : Math.min(100, 80 + ((avgEngagement - 5) / 5) * 20);
 
-    // Cobertura (20%): redes con ≥1 post / total redes activas
-    const activeProfiles = await prisma.brandProfile.count({ where: { brandId, active: true, deletedAt: null } });
-    const networksWithPosts = new Set(posts.map(p => p.brandProfileId)).size;
-    const coverage = activeProfiles > 0 ? (networksWithPosts / activeProfiles) * 100 : 0;
+    // Cobertura (20%): cuentas sociales con ≥1 post / total cuentas activas
+    const activeAccounts = await prisma.socialAccount.count({ where: { brandId, active: true, deletedAt: null } });
+    const networksWithPosts = new Set(posts.flatMap(p => p.socialAccounts.map(sa => sa.socialAccountId))).size;
+    const coverage = activeAccounts > 0 ? (networksWithPosts / activeAccounts) * 100 : 0;
 
     // Frecuencia (10%): 100 − (desv. estándar de días entre posts × 10)
     let frequency = 50; // neutro si < 2 posts

@@ -10,6 +10,7 @@ export function simulateMetrics(followers: number, baseEngagementRate: number, p
   const comments = Math.round(likes * 0.05 * random);
   const shares   = Math.round(likes * 0.02 * random);
   const reach    = Math.round(followers * (0.1 + decay * 0.3) * random);
-  const engagementRate = reach > 0 ? ((likes + comments + shares) / reach) * 100 : 0;
-  return { likes, comments, shares, reach, engagementRate: Math.round(engagementRate * 100) / 100 };
+  const views    = Math.round(reach * (1.2 + Math.random() * 0.8)); // impresiones ≥ reach (mismo usuario puede ver más de una vez)
+  const engagement = reach > 0 ? ((likes + comments + shares) / reach) * 100 : 0;
+  return { likes, comments, shares, views, reach, engagement: Math.round(engagement * 100) / 100 };
 }
