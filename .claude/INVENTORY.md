@@ -40,9 +40,10 @@ Antes de asumir que algo "ya funciona", verifica contra esta lista:
   (`GET /me/permissions`); `core-service` importa `CatalogsModule` (CRUD de categories/specialties/
   social-networks, protegido con `JwtAuthGuard`). **`alexa-service` sigue con `imports: []`** y el
   comentario `// TODO: importar módulos de dominio` — no se tocó en esta ronda.
-- **El gateway sigue sin proxear nada.** `http-proxy-middleware` está en `package.json` pero no se usa en
-  ningún archivo. `apps/backend/gateway/src/app.module.ts` solo registra `HealthController` (`GET /health`)
-  + `CorrelationIdMiddleware`. No hay ruta que reenvíe a los microservicios.
+- **El gateway ya proxea de verdad** (2026-07-23): `/api/auth/*`+`/api/me/*` → `auth-service`,
+  `/api/catalogs/*` → `core-service`, vía `http-proxy-middleware` montado en `main.ts` (no en
+  `app.module.ts`, que sigue solo con `HealthController`+`CorrelationIdMiddleware`). Ver §1.1 para el
+  detalle de implementación. Falta agregar rutas nuevas conforme se construyan más módulos de dominio.
 - **`core-service/campaigns`, `core-service/reports`, `core-service/ideas`** siguen siendo clases
   completamente vacías (`@Controller('campaigns') export class CampaignsController {}`, sin métodos) — no
   se tocaron. **`alexa-service/campaigns`+`alexa-service/ideas`** — mismo patrón de stub vacío.
@@ -120,12 +121,26 @@ correspondiente con endpoints reales y reemplazar el `useState`/mock-data por ho
 
 ## 1. Backend
 
-### 1.1 Gateway (`apps/backend/gateway/`, puerto 4000, paquete `@repo/api-gateway`)
-- `src/main.ts` — `NestFactory.create(AppModule)`, `app.enableCors()`, `listen(4000)`. Sin Swagger, sin prefix global.
+### 1.1 Gateway (`apps/backend/gateway/`, puerto 4000, paquete `@repo/api-gateway`) — proxea de verdad desde 2026-07-23
+- `src/main.ts` — `NestFactory.create(AppModule, { bodyParser: false })` (el `false` es necesario: si Nest
+  parseara el body antes de llegar al proxy, `http-proxy-middleware` reenviaría POST/PATCH con el body ya
+  consumido/vacío). `app.enableCors()`, `listen(4000)`. Sin Swagger, sin prefix global.
+- Monta 3 proxies con `app.use(createProxyMiddleware({ pathFilter, target, changeOrigin: true }))` — **sin**
+  pasar el path a `app.use()` (si se hiciera `app.use('/api/auth', ...)`, Express recortaría ese prefijo de
+  `req.url` antes de pasarlo al middleware, y el proxy reenviaría `/login` en vez de `/api/auth/login`).
+  `pathFilter` matchea sobre la URL completa sin tocarla:
+  - `/api/auth` → `AUTH_SERVICE_URL`
+  - `/api/me` → `AUTH_SERVICE_URL`
+  - `/api/catalogs` → `CORE_SERVICE_URL`
+  Faltan agregar rutas nuevas conforme se construyan (`/api/campaigns`, `/api/posts`, etc. → `CORE_SERVICE_URL`).
+- `AUTH_SERVICE_URL`/`CORE_SERVICE_URL` — mismo patrón host-vs-Docker que `DATABASE_URL_AUTH`/`CORE`:
+  `.env` trae `localhost:3001`/`3002` (para `pnpm dev`), `docker-compose.yml` los override con
+  `http://auth-service:3001`/`http://core-service:3002` (nombre del servicio en la red de compose).
 - `src/app.module.ts` — `controllers: [HealthController]`, aplica `CorrelationIdMiddleware` a `'*'`.
 - `src/health/health.controller.ts` — `GET /health` → `{ status: 'ok', timestamp }`.
 - `src/middleware/correlation-id.middleware.ts` — genera/propaga `X-Request-Id` (uuid) en cada request.
-- Dependencia `http-proxy-middleware` presente pero **sin uso** (ver §0).
+- Verificado en vivo y en Docker real (3 contenedores separados, comunicándose por nombre de servicio):
+  login, `/me/permissions`, catálogos (incluyendo `POST` con body) todo a través de `localhost:4000/api/...`.
 
 ### 1.2 `commons` (`apps/backend/commons/`) — ya NO incluye Prisma, y va perdiendo piezas conforme cada servicio se vuelve autocontenido
 Desde `feat/catalogos-base` (mergeada) + la separación de bases del 2026-07-23, cada servicio duplica
