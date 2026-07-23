@@ -1,0 +1,31 @@
+# Backend Docker build context = repo root. Keep this list conservative:
+# excluding something the pnpm install / prisma generate / nest build steps
+# need will fail the build, so when in doubt, don't exclude it.
+
+.git
+
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+
+# Stale TypeScript incremental-build caches must never ride along into a
+# Docker build: if present without a matching dist/, tsc treats the project
+# as already up to date and silently emits nothing (0 files, exit 0). This
+# has actually happened in this repo (auth-service/core-service committed
+# tsconfig.build.tsbuildinfo files) — always force a full compile in images.
+**/*.tsbuildinfo
+
+# Frontend apps are out of scope for backend images.
+apps/frontend
+
+# Misc repo housekeeping not needed to build/run the backend.
+docs
+.planning
+.claude
+.github
+infra
+*.md
+.env
+.env.*
