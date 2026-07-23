@@ -7,7 +7,7 @@ export class AuthRepository {
   findByEmail(email: string) {
     return prisma.user.findFirst({
       where: { email, deletedAt: null },
-      include: { role: true, brandUsers: true },
+      include: { role: true },
     });
   }
 
@@ -35,7 +35,7 @@ export class AuthRepository {
   findRefreshToken(token: string) {
     return prisma.refreshToken.findUnique({
       where: { token },
-      include: { user: true },
+      include: { user: { include: { role: true } } },
     });
   }
 
