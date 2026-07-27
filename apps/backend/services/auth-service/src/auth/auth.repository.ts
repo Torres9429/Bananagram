@@ -104,4 +104,33 @@ export class AuthRepository {
       data: { revokedAt: new Date() },
     });
   }
+
+  createPasswordResetToken(userId: string) {
+    return prisma.passwordResetToken.create({
+      data: {
+        userId,
+        token: uuidv4(),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
+  }
+
+  findValidPasswordResetToken(token: string) {
+    return prisma.passwordResetToken.findFirst({
+      where: { token, usedAt: null, expiresAt: { gt: new Date() } },
+    });
+  }
+
+  async consumePasswordResetToken(id: string, userId: string, passwordHash: string) {
+    await prisma.$transaction([
+      prisma.passwordResetToken.update({ where: { id }, data: { usedAt: new Date() } }),
+      prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      // Cambiar la contraseña invalida todas las sesiones activas: si alguien
+      // más tenía el password viejo (o robó el refresh token), queda fuera.
+      prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+  }
 }

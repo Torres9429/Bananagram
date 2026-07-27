@@ -4,6 +4,8 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
+import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
+import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 
@@ -39,5 +41,15 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: any) {
     return user;
+  }
+
+  @Post('password-reset/request')
+  requestPasswordReset(@Body() dto: PasswordResetRequestDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('password-reset/confirm')
+  confirmPasswordReset(@Body() dto: PasswordResetConfirmDto) {
+    return this.authService.confirmPasswordReset(dto);
   }
 }

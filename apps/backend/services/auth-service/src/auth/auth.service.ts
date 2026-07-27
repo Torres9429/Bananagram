@@ -3,6 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
+import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -120,5 +122,27 @@ export class AuthService {
   async logout(userId: string) {
     await this.repo.revokeAllTokens(userId);
     return { message: 'Sesión cerrada' };
+  }
+
+  // Respuesta uniforme sin importar si el email existe: no revela identidades.
+  async requestPasswordReset(dto: PasswordResetRequestDto) {
+    const user = await this.repo.findByEmail(dto.email);
+    if (!user) return { requested: true };
+
+    const resetToken = await this.repo.createPasswordResetToken(user.id);
+    // El token en claro solo se expone fuera de producción, para probarlo
+    // localmente sin necesitar un envío de correo real (no implementado).
+    return process.env.NODE_ENV === 'production'
+      ? { requested: true }
+      : { requested: true, devToken: resetToken.token };
+  }
+
+  async confirmPasswordReset(dto: PasswordResetConfirmDto) {
+    const stored = await this.repo.findValidPasswordResetToken(dto.token);
+    if (!stored) throw new UnauthorizedException('Token inválido o expirado');
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.repo.consumePasswordResetToken(stored.id, stored.userId, passwordHash);
+    return { reset: true };
   }
 }
