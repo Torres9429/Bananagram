@@ -23,7 +23,22 @@ async function bootstrap() {
   );
   app.use(createProxyMiddleware({ pathFilter: '/api/me', target: authServiceUrl, changeOrigin: true }));
   app.use(
+    createProxyMiddleware({ pathFilter: '/api/admin', target: authServiceUrl, changeOrigin: true }),
+  );
+  app.use(
     createProxyMiddleware({ pathFilter: '/api/catalogs', target: coreServiceUrl, changeOrigin: true }),
+  );
+  app.use(
+    createProxyMiddleware({ pathFilter: '/api/brands', target: coreServiceUrl, changeOrigin: true }),
+  );
+  app.use(
+    createProxyMiddleware({ pathFilter: '/api/campaigns', target: coreServiceUrl, changeOrigin: true }),
+  );
+  app.use(
+    createProxyMiddleware({ pathFilter: '/api/reports', target: coreServiceUrl, changeOrigin: true }),
+  );
+  app.use(
+    createProxyMiddleware({ pathFilter: '/api/ideas', target: coreServiceUrl, changeOrigin: true }),
   );
 
   await app.listen(4000);
