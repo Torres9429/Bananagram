@@ -3,6 +3,7 @@ import { CatalogsModule } from './catalogs/catalogs.module';
 import { InternalModule } from './internal/internal.module';
 import { BrandsModule } from './brands/brands.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { ReportsModule } from './reports/reports.module';
 
-@Module({ imports: [CatalogsModule, InternalModule, BrandsModule, CampaignsModule] })
+@Module({ imports: [CatalogsModule, InternalModule, BrandsModule, CampaignsModule, ReportsModule] })
 export class AppModule {}
