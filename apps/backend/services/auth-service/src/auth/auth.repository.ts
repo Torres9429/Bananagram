@@ -11,6 +11,17 @@ export class AuthRepository {
     });
   }
 
+  findRoleByName(name: string) {
+    return prisma.role.findUnique({ where: { name } });
+  }
+
+  createUser(email: string, passwordHash: string, roleId: string) {
+    return prisma.user.create({
+      data: { email, passwordHash, roleId },
+      include: { role: true },
+    });
+  }
+
   async getPermissions(roleId: string): Promise<Record<string, string[]>> {
     const perms = await prisma.rolePermission.findMany({
       where: { roleId, allowed: true },

@@ -1,8 +1,15 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
+
+// Rol que recibe quien se auto-registra: el flujo de alta espontánea de este
+// sistema es "un Cliente pide que le gestionen sus redes", así que nace
+// Cliente. CM/Diseñador se incorporan asignados por un Admin, no por
+// auto-registro (evita que cualquiera se dé de alta como staff interno).
+const DEFAULT_REGISTER_ROLE = process.env.DEFAULT_REGISTER_ROLE || 'cliente';
 
 @Injectable()
 export class AuthService {
@@ -10,6 +17,41 @@ export class AuthService {
     private readonly repo: AuthRepository,
     private readonly jwtService: JwtService,
   ) {}
+
+  async register(dto: RegisterDto) {
+    const existing = await this.repo.findByEmail(dto.email);
+    if (existing) throw new ConflictException('Email ya registrado');
+
+    const role = await this.repo.findRoleByName(DEFAULT_REGISTER_ROLE);
+    if (!role) {
+      throw new UnauthorizedException(`Rol por defecto '${DEFAULT_REGISTER_ROLE}' no existe — corre el seed`);
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const user = await this.repo.createUser(dto.email, passwordHash, role.id);
+
+    // Best-effort: el nombre para mostrar vive en UserProfile, en la BD de
+    // core-service (servicios separados, sin @relation real — ver
+    // docs/base/modelo2.txt). No bloqueamos el registro si core-service está
+    // caído: el login/JWT no depende de este dato, solo el nombre en UI.
+    await this.createProfileBestEffort(user.id, dto.name);
+
+    return this.issueTokens(user);
+  }
+
+  private async createProfileBestEffort(userId: string, name: string) {
+    const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
+    try {
+      await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, name }),
+      });
+    } catch {
+      // core-service caído: el perfil se puede crear/actualizar después
+      // (el endpoint es un upsert), no vale la pena tumbar el registro por esto.
+    }
+  }
 
   async login(dto: LoginDto) {
     const user = await this.repo.findByEmail(dto.email);
