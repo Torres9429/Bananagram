@@ -71,10 +71,18 @@ model RefreshToken {
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   token     String    @unique
+  // Todos los tokens nacidos de la misma sesión (login inicial + cada
+  // rotación de refresh) comparten familyId. Reusar un token ya consumido
+  // (usedAt) o revocado revoca TODA la familia — así un refresh robado y
+  // reutilizado mata también la sesión legítima que ya rotó, en vez de
+  // solo rechazar el intento del atacante.
+  familyId  String
   expiresAt DateTime
   usedAt    DateTime?
+  revokedAt DateTime?
   createdAt DateTime  @default(now())
 
+  @@index([familyId])
   @@map("refresh_tokens")
 }
 

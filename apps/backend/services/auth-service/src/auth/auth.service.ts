@@ -4,6 +4,7 @@ import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 
 // Rol que recibe quien se auto-registra: el flujo de alta espontánea de este
 // sistema es "un Cliente pide que le gestionen sus redes", así que nace
@@ -64,21 +65,33 @@ export class AuthService {
   }
 
   async refresh(token: string) {
-    const rt = await this.repo.findRefreshToken(token);
-    if (!rt || rt.usedAt || rt.expiresAt < new Date()) {
+    const nextToken = uuidv4();
+    const result = await this.repo.rotateRefreshToken(token, nextToken);
+
+    if (result.status === 'not_found') {
       throw new UnauthorizedException('Refresh token inválido o expirado');
     }
-    await this.repo.markTokenUsed(rt.id);
-    return this.issueTokens(rt.user);
+    if (result.status === 'reused') {
+      // Reuso detectado (token ya consumido, revocado o expirado): se
+      // revocó la familia entera en el repository. Ni siquiera avisamos
+      // cuál fue la causa exacta — el mensaje es el mismo para no darle
+      // pistas a quien esté reintentando un token robado.
+      throw new UnauthorizedException(
+        'Refresh token reusado o expirado: la sesión fue revocada, vuelve a iniciar sesión',
+      );
+    }
+    return this.issueTokens(result.user, result.refreshToken);
   }
 
-  // Compartido por login() y refresh() — antes refresh() volvía a llamar a
-  // login() con password: '' para "reutilizar" la emisión de tokens, lo cual
-  // siempre fallaba el bcrypt.compare (además de quemar el refresh token
-  // viejo aunque la emisión fallara). Aquí no hay verificación de contraseña
-  // porque para cuando se llega a este punto ya se validó identidad
-  // (password correcto en login, o refresh token válido/sin usar en refresh).
-  private async issueTokens(user: { id: string; email: string; roleId: string; role: { name: string } }) {
+  // Compartido por login()/register() (crean sesión nueva) y refresh()
+  // (recibe el refresh ya rotado por AuthRepository.rotateRefreshToken).
+  // No hay verificación de contraseña aquí porque para cuando se llega a
+  // este punto ya se validó identidad (password correcto en login/register,
+  // o refresh token válido/sin usar en refresh).
+  private async issueTokens(
+    user: { id: string; email: string; roleId: string; role: { name: string } },
+    existingRefreshToken?: { token: string },
+  ) {
     const permissions = await this.repo.getPermissions(user.roleId);
 
     const payload = {
@@ -99,7 +112,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
-    const refreshToken = await this.repo.createRefreshToken(user.id);
+    const refreshToken = existingRefreshToken ?? (await this.repo.createRefreshToken(user.id));
 
     return { accessToken, refreshToken };
   }
