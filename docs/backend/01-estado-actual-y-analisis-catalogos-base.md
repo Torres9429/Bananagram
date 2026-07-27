@@ -1,10 +1,75 @@
-# Estado del backend — bases separadas + catálogos protegidos (al día: 2026-07-23)
+# Estado del backend — bases separadas + catálogos protegidos (al día: 2026-07-27)
 
 > Este documento arrancó como un análisis de la rama `feat/catalogos-base` antes de mergearla. Esa rama
 > ya se mergeó, y desde entonces se hizo trabajo real de fondo (separación de bases de datos completa,
 > catálogos protegidos con auth real). Este documento se reescribió para reflejar el estado **actual**,
 > no el análisis original — sirve como punto de partida para quien siga con el resto de los módulos de
 > `core-service` (`campaigns`, `posts`, `reports`, `ideas`).
+>
+> **2026-07-27**: la sección §2 de la versión anterior ("Qué falta") describía `campaigns`/`reports`/
+> `ideas` como stubs vacíos, el gateway sin proxear nada, y `PermissionGuard`/`BrandAccessGuard` sin
+> aplicar a ningún endpoint. Todo eso se construyó en esta ronda — ver §0 abajo. Se deja §1 intacta
+> (sigue siendo verdad) y se reescribió §2/§4 para reflejar lo que sigue pendiente ahora.
+
+## 0. Actualización 2026-07-27 — resto de `core-service` + admin de `auth-service`
+
+Además de catálogos (§1, sin cambios), esta ronda construyó:
+
+- **`brands/`** (nuevo, no estaba ni mencionado como pendiente porque nadie lo había notado hasta ahora):
+  CRUD completo. `ownerId` sale del JWT, nunca del body — nadie puede crear una marca a nombre de otro
+  usuario. `listBrands` filtra por rol: Administrador ve todas, el resto solo las suyas (dueño) o las de
+  campañas donde participa (CM/Diseñador). Es prerrequisito real de `campaigns` (`Campaign.brandId` es
+  obligatorio) — por eso se construyó aunque no estaba en el pendiente original.
+- **`campaigns/`**: CRUD + `POST/DELETE /campaigns/:id/designers/:userId` (asignar/quitar Diseñadores,
+  regla de negocio #3 — solo el CM asignado o un Administrador). Ojo con el patrón: `BrandAccessGuard`
+  **no se pudo reusar aquí** — resuelve el `:id` de la ruta como si fuera un `brandId`, y en las rutas de
+  campaign `:id` es un `campaignId`; reusarlo tal cual habría negado el acceso siempre. La pertenencia
+  (dueño de la marca / CM asignado / Administrador) se resuelve con una consulta local dentro de
+  `CampaignsService.assertCanManage`, no con un guard genérico.
+- **`reports/`**: `Report` no tiene `deletedAt` ni campos editables en el schema — es un registro de
+  solicitud, no una entidad mutable. Por eso el service solo expone `list`/`get`/`create` (gatillado por
+  el permiso `reportes:exportar`, que es el que sí tiene el Cliente en el seed — no `reportes:crear`, que
+  nadie tiene salvo Administrador). La generación real del archivo csv/pdf no está implementada: `fileUrl`
+  queda `null`.
+- **`ideas/`**: CRUD completo, pero con rutas planas (`/ideas?campaignId=`, no anidadas bajo
+  `/campaigns/:campaignId/ideas` como prescribía el comentario viejo de `modelo2.txt` — ya corregido ahí).
+  `ContentIdea` no tiene módulo de permiso propio en el seed; se autoriza con `campanas:ver`/`crear` +
+  una verificación real de pertenencia a la campaña (mismo criterio que `assertCanManage` de campaigns).
+- **`admin/` en `auth-service`** (nuevo): `admin/users` (CRUD de usuarios, respuestas sin `passwordHash`) y
+  `admin/roles` (lista roles+permisos, `PATCH admin/roles/:id/permissions` para editar la matriz
+  `role_permissions` por slug de módulo/acción vía HTTP — antes solo existía `PermissionsService` sin
+  ningún controller que lo expusiera).
+- **`POST auth/register`** y **`POST auth/password-reset/{request,confirm}`**: no existían. Register nace
+  con rol `cliente` por defecto; intenta (best-effort, sin bloquear el registro si falla) crear el
+  `UserProfile` en `core-service` vía un endpoint interno nuevo, `POST internal/user-profiles` — sin
+  `JwtAuthGuard` a propósito, es tráfico servicio-a-servicio, no expuesto por el gateway.
+- **`PermissionGuard`/`@RequirePermission`**: ya no es "decisión abierta" (§7 de la guía lo decía así) —
+  se adoptó, y se **duplicó localmente en cada servicio** (`auth-service/src/guards/permission.guard.ts`,
+  `core-service/src/guards/permission.guard.ts`) en vez de importarse de `commons/`, mismo criterio ya
+  usado para `JwtAuthGuard`/`CurrentUser` (cada servicio autocontenido). Se agregó un módulo de permiso
+  nuevo, `catalogos` (no existía), porque los 3 catálogos no encajaban en ningún módulo de
+  `modules.enum.ts` existente — todos los roles tienen `catalogos:ver`, solo Administrador puede mutar.
+- **Gateway**: ahora proxea también `/api/admin`, `/api/brands`, `/api/campaigns`, `/api/reports`,
+  `/api/ideas` hacia el servicio correspondiente (antes solo `/api/auth`, `/api/me`, `/api/catalogs`).
+- **`alexa-service`**: ganó su propia infraestructura JWT (`strategies/jwt.strategy.ts`,
+  `guards/jwt-auth.guard.ts`, `auth/jwt-auth.module.ts`, `decorators/current-user.decorator.ts` — mismo
+  patrón que `core-service`) y sus controllers de `campaigns`/`ideas` (stubs) quedaron protegidos con
+  `@UseGuards(JwtAuthGuard)`. Sigue sin la lógica real de traducir intents de voz a llamadas HTTP.
+- **Tests reales**: `apps/backend/test/` no tenía ni `package.json` ni `jest.config.js` — los specs
+  existentes (`auth.integration.spec.ts`, `posts-flow.spec.ts`) eran `expect(true).toBe(true)`, nunca se
+  ejecutaban en ningún lado. Se armó el paquete (`@repo/backend-integration-tests`) con `ts-jest` y se
+  reescribieron ambos specs con aserciones reales contra Postgres (auth) y contra la máquina de estados
+  pura (posts). Correr con `pnpm --filter @repo/backend-integration-tests test` (necesita
+  `docker compose up -d postgres`).
+- **Bug real encontrado en el camino**: `auth-service/src/prisma/client.ts` y
+  `core-service/src/prisma/client.ts` cacheaban su singleton en la misma clave `global.prisma` — si ambos
+  se cargan en el mismo proceso de Node (exactamente lo que hace un test que importa los dos), el segundo
+  en cargar pisaba silenciosamente al primero. Cada uno ahora usa su propia clave (`prismaAuth`/
+  `prismaCore`). En producción/dev normal no se manifestaba (cada servicio corre en su propio proceso),
+  pero es un bug real, no cosmético.
+
+Pendiente de correr tras esta ronda: `pnpm seed` (la matriz de permisos cambió — se agregó `catalogos` y
+se amplió `marcas` para cliente/CM/diseñador).
 
 ## 1. Qué está hecho y verificado hoy (no solo "debería funcionar")
 
@@ -80,23 +145,34 @@ reales todavía — aplíquenlo con `@UseGuards(BrandAccessGuard)` en cuanto se 
 - Dockerfiles de los 4 servicios reescritos para build con **contexto = raíz del repo** (antes usaban
   `npm ci` sin lockfile y contexto limitado a su propia carpeta — nunca habían funcionado de verdad).
 
-## 2. Qué falta — para cuando se retome el resto de `core-service`
+## 2. Qué falta — actualizado 2026-07-27
 
-Fuera de alcance de esta ronda a propósito (nadie los tocó):
-- **`campaigns/`, `reports/`, `ideas/` siguen siendo stubs vacíos** (`export class CampaignsService {}`,
-  sin métodos). Registrar el módulo en `AppModule` no alcanza — hay que escribir la lógica real.
-- **`posts/state-machine/`** sigue sin controller que lo exponga por HTTP (la máquina de estados en sí ya
-  soporta los 10 valores nuevos de `PostStatus`, incluyendo el tramo `publicando→{publicado|parcial|error|
-  cancelado}` — es traducción directa del comentario ya escrito en `modelo2.txt`, no lógica nueva).
-- **`auth-service`** (dominio) y **`alexa-service`** no se tocaron — siguen como estaban antes de esta
-  sesión (`auth-service` ya estaba wireado desde una sesión anterior; `alexa-service` sigue con
-  `imports: []`).
-- **El gateway sigue sin proxear nada** (`http-proxy-middleware` instalado, sin usar).
-- **El cálculo real del Score Digital** existe y ahora usa el shape nuevo (`PostSocialAccount`/
-  `SocialAccount`), pero la fórmula sigue sin confirmar con el usuario (`CLAUDE.md` documenta 3 factores,
-  el código implementa 4 con `coverage`) — confirmar antes de tocarlo.
-- `.claude/INVENTORY.md` §2 (Frontend) sigue con fecha 2026-07-19, sin actualizar en esta ronda (solo se
-  reescribió la §1, Backend).
+Lo que describía esta sección antes (campaigns/reports/ideas vacíos, gateway sin proxear, guards sin
+aplicar) ya está hecho — ver §0. Lo que sigue de verdad pendiente:
+
+- **`posts/` sigue sin controller/service/module que exponga la máquina de estados por HTTP.** Es el
+  módulo de negocio más grande que falta — sin él no hay flujo de aprobación real, ni fan-out multi-red
+  (`PostSocialAccount`), ni biblioteca de medios (`Media`/`PostMedia`) conectada a nada. La máquina de
+  estados en sí (`posts/state-machine/`) ya soporta los 10 valores de `PostStatus` y está probada
+  (`apps/backend/test/posts-flow.spec.ts`) — lo que falta es la capa HTTP + Prisma alrededor.
+- **Métricas y Score sin exponer por HTTP.** `score.service.ts` y `cron/metrics-cron.service.ts` existen
+  como lógica pero no hay ningún controller que los sirva — nadie puede consultar el score de una marca
+  todavía. La fórmula real (4 factores con `coverage`) sigue sin confirmarse contra la documentada en
+  `CLAUDE.md` (3 factores) — confirmar con el usuario antes de tocar el cálculo o de exponerlo.
+- **Notificaciones**: el modelo `Notification` existe en `auth-service` pero no hay service/controller, ni
+  el endpoint interno que `core-service` debería llamar al rechazar un post o asignar una campaña
+  (mencionado como pendiente en el propio `modelo2.txt`).
+- **`alexa-service`** ya tiene infraestructura JWT (ver §0) pero sus controllers de `campaigns`/`ideas`
+  siguen siendo stubs — falta la lógica real de traducir intents de voz a llamadas HTTP contra
+  `core-service`/`auth-service` (con el circuit breaker de `commons/circuit-breaker/opossum.factory.ts`,
+  que existe pero nadie usa todavía, ni siquiera el fetch best-effort de `auth-service` hacia
+  `core-service` en `register()`).
+- **`AuditInterceptor`/`LoggingInterceptor`** (`commons/interceptors/`) no están registrados como
+  interceptor global en ningún servicio, pese a que `audit_log` es una tabla inmutable pensada
+  exactamente para esto.
+- **Frontend**: sigue 100% en modo mock, cero consumo de cualquier endpoint real (ni siquiera los que ya
+  existían antes de esta ronda). Fuera de alcance a propósito, no se tocó.
+- `.claude/INVENTORY.md` §2 (Frontend) sigue con fecha 2026-07-19, sin actualizar.
 
 ## 3. Cosas importantes a tener en cuenta antes de escribir el siguiente módulo
 
@@ -118,13 +194,21 @@ Fuera de alcance de esta ronda a propósito (nadie los tocó):
    probar el CRUD de catálogos desde cero vía API/Postman). Si un módulo nuevo necesita datos de catálogo
    para probarse, hay que crearlos a mano vía `POST /api/catalogs/*` (ahora requiere login).
    
-## 4. Siguiente paso sugerido (cuando se retome)
+## 4. Siguiente paso sugerido — actualizado 2026-07-27
 
-Dentro de `core-service`, en orden de menor a mayor esfuerzo — sin empezar todavía, según lo acordado:
-1. `campaigns/` — es el módulo del que dependen `posts/`, `ideas/`, y a futuro `alexa-service`.
-2. `posts/` — dar controller a la máquina de estados ya existente.
-3. `reports/`, `ideas/`, en el orden que priorice el equipo.
+`campaigns/`, `reports/`, `ideas/` (y `brands/`, que no estaba en el plan original) ya están construidos —
+ver §0. En orden de prioridad para lo que sigue:
+1. `posts/` — el módulo de negocio central que falta, dar controller/service a la máquina de estados ya
+   existente y probada. Depende de `campaigns`/`brands` (ya listos) y de `Media`/`SocialAccount` (sin
+   controller propio todavía tampoco).
+2. Notificaciones — el endpoint interno en `auth-service` que `core-service` debería llamar al rechazar un
+   post o asignar una campaña (hoy no existe ninguno de los dos lados).
+3. Métricas/Score — exponer `score.service.ts` por HTTP, una vez confirmada la fórmula vigente con el
+   usuario.
+4. `alexa-service` — lógica real de intents una vez que `campaigns`/`ideas` de `core-service` (ya listos)
+   tengan también `posts` para poder cubrir los intents que lo requieran.
 
 Todos deberían seguir el mismo patrón ya establecido: DTOs con `class-validator`, `JwtAuthGuard` +
-`BrandAccessGuard` en endpoints que toquen una marca/campaña específica, repository/service local sin
-depender de `commons/`.
+`PermissionGuard` + (si el recurso cuelga directo de una marca) `BrandAccessGuard` — pero ver la nota de
+§0 sobre `campaigns`: si el `:id` de la ruta no es un `brandId` (es un `campaignId`, un `postId`, etc.),
+`BrandAccessGuard` no aplica tal cual y la pertenencia se resuelve a mano en el service.

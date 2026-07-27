@@ -15,7 +15,14 @@ Stack: Next.js (MFE host, Multi-Zones) + NestJS (microservicios) + PostgreSQL + 
 
 ## Privilegios dinámicos
 - Decorator: `@RequirePermission('módulo', 'acción')` en controllers de NestJS
-- Guard: `PermissionGuard` (`apps/backend/commons/guards/permission.guard.ts`) lee `user.permissions[module]` del JWT
+- Guard: `PermissionGuard` lee `user.permissions[module]` del JWT — **desde 2026-07-27 ya está conectado**
+  (antes existía en `commons/guards/permission.guard.ts` sin usarse en ningún endpoint). Cada servicio
+  tiene su propia copia local (`auth-service/src/guards/permission.guard.ts`,
+  `core-service/src/guards/permission.guard.ts`, mismo criterio que `JwtAuthGuard`/`CurrentUser`) — el de
+  `commons/` queda como referencia, no es lo que corre en runtime.
+- Módulos del catálogo (`commons/types/modules.enum.ts` + `packages/seed/src/index.js`): `marcas`,
+  `publicaciones`, `calendario`, `campanas`, `metricas`, `score`, `reportes`, `usuarios`, `privilegios`,
+  y `catalogos` (agregado 2026-07-27 — los 3 catálogos no encajaban en ninguno existente).
 - Endpoint: `GET /me/permissions` → fuente de verdad del menú frontend
 - Hook: `usePermissions()` (`apps/frontend/commons/src/hooks/usePermissions.ts`) → `can(module, action)` / `canAny(module, actions)`
 
@@ -27,29 +34,32 @@ el usuario cuál es la vigente antes de tocar el score.
 
 ## Estado real del código — léase antes de asumir que algo "ya funciona"
 
-Este repo está en etapa de scaffold: la estructura sigue las convenciones, pero casi nada está conectado
-end-to-end todavía.
+El backend de `auth-service`/`core-service` ya tiene bastante dominio real conectado (ver bullets abajo);
+`alexa-service`, `posts`, notificaciones y **todo el frontend** siguen en etapa de scaffold/mock — no
+asumas que algo "ya funciona" sin verificarlo primero.
 
-- **Los 3 microservicios backend (`auth`, `core`, `alexa`) tienen `AppModule` con
-  `imports: []`** — ningún controller de dominio responde hoy, aunque el código (auth-service completo,
-  máquina de estados de posts, score, cron de métricas, ahora todo dentro de core-service) es real.
-  `core-service` fusiona lo que antes eran brands/content/analytics-service; `alexa-service` es nuevo,
-  BFF de la Alexa Skill, sin base de datos propia (ver `docs/base/service-boundaries.md`).
-  `auth-service` ya registra `AuthModule`+`PermissionsModule` y `core-service` ya registra
-  `CatalogsModule` (desde 2026-07-23) — la afirmación de arriba ya no aplica a esos dos, solo a
-  `alexa-service`.
-- **El gateway ya proxea de verdad** (desde 2026-07-23): `/api/auth/*` y `/api/me/*` →
-  `AUTH_SERVICE_URL`, `/api/catalogs/*` → `CORE_SERVICE_URL` (env vars, con split host/Docker igual que
-  `DATABASE_URL_AUTH`/`CORE`). `main.ts` crea la app con `{ bodyParser: false }` — necesario para que
-  `http-proxy-middleware` reciba el stream del body sin consumir (si Nest lo parseara antes, los
-  POST/PATCH llegarían vacíos al servicio destino). Montado con `app.use(createProxyMiddleware(...))`
-  **sin** pasar el path como argumento de `app.use()` — Express recorta ese prefijo de `req.url` antes de
-  pasarlo al middleware si se hace así, rompiendo el proxy; se usa `pathFilter` en su lugar, que matchea
-  sobre la URL completa sin tocarla. Verificado con `docker run` real, contenedores separados
-  comunicándose por nombre de servicio en la red de Docker. Sigue faltando agregar rutas nuevas
-  (`/api/campaigns/*`, etc.) conforme se construyan esos módulos.
-- `core-service/campaigns`, `core-service/reports` y `core-service/ideas` son stubs vacíos (sin métodos),
-  igual que `alexa-service/campaigns` y `alexa-service/ideas`.
+- **`auth-service` y `core-service` ya tienen dominio real conectado** (`auth-service`: `AuthModule` +
+  `PermissionsModule` + `AdminModule` desde 2026-07-27; `core-service`: `CatalogsModule` +
+  `BrandsModule` + `CampaignsModule` + `ReportsModule` + `IdeasModule` + `InternalModule`, mismo corte de
+  fecha). `alexa-service` sigue siendo la excepción real: tiene infraestructura JWT propia desde
+  2026-07-27 (`JwtAuthGuard` aplicado a sus controllers), pero sus módulos de dominio
+  (`campaigns`/`ideas`) siguen siendo stubs sin lógica — solo quedaron protegidos, no implementados (BFF
+  de la Alexa Skill, sin base de datos propia, ver `docs/base/service-boundaries.md`).
+- **Sigue faltando por completo**: `posts` (la máquina de estados en `core-service/src/posts/` existe y
+  está probada, pero no tiene controller/service/module — es el hueco de negocio más grande), métricas/
+  score expuestos por HTTP (`score.service.ts`/`metrics-cron.service.ts` existen, sin controller),
+  notificaciones (modelo existe en `auth-service`, cero service/controller de ningún lado).
+- **El gateway ya proxea de verdad**: `/api/auth/*`, `/api/me/*`, `/api/admin/*` → `AUTH_SERVICE_URL`;
+  `/api/catalogs/*`, `/api/brands/*`, `/api/campaigns/*`, `/api/reports/*`, `/api/ideas/*` →
+  `CORE_SERVICE_URL` (env vars, con split host/Docker igual que `DATABASE_URL_AUTH`/`CORE`). `main.ts`
+  crea la app con `{ bodyParser: false }` — necesario para que `http-proxy-middleware` reciba el stream
+  del body sin consumir (si Nest lo parseara antes, los POST/PATCH llegarían vacíos al servicio destino).
+  Montado con `app.use(createProxyMiddleware(...))` **sin** pasar el path como argumento de `app.use()` —
+  Express recorta ese prefijo de `req.url` antes de pasarlo al middleware si se hace así, rompiendo el
+  proxy; se usa `pathFilter` en su lugar, que matchea sobre la URL completa sin tocarla. Verificado con
+  `docker run` real, contenedores separados comunicándose por nombre de servicio en la red de Docker.
+  `/api/internal/*` (llamada auth-service → core-service para crear el `UserProfile` al registrar) **no**
+  se proxea a propósito — es tráfico servicio-a-servicio, no debe ser alcanzable desde fuera.
 - **Todo el frontend corre en modo mock**: login/registro/sesión usan JWTs sin firmar generados en
   `@repo/ui/mocks`, guardados en la cookie `bananagram_token`. Ningún microfrontend hace fetch real a un
   backend — los 7 slices RTK Query de `web-shell/src/store/api/*.ts` están vacíos y ni siquiera
@@ -82,9 +92,14 @@ con un join local (Brand/Campaign viven en la BD de core-service) y emite `brand
 propósito — nada lo lee. `BrandAccessGuard` se movió a vivir dentro de `core-service`
 (`apps/backend/services/core-service/src/guards/brand-access.guard.ts`) y valida acceso con una consulta
 LOCAL contra su propia BD (`Brand.ownerId` o `Campaign.cmId`/`CampaignDesigner.userId` para el `brandId`
-del request) usando `payload.sub` (userId) — sin llamada HTTP, sin depender del JWT para esto. Existe y
-compila, pero **todavía no está aplicado a ningún endpoint** (no hay endpoints de `campaigns`/`brands`
-reales aún) — aplíquese con `@UseGuards(BrandAccessGuard)` cuando se construya el primero.
+del request) usando `payload.sub` (userId) — sin llamada HTTP, sin depender del JWT para esto. **Desde
+2026-07-27 ya está aplicado** en `brands/:id` (`GET`/`PATCH`/`DELETE`), donde `:id` **es** literalmente un
+`brandId`. Importante: **no se pudo reusar tal cual en `campaigns`** — ahí `:id` es un `campaignId`, y el
+guard resuelve `request.params.brandId || request.params.id` asumiendo que ese `:id` identifica una
+`Brand`; aplicado a una ruta de campaign buscaría un `Brand` con el id de una `Campaign` y negaría el
+acceso siempre (falla silenciosa, no un error ruidoso). Para `campaigns` (y cualquier recurso futuro
+donde `:id` no sea un `brandId`) la pertenencia se resuelve a mano en el service — ver
+`CampaignsService.assertCanManage` en `core-service/src/campaigns/campaigns.service.ts`.
 
 **El 2026-07-19 se habían realineado los mocks/tipos de las 6 apps frontend (`apps/frontend/**`) a este
 modelo** — el frontend sigue en modo mock, sin conectar al backend real todavía. Documentación de ese
@@ -122,7 +137,7 @@ pnpm lint                      # turbo run lint
 - No hay `jest.config.js` ni `.eslintrc` explícitos en el repo — `test`/`lint` corren `jest`/`eslint` con configuración por defecto de cada paquete cuando existan. `apps/frontend/*` no tienen script `lint` propio todavía; no asumas que `pnpm lint` cubre todo.
 - Para correr un solo servicio backend: `pnpm --filter @repo/auth-service dev` (o `test`/`build`). Nombres de paquete backend: `@repo/auth-service`, `@repo/core-service`, `@repo/alexa-service`, y el gateway (sin nombre `@repo/` explícito, revisar `apps/backend/gateway/package.json`).
 - Para un solo frontend: `pnpm --filter @repo/web-shell dev` (equivalentes: `admin-front`, `analytics-front`, `auth-front`, `brands-front`, `posts-front` — cada uno con su propio puerto fijo, ver abajo).
-- Tests de integración backend viven en `apps/backend/test/*.spec.ts` (no dentro de cada servicio) y usan `apps/backend/test/helpers/auth.helper.ts` (JWT de prueba por rol) y `db.helper.ts` (limpieza de tablas). Tests e2e cross-servicio en `apps/e2e/src/*.e2e.spec.ts` (paquete `@repo/e2e`, usa `supertest`).
+- Tests de integración backend viven en `apps/backend/test/*.spec.ts` (no dentro de cada servicio) y usan `apps/backend/test/helpers/auth.helper.ts` (JWT de prueba por rol) y `db.helper.ts` (limpieza de tablas). Paquete propio `@repo/backend-integration-tests` (`jest`+`ts-jest`, agregado 2026-07-27 — antes no existía ni `package.json` ahí, los specs no se ejecutaban nunca): `pnpm --filter @repo/backend-integration-tests test` (necesita `docker compose up -d postgres`). Tests e2e cross-servicio en `apps/e2e/src/*.e2e.spec.ts` (paquete `@repo/e2e`, usa `supertest`) siguen siendo placeholder.
 - `docker compose --profile full up -d --build` levanta el stack completo containerizado (todos los servicios + fronts); el modo diario (`docker compose up -d`, sin profile) solo levanta `postgres` + `adminer` y se espera correr el resto con `pnpm dev` en el host.
 
 ## Puertos
@@ -151,8 +166,8 @@ pnpm lint                      # turbo run lint
 `apps/backend/`
 - `gateway/` — único punto de entrada HTTP externo (puerto 4000). Usa `http-proxy-middleware` para enrutar a cada servicio; también aplica `CorrelationIdMiddleware` (propaga `X-Request-ID`) a todas las rutas.
 - `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes, ideas de contenido) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill y **no tiene base de datos propia** (solo consume las APIs de core-service y auth-service). `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **desde 2026-07-23 cada uno con su propio `prisma/schema.prisma` y su propia base de datos** (`gestor_redes_auth`/`gestor_redes_core`, ver `docs/base/modelo2.txt`) — ya no hay schema ni BD compartida entre ellos. Cada uno genera su Prisma Client con `output` propio (`node_modules/.prisma-client`, ver comentario en su `schema.prisma`) para evitar que pnpm resuelva ambos al mismo folder por compartir versión de `@prisma/client`.
-- `commons/` — código compartido importado por **path relativo** (no es un workspace package con alias corto), p.ej. `../../../../../commons/types/post-status.enum`. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases; `auth-service`/`core-service` además ya duplican localmente en su propio `src/` sus copias de `JwtAuthGuard`/`CurrentUser`/`PostStatus` en vez de importarlas de aquí — decisión tomada para que cada servicio sea desplegable solo, ver `feat/catalogos-base`):
-  - `guards/` — `JwtAuthGuard`, `PermissionGuard` (`BrandAccessGuard` ya no vive aquí — se movió a `core-service/src/guards/`, ver nota de `brandIds` arriba)
+- `commons/` — código compartido importado por **path relativo** (no es un workspace package con alias corto), p.ej. `../../../../../commons/types/post-status.enum`. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases; `auth-service`/`core-service`/`alexa-service` además ya duplican localmente en su propio `src/` sus copias de `JwtAuthGuard`/`CurrentUser`/`PostStatus`/`PermissionGuard`/`RequirePermission` en vez de importarlas de aquí — decisión tomada para que cada servicio sea desplegable solo, ver `feat/catalogos-base`; `PermissionGuard` se sumó a esta lista 2026-07-27):
+  - `guards/` — `JwtAuthGuard`, `PermissionGuard` (quedan como referencia/histórico — cada servicio corre su propia copia local, ver arriba; `BrandAccessGuard` ya no vive aquí — se movió a `core-service/src/guards/`, ver nota de `brandIds` arriba)
   - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)`
   - `interceptors/` — `AuditInterceptor` (escribe en `audit_log`), `LoggingInterceptor`
   - `filters/` — `HttpExceptionFilter`
@@ -170,6 +185,10 @@ Convenciones (`.agents/backend.md`, `agents/conventions.md`):
 - Soft delete universal (`deleted_at`), `created_at`/`updated_at` en todas las tablas.
 - UUID como PK excepto `audit_log` y `post_status_history` (BIGINT autoincrement, inmutables — solo INSERT).
 - Auth: JWT HS256 stateless, sin Redis/OIDC; access token 15 min, refresh token 7 días de un solo uso con rotación (tabla `refresh_tokens`) (ADR-0002). Payload del JWT: `userId, email, role, brandIds[], permissions{}` — `brandIds` hoy siempre `[]` (ver nota en "Modelo de datos vigente": ya no se puede resolver con join local, Brand vive en la BD de core-service).
+- **Rotación con detección de reuso (2026-07-27)**: `refresh_tokens` tiene `familyId`/`revokedAt` (ver
+  `docs/base/modelo2.txt`). Reusar un token ya consumido/revocado/expirado revoca **toda** la familia,
+  incluido el token que ganó la rotación — no solo rechaza el intento inválido. Lógica en
+  `AuthRepository.rotateRefreshToken` (transacción: consumir + crear el reemplazo).
 
 ### Frontend: Next.js Multi-Zones (no monolito, no Module Federation)
 

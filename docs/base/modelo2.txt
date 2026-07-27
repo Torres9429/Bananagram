@@ -117,15 +117,26 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+// familyId/revokedAt agregados 2026-07-27 (migración
+// auth-service/prisma/migrations/20260727143453_refresh_token_family):
+// todos los tokens nacidos de la misma sesión (login/register + cada
+// rotación de refresh) comparten familyId. AuthRepository.rotateRefreshToken
+// consume el token viejo y crea el reemplazo en una sola transacción; si
+// alguien reusa un token ya consumido/revocado/expirado, se revoca TODA la
+// familia (incluido el token que "ganó" la rotación) — detección de robo de
+// refresh token, no solo rechazo del intento inválido.
 model RefreshToken {
   id        String    @id @default(uuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   token     String    @unique
+  familyId  String
   expiresAt DateTime
   usedAt    DateTime?
+  revokedAt DateTime?
   createdAt DateTime  @default(now())
 
+  @@index([familyId])
   @@map("refresh_tokens")
 }
 
@@ -637,14 +648,25 @@ model ContentIdea {
   @@map("content_ideas")
 }
 
-// Endpoints que expone core-service para este modelo (consumidos por
-// alexa-service, nunca directamente por el Lambda):
-//   POST   /campaigns/:campaignId/ideas   (SaveIdeaIntent, SaveCustomIdeaIntent)
-//   GET    /campaigns/:campaignId/ideas   (GetSavedIdeasIntent)
-//   DELETE /ideas/:id                     (DeleteIdeaIntent, resuelto por título
-//          hablado — búsqueda por title/text dentro del campaignId de sesión)
-// Requieren JwtAuthGuard + BrandAccessGuard + PermissionGuard como cualquier
-// otro endpoint de negocio del proyecto (.agents/backend.md).
+// Endpoints que expone core-service para este modelo (implementado
+// 2026-07-27 en core-service/src/ideas/ — diverge de la forma de ruta que
+// este comentario documentaba antes, ver nota abajo):
+//   GET    /ideas?campaignId=:campaignId  (list, no anidado bajo /campaigns)
+//   GET    /ideas/:id
+//   POST   /ideas                          (campaignId va en el body, no en la URL)
+//   PATCH  /ideas/:id
+//   DELETE /ideas/:id
+// Guardados con JwtAuthGuard + PermissionGuard (`campanas:ver`/`crear` — Idea
+// no tiene módulo de permiso propio en el seed) + una verificación de
+// pertenencia a la campaña dentro de IdeasService (no hay guard genérico
+// para esto: BrandAccessGuard resuelve el :id de la ruta como brandId, y acá
+// :id es un ideaId/campaignId, no un brandId — reusarlo directo lo rompería).
+// NOTA: la versión anterior de este comentario prescribía rutas anidadas
+// (`/campaigns/:campaignId/ideas`, `DELETE /ideas/:id` resuelto por título
+// hablado) pensadas para alexa-service — ese consumo real desde
+// alexa-service (traducir los intents de voz a estas llamadas HTTP) todavía
+// no se construyó; cuando se haga, decidir si conviene agregar esas rutas
+// anidadas o si alexa-service llama a las planas de arriba.
 
 // Capa 3 — Snapshot de métricas por red (cron job).
 model PostMetric {

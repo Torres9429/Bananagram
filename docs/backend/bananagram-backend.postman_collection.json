@@ -2,7 +2,7 @@
   "info": {
     "name": "Bananagram - Backend (auth-service + core-service catalogos)",
     "_postman_id": "b4n4n4gr4m-0000-0000-0000-000000000001",
-    "description": "Colección para probar en local auth-service (3001) y los endpoints de catálogos de core-service (3002) que trae la rama feat/catalogos-base ya mergeada a develop. El login guarda accessToken/refreshToken en variables de colección automáticamente (ver script de test en 'Login'). Auth Bearer configurado a nivel de colección (usa {{accessToken}}) — cualquier request nueva que agregues hereda el token automáticamente sin que tengas que poner el header a mano; solo Login y Refresh lo desactivan explícitamente (auth: noauth) porque no los necesitan.",
+    "description": "Colección para probar en local auth-service (3001) y core-service (3002). El login guarda accessToken/refreshToken en variables de colección automáticamente (ver script de test en 'Login'). Auth Bearer configurado a nivel de colección (usa {{accessToken}}) — cualquier request nueva que agregues hereda el token automáticamente sin que tengas que poner el header a mano; solo Login, Register y Refresh lo desactivan explícitamente (auth: noauth) porque no los necesitan. Actualizada 2026-07-27 con los módulos construidos en esa ronda: brands, campaigns (+ designers), reports, ideas, admin (users/roles/permisos) y register/password-reset de auth-service.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -18,12 +18,49 @@
     { "key": "refreshToken", "value": "" },
     { "key": "categoryId", "value": "" },
     { "key": "specialtyId", "value": "" },
-    { "key": "socialNetworkId", "value": "" }
+    { "key": "socialNetworkId", "value": "" },
+    { "key": "resetToken", "value": "" },
+    { "key": "adminUserId", "value": "" },
+    { "key": "roleId", "value": "" },
+    { "key": "brandId", "value": "" },
+    { "key": "campaignId", "value": "" },
+    { "key": "designerUserId", "value": "", "description": "userId de un Diseñador ya existente (ver admin/users) — CampaignDesigner no crea usuarios, solo vincula uno ya dado de alta." },
+    { "key": "cmUserId", "value": "", "description": "userId de un Community Manager ya existente — Campaign.cmId lo requiere al crear." },
+    { "key": "reportId", "value": "" },
+    { "key": "ideaId", "value": "" }
   ],
   "item": [
     {
       "name": "auth-service",
       "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.accessToken) { pm.collectionVariables.set('accessToken', body.accessToken); }",
+                  "if (body.refreshToken && body.refreshToken.token) { pm.collectionVariables.set('refreshToken', body.refreshToken.token); }",
+                  "pm.test('200/201', () => [200, 201].includes(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nuevo-cliente@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"name\": \"Nuevo Cliente\"\n}"
+            },
+            "url": { "raw": "{{authBaseUrl}}/auth/register", "host": ["{{authBaseUrl}}"], "path": ["auth", "register"] },
+            "description": "Nace con rol 'cliente' (DEFAULT_REGISTER_ROLE). Best-effort: intenta crear el UserProfile en core-service (POST internal/user-profiles) sin bloquear el registro si core-service está caído."
+          }
+        },
         {
           "name": "Login (admin)",
           "event": [
@@ -65,7 +102,7 @@
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
             },
             "url": { "raw": "{{authBaseUrl}}/auth/refresh", "host": ["{{authBaseUrl}}"], "path": ["auth", "refresh"] },
-            "description": "No lleva token Bearer (auth: noauth) — la identidad aquí viene del refreshToken en el body, no del header Authorization."
+            "description": "No lleva token Bearer (auth: noauth) — la identidad aquí viene del refreshToken en el body, no del header Authorization. Rota el token (familyId): reusar el mismo refreshToken dos veces revoca toda la sesión."
           }
         },
         {
@@ -91,6 +128,167 @@
             "url": { "raw": "{{authBaseUrl}}/auth/logout", "host": ["{{authBaseUrl}}"], "path": ["auth", "logout"] },
             "description": "Hereda el Bearer {{accessToken}} del auth de la colección — no necesita header propio."
           }
+        },
+        {
+          "name": "Password reset - request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.devToken) { pm.collectionVariables.set('resetToken', body.devToken); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\"\n}" },
+            "url": { "raw": "{{authBaseUrl}}/auth/password-reset/request", "host": ["{{authBaseUrl}}"], "path": ["auth", "password-reset", "request"] },
+            "description": "Respuesta uniforme (requested: true) sin importar si el email existe, para no filtrar identidades. Fuera de producción (NODE_ENV != production) devuelve además devToken, capturado aquí en {{resetToken}} — no hay envío de correo real implementado."
+          }
+        },
+        {
+          "name": "Password reset - confirm",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"ChangeMe123!\"\n}" },
+            "url": { "raw": "{{authBaseUrl}}/auth/password-reset/confirm", "host": ["{{authBaseUrl}}"], "path": ["auth", "password-reset", "confirm"] },
+            "description": "Consume el token (single-use) y revoca todas las sesiones activas del usuario (refresh tokens)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "auth-service - admin",
+      "item": [
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "List users",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{authBaseUrl}}/admin/users", "host": ["{{authBaseUrl}}"], "path": ["admin", "users"] },
+                "description": "Requiere permiso usuarios:ver. Respuesta nunca incluye passwordHash."
+              }
+            },
+            {
+              "name": "Create user",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const body = pm.response.json();",
+                      "if (body.id) { pm.collectionVariables.set('adminUserId', body.id); }"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"cm-nuevo@example.com\",\n  \"password\": \"ChangeMe123!\",\n  \"roleName\": \"community_manager\"\n}"
+                },
+                "url": { "raw": "{{authBaseUrl}}/admin/users", "host": ["{{authBaseUrl}}"], "path": ["admin", "users"] },
+                "description": "Requiere permiso usuarios:crear (solo Administrador en el seed). A diferencia de /auth/register, permite elegir el rol directamente — así se dan de alta CM/Diseñador/Administrador, que nunca nacen por auto-registro."
+              }
+            },
+            {
+              "name": "Get user by id",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{authBaseUrl}}/admin/users/{{adminUserId}}", "host": ["{{authBaseUrl}}"], "path": ["admin", "users", "{{adminUserId}}"] }
+              }
+            },
+            {
+              "name": "Update user",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"status\": \"suspended\"\n}" },
+                "url": { "raw": "{{authBaseUrl}}/admin/users/{{adminUserId}}", "host": ["{{authBaseUrl}}"], "path": ["admin", "users", "{{adminUserId}}"] }
+              }
+            },
+            {
+              "name": "Delete user (soft delete)",
+              "request": {
+                "method": "DELETE",
+                "url": { "raw": "{{authBaseUrl}}/admin/users/{{adminUserId}}", "host": ["{{authBaseUrl}}"], "path": ["admin", "users", "{{adminUserId}}"] },
+                "description": "Baja lógica + revoca todos los refresh tokens activos del usuario."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Roles y permisos",
+          "item": [
+            {
+              "name": "List roles (con permisos)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const body = pm.response.json();",
+                      "if (Array.isArray(body) && body[0] && body[0].id) { pm.collectionVariables.set('roleId', body[0].id); }"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{authBaseUrl}}/admin/roles", "host": ["{{authBaseUrl}}"], "path": ["admin", "roles"] },
+                "description": "Guarda el primer role.id en {{roleId}} para los requests siguientes de esta carpeta."
+              }
+            },
+            {
+              "name": "Get role by id",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{authBaseUrl}}/admin/roles/{{roleId}}", "host": ["{{authBaseUrl}}"], "path": ["admin", "roles", "{{roleId}}"] }
+              }
+            },
+            {
+              "name": "List modules",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{authBaseUrl}}/admin/modules", "host": ["{{authBaseUrl}}"], "path": ["admin", "modules"] },
+                "description": "Catálogo de módulos (marcas, campanas, catalogos, ...) — mismos slugs de commons/types/modules.enum.ts."
+              }
+            },
+            {
+              "name": "List actions",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{authBaseUrl}}/admin/actions", "host": ["{{authBaseUrl}}"], "path": ["admin", "actions"] }
+              }
+            },
+            {
+              "name": "Update role permission",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"moduleSlug\": \"reportes\",\n  \"actionSlug\": \"crear\",\n  \"allowed\": true\n}"
+                },
+                "url": { "raw": "{{authBaseUrl}}/admin/roles/{{roleId}}/permissions", "host": ["{{authBaseUrl}}"], "path": ["admin", "roles", "{{roleId}}", "permissions"] },
+                "description": "Upsert sobre role_permissions — el cambio no aparece en un token ya emitido hasta el próximo login/refresh (JWT stateless, ver ADR-0002)."
+              }
+            }
+          ]
         }
       ]
     },
@@ -267,6 +465,253 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "core-service - brands",
+      "item": [
+        {
+          "name": "List brands",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/brands", "host": ["{{coreBaseUrl}}"], "path": ["brands"] },
+            "description": "Administrador ve todas; el resto solo las suyas (dueño) o las de campañas donde participa."
+          }
+        },
+        {
+          "name": "Create brand",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) { pm.collectionVariables.set('brandId', body.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Marca de prueba\",\n  \"slug\": \"marca-de-prueba\"\n}"
+            },
+            "url": { "raw": "{{coreBaseUrl}}/brands", "host": ["{{coreBaseUrl}}"], "path": ["brands"] },
+            "description": "ownerId sale del JWT (user.sub), no del body. Requiere permiso marcas:crear (Cliente o Administrador en el seed)."
+          }
+        },
+        {
+          "name": "Get brand by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/brands/{{brandId}}", "host": ["{{coreBaseUrl}}"], "path": ["brands", "{{brandId}}"] }
+          }
+        },
+        {
+          "name": "Update brand",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Marca de prueba (editada)\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/brands/{{brandId}}", "host": ["{{coreBaseUrl}}"], "path": ["brands", "{{brandId}}"] },
+            "description": "BrandAccessGuard exige ser dueño de la marca (o Administrador)."
+          }
+        },
+        {
+          "name": "Delete brand (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{coreBaseUrl}}/brands/{{brandId}}", "host": ["{{coreBaseUrl}}"], "path": ["brands", "{{brandId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "core-service - campaigns",
+      "item": [
+        {
+          "name": "List campaigns",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/campaigns", "host": ["{{coreBaseUrl}}"], "path": ["campaigns"] }
+          }
+        },
+        {
+          "name": "Create campaign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) { pm.collectionVariables.set('campaignId', body.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brandId\": \"{{brandId}}\",\n  \"name\": \"Campaña de prueba\",\n  \"cmId\": \"{{cmUserId}}\"\n}"
+            },
+            "url": { "raw": "{{coreBaseUrl}}/campaigns", "host": ["{{coreBaseUrl}}"], "path": ["campaigns"] },
+            "description": "Solo el dueño de la marca (o Administrador) puede crear campañas para ella — verificado en CampaignsService, no solo por el permiso de módulo. cmId es un userId real de un Community Manager (ver admin/users)."
+          }
+        },
+        {
+          "name": "Get campaign by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}"] }
+          }
+        },
+        {
+          "name": "Update campaign",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"paused\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}"] },
+            "description": "Dueño de la marca, CM asignado o Administrador. No usa BrandAccessGuard (el :id de esta ruta es un campaignId, no un brandId) — la pertenencia se resuelve en CampaignsService.assertCanManage."
+          }
+        },
+        {
+          "name": "Delete campaign (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}"] }
+          }
+        },
+        {
+          "name": "Assign designer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{designerUserId}}\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}/designers", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}", "designers"] },
+            "description": "Regla de negocio #3: solo el CM asignado a esta campaña (o Administrador) puede agregar/quitar Diseñadores."
+          }
+        },
+        {
+          "name": "Unassign designer",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}/designers/{{designerUserId}}", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}", "designers", "{{designerUserId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "core-service - reports",
+      "item": [
+        {
+          "name": "List reports",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/reports", "host": ["{{coreBaseUrl}}"], "path": ["reports"] }
+          }
+        },
+        {
+          "name": "Create report (solicitar)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) { pm.collectionVariables.set('reportId', body.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"brandId\": \"{{brandId}}\",\n  \"format\": \"csv\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/reports", "host": ["{{coreBaseUrl}}"], "path": ["reports"] },
+            "description": "Requiere permiso reportes:exportar (no reportes:crear — así está en el seed: solo Cliente y Administrador lo tienen). Solo registra la solicitud: fileUrl queda null, la generación real del csv/pdf no está implementada. Report no tiene update/delete (no tiene deletedAt en el schema)."
+          }
+        },
+        {
+          "name": "Get report by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/reports/{{reportId}}", "host": ["{{coreBaseUrl}}"], "path": ["reports", "{{reportId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "core-service - ideas",
+      "item": [
+        {
+          "name": "List ideas by campaign",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{coreBaseUrl}}/ideas?campaignId={{campaignId}}",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["ideas"],
+              "query": [{ "key": "campaignId", "value": "{{campaignId}}" }]
+            },
+            "description": "No está anidado bajo /campaigns/:campaignId/ideas — es una ruta plana con campaignId como query param."
+          }
+        },
+        {
+          "name": "Create idea",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) { pm.collectionVariables.set('ideaId', body.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": \"{{campaignId}}\",\n  \"text\": \"Idea de prueba capturada desde el panel web\"\n}"
+            },
+            "url": { "raw": "{{coreBaseUrl}}/ideas", "host": ["{{coreBaseUrl}}"], "path": ["ideas"] },
+            "description": "source por default 'propia' (una idea creada por HTTP viene del panel web, no de la Alexa Skill). Requiere pertenecer a la campaña (dueño de la marca, CM o Diseñador asignado), verificado en IdeasService, no solo por el permiso campanas:crear."
+          }
+        },
+        {
+          "name": "Get idea by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/ideas/{{ideaId}}", "host": ["{{coreBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
+          }
+        },
+        {
+          "name": "Update idea",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"text\": \"Idea de prueba (editada)\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/ideas/{{ideaId}}", "host": ["{{coreBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
+          }
+        },
+        {
+          "name": "Delete idea (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{coreBaseUrl}}/ideas/{{ideaId}}", "host": ["{{coreBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
+          }
         }
       ]
     }
