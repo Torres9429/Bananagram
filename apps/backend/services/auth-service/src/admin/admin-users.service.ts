@@ -15,10 +15,28 @@ const SELECT_SAFE = {
   updatedAt: true,
 } as const;
 
+const ROLE_ALIASES: Record<string, string> = {
+  cliente: 'cliente',
+  cm: 'community_manager',
+  community_manager: 'community_manager',
+  disenador: 'disenador',
+  diseñador: 'disenador',
+  administrador: 'administrador',
+};
+
 @Injectable()
 export class AdminUsersService {
-  listUsers(): Promise<any> {
-    return prisma.user.findMany({ where: { deletedAt: null }, select: SELECT_SAFE, orderBy: { createdAt: 'desc' } });
+  listUsers(roleName?: string): Promise<any> {
+    const normalizedRoleName = roleName ? this.resolveRoleName(roleName) : undefined;
+
+    return prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        ...(normalizedRoleName ? { role: { name: normalizedRoleName } } : {}),
+      },
+      select: SELECT_SAFE,
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async getUser(id: string): Promise<any> {
@@ -78,5 +96,14 @@ export class AdminUsersService {
 
   private isUniqueConstraintError(error: unknown): error is { code: string } {
     return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
+  }
+
+  private resolveRoleName(roleName: string): string {
+    const normalized = ROLE_ALIASES[roleName.trim().toLowerCase()];
+    if (!normalized) {
+      throw new BadRequestException(`Rol '${roleName}' no existe`);
+    }
+
+    return normalized;
   }
 }

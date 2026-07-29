@@ -37,18 +37,21 @@ export class AuthService {
     // core-service (servicios separados, sin @relation real — ver
     // docs/base/modelo2.txt). No bloqueamos el registro si core-service está
     // caído: el login/JWT no depende de este dato, solo el nombre en UI.
-    await this.createProfileBestEffort(user.id, dto.name);
+    await this.createProfileBestEffort(user.id, dto);
 
     return this.issueTokens(user);
   }
 
-  private async createProfileBestEffort(userId: string, name: string) {
+  private async createProfileBestEffort(
+    userId: string,
+    dto: { name: string; avatarUrl?: string; roleName: string; categoryIds?: string[]; specialtyIds?: string[] },
+  ) {
     const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
     try {
       await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, name }),
+        body: JSON.stringify({ userId, ...dto }),
       });
     } catch {
       // core-service caído: el perfil se puede crear/actualizar después
