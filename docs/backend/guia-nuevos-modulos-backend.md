@@ -63,6 +63,12 @@ cohesión de dominio, no por dogma.
    `PostStatusHistory` (BIGINT, inmutables). La regla de `brand_id NOT NULL` aplica a tablas de negocio
    con dueño de marca — catálogos/identidad (`Category`, `Role`, etc.) son la excepción obvia, no tienen
    `brandId` porque no son de una marca.
+6. **Ojo con el singleton de `client.ts` si algo carga los dos servicios en el mismo proceso** (p. ej. un
+   test de integración): `auth-service/src/prisma/client.ts` y `core-service/src/prisma/client.ts` cacheaban
+   su instancia en la misma clave `global.prisma` — el segundo en importarse pisaba en silencio al
+   primero (bug real, corregido 2026-07-27: ahora usan `global.prismaAuth`/`global.prismaCore`). Si creas
+   un `client.ts` nuevo para un servicio adicional, usa una clave de `global` distinta a las que ya
+   existen — no reuses `prisma` a secas.
 
 ## 4. DTOs y validación
 
@@ -149,16 +155,20 @@ export class TuController { ... }
 Si algún día un servicio **nuevo** (no `auth-service`/`core-service`) necesita validar JWT, copia estos 3
 archivos tal cual (mismo patrón autocontenido) — no los muevas a `commons/`, esa decisión ya se tomó.
 
-## 7. Autorización por marca (`BrandAccessGuard`)
+## 7. Autorización por marca (`BrandAccessGuard`) — y por qué no siempre aplica
 
-Ya existe en `core-service/src/guards/brand-access.guard.ts`, **sin aplicar a ningún endpoint todavía**
-(no hay endpoints de `campaigns`/`brands` reales). Cuando construyas el primero que reciba un `brandId`
-(o un `:id` que sea un recurso de marca), agrégalo:
+**Actualizado 2026-07-27**: ya está aplicado, en `core-service/src/brands/brands.controller.ts` (rutas
+`GET/PATCH/DELETE /brands/:id`):
 
 ```ts
-@UseGuards(JwtAuthGuard, BrandAccessGuard)
-@Controller('campaigns')
-export class CampaignsController { ... }
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@Controller('brands')
+export class BrandsController {
+  @Get(':id')
+  @RequirePermission('marcas', 'ver')
+  @UseGuards(BrandAccessGuard)
+  findOne(@Param('id', ParseUUIDPipe) id: string) { ... }
+}
 ```
 
 Qué hace: valida que el `userId` del JWT (`user.sub`) sea dueño de la marca (`Brand.ownerId`) o esté
@@ -167,9 +177,47 @@ la BD de `core-service`**, no llamada HTTP. No confundir con `brandIds[]` del JW
 vacío a propósito (`auth-service` ya no puede resolverlo, Brand vive en otra BD) — no lo uses para nada,
 usa el guard.
 
-`PermissionGuard` (`@RequirePermission(module, action)`) existe en `commons/guards/` pero **nadie lo usa
-todavía en ningún servicio** — sigue siendo una decisión abierta si se adopta o no antes de escribir el
-primer endpoint que lo necesite.
+**Trampa real en la que ya se cayó al construir `campaigns/`**: `BrandAccessGuard` resuelve el `brandId` a
+validar leyendo `request.params.brandId || request.params.id` — asume que el `:id` de la ruta ES un
+`brandId`. Eso es cierto en `brands/:id`, pero **no** en `campaigns/:id` (ahí `:id` es un `campaignId`) ni
+lo será en `posts/:id`, `reports/:id`, etc. Aplicar el guard tal cual en esas rutas lo rompe: buscaría un
+`Brand` con el id de una `Campaign`, nunca lo encontraría, y negaría el acceso siempre — no falla ruidoso,
+falla silencioso (403 en todo). Regla práctica: **`BrandAccessGuard` solo sirve en rutas donde `:id` literalmente
+identifica una `Brand`.** Para cualquier otro recurso, resuelve la pertenencia a mano en el service (ver
+`CampaignsService.assertCanManage` en `core-service/src/campaigns/campaigns.service.ts` — misma idea,
+sin guard genérico: dueño de la marca del recurso, o CM/rol asignado, o Administrador).
+
+## 7bis. `PermissionGuard` — ya no es una decisión abierta
+
+**Actualizado 2026-07-27**: se adoptó. Se **duplicó localmente en cada servicio** (mismo criterio que
+`JwtAuthGuard`/`CurrentUser`, ver §6) en vez de importarse de `commons/guards/permission.guard.ts` —
+`core-service/src/guards/permission.guard.ts`, `auth-service/src/guards/permission.guard.ts`, cada uno
+con su propio `decorators/require-permission.decorator.ts`. El de `commons/` queda como referencia/
+histórico, no se borra, pero ya no es lo que se usa en runtime.
+
+Patrón para un endpoint nuevo:
+```ts
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@Controller('tu-recurso')
+export class TuController {
+  @Get()
+  @RequirePermission('tu-modulo', 'ver')
+  findAll() { ... }
+}
+```
+
+`tu-modulo` tiene que existir en `commons/types/modules.enum.ts` **y** en `packages/seed/src/index.js`
+(`MODULES`/`ROLE_PERMISSIONS`) — si tu recurso no encaja en ningún módulo existente (`marcas`,
+`publicaciones`, `calendario`, `campanas`, `metricas`, `score`, `reportes`, `usuarios`, `privilegios`,
+`catalogos`), agrega uno nuevo ahí (así se hizo con `catalogos`, que no existía) y define qué acción
+(`ver`/`crear`/`editar`/`eliminar`/...) recibe cada rol. Después de tocar el seed hay que volver a correr
+`pnpm seed` — no aplica solo con reiniciar el servicio.
+
+Si el sub-recurso no tiene módulo propio natural (como `ContentIdea`, que no tiene un módulo `ideas` en el
+seed), es válido reusar el módulo del recurso padre (`campanas` en ese caso) en vez de inventar uno — pero
+entonces la pertenencia real (¿esta idea es de una campaña a la que tengo acceso?) hay que verificarla en
+el service, el permiso por módulo solo cubre "¿tiene este rol el privilegio en general?", no "¿es SU
+campaña?".
 
 ## 8. Wiring — de código muerto a endpoint real
 
@@ -231,6 +279,12 @@ No es "compila". Antes de considerar un módulo terminado, verificado de verdad:
    solo contra el puerto directo del servicio.
 5. Limpiar los datos de prueba que hayas creado en la BD antes de dar por cerrado (no dejar
    "Prueba 123" viviendo en `gestor_redes_core`).
+6. Si tocaste `packages/seed/src/index.js` (módulo/permiso nuevo), vuelve a correr `pnpm seed` — el efecto
+   no aparece solo con reiniciar el servicio.
+7. Si el módulo tiene lógica no trivial reusable en un test (una máquina de estados, un flujo de
+   rotación/reuso, etc.), agrega un spec real en `apps/backend/test/` (`pnpm --filter
+   @repo/backend-integration-tests test`, necesita `docker compose up -d postgres`) — no dejes un
+   placeholder `expect(true).toBe(true)` como los que había antes de 2026-07-27.
 
 ## 12. Commits
 

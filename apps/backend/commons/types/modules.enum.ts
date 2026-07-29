@@ -1,4 +1,5 @@
 export enum AppModule {
+  CATALOGOS     = 'catalogos',
   MARCAS        = 'marcas',
   PUBLICACIONES = 'publicaciones',
   CALENDARIO    = 'calendario',

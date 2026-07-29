@@ -11,6 +11,7 @@ const corePrisma = new CorePrismaClient();
 // Mismos slugs que apps/backend/commons/types/modules.enum.ts / actions.enum.ts / roles.enum.ts
 // — nunca hardcodear permisos en el código, viven en role_permissions (ver CLAUDE.md).
 const MODULES = [
+  { slug: 'catalogos', name: 'Catálogos' },
   { slug: 'marcas', name: 'Marcas' },
   { slug: 'publicaciones', name: 'Publicaciones' },
   { slug: 'calendario', name: 'Calendario' },
@@ -40,6 +41,8 @@ const ROLES = ['administrador', 'community_manager', 'disenador', 'cliente'];
 // (ver más abajo); el resto refleja lo que cada rol necesita para operar.
 const ROLE_PERMISSIONS = {
   community_manager: {
+    catalogos: ['ver'],
+    marcas: ['ver'],
     publicaciones: ['ver', 'crear', 'editar'],
     calendario: ['ver', 'crear', 'editar'],
     campanas: ['ver', 'crear', 'editar', 'asignar'],
@@ -48,11 +51,15 @@ const ROLE_PERMISSIONS = {
     reportes: ['ver'],
   },
   disenador: {
+    catalogos: ['ver'],
+    marcas: ['ver'],
     publicaciones: ['ver', 'crear'],
     calendario: ['ver'],
     campanas: ['ver'],
   },
   cliente: {
+    catalogos: ['ver'],
+    marcas: ['ver', 'crear', 'editar'],
     publicaciones: ['ver', 'aprobar', 'rechazar'],
     calendario: ['ver'],
     campanas: ['ver', 'crear'],
