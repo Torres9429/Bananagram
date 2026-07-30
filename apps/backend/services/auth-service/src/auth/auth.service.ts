@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
@@ -16,6 +16,8 @@ const REGISTER_ROLE_MAP = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly repo: AuthRepository,
     private readonly jwtService: JwtService,
@@ -54,7 +56,7 @@ export class AuthService {
         body: JSON.stringify({ userId, ...dto }),
       });
     } catch (error) {
-      console.error('Error al crear perfil en core-service (no bloquea registro):', error);
+      this.logger.error('Error al crear perfil en core-service (no bloquea registro):', error);
       // core-service caído: el perfil se puede crear/actualizar después
       // (el endpoint es un upsert), no vale la pena tumbar el registro por esto.
     }
