@@ -53,7 +53,8 @@ export class AuthService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, ...dto }),
       });
-    } catch {
+    } catch (error) {
+      console.error('Error al crear perfil en core-service (no bloquea registro):', error);
       // core-service caído: el perfil se puede crear/actualizar después
       // (el endpoint es un upsert), no vale la pena tumbar el registro por esto.
     }

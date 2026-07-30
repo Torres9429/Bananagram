@@ -75,7 +75,6 @@ model Category {
   name String @unique
 
   userProfileCategories UserProfileCategory[]
-  brands                Brand[]
   campaignCategories    CampaignCategory[]
 
   createdAt DateTime  @default(now())
@@ -134,12 +133,8 @@ model Brand {
   // vía HTTP GET /internal/users/:id si la vista necesita nombre/email —
   // para validar propiedad basta comparar contra el userId del JWT, sin llamada)
 
-  // industria/categoría de la marca (catálogo base, semilla por Admin).
-  categoryId String?
-  category   Category? @relation(fields: [categoryId], references: [id])
-
-  // Ayrshare: null hasta que el Cliente conecte sus redes en el onboarding
-  ayrshareProfileKey String? @unique
+  refId      String? @unique
+  profileKey String? @unique
 
   socialAccounts SocialAccount[]
   campaigns      Campaign[]
@@ -331,7 +326,6 @@ model Media {
   brandId String
   brand   Brand  @relation(fields: [brandId], references: [id])
 
-  uploadedBy String // FK → auth-service.User.id (CM o Diseñador; sin constraint)
 
   fileName     String
   originalName String
