@@ -1,4 +1,4 @@
-import { ArrayUnique, IsArray, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateBrandDto {
@@ -17,6 +17,7 @@ export class CreateBrandDto {
 
   @ApiProperty({ type: [String] })
   @IsArray()
+  @ArrayMinSize(1)
   @ArrayUnique()
   @IsString({ each: true })
   allowedSocial: string[];
