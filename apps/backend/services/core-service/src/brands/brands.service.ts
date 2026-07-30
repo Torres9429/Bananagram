@@ -1,10 +1,12 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { prisma } from '../prisma/client';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
+import { getAyrshareConfig, getAyrshareErrorMessage } from './ayrshare.util';
 
 type CurrentUser = { sub: string; role: string };
-type BrandWithConnection = Awaited<ReturnType<typeof prisma.brand.create>> & { connectUrl: string };
+type Brand = Awaited<ReturnType<typeof prisma.brand.create>>;
+type BrandResponse = Omit<Brand, 'refId' | 'profileKey'> & { connectUrl?: string };
 
 type AyrshareCreateProfileResponse =
   | { status: 'success'; title: string; refId: string; profileKey: string; messagingActive?: boolean }
@@ -16,15 +18,18 @@ type AyrshareGenerateJwtResponse =
 
 @Injectable()
 export class BrandsService {
+  private readonly logger = new Logger(BrandsService.name);
+
   // Multi-tenancy row-level (ADR-0001): cada rol ve solo las marcas con las
   // que tiene relación — el Administrador ve todas, el resto solo las
   // suyas (dueño) o las de campañas donde participa como CM/Diseñador.
-  async listBrands(user: CurrentUser) {
+  async listBrands(user: CurrentUser): Promise<BrandResponse[]> {
     if (user.role === 'administrador') {
-      return prisma.brand.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } });
+      const brands = await prisma.brand.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } });
+      return brands.map((brand) => this.toBrandResponse(brand));
     }
 
-    return prisma.brand.findMany({
+    const brands = await prisma.brand.findMany({
       where: {
         deletedAt: null,
         OR: [
@@ -41,17 +46,18 @@ export class BrandsService {
       },
       orderBy: { name: 'asc' },
     });
+    return brands.map((brand) => this.toBrandResponse(brand));
   }
 
-  async getBrand(id: string) {
+  async getBrand(id: string): Promise<BrandResponse> {
     const brand = await prisma.brand.findFirst({ where: { id, deletedAt: null } });
     if (!brand) throw new NotFoundException(`Brand ${id} no existe`);
-    return brand;
+    return this.toBrandResponse(brand);
   }
 
   // ownerId siempre es un Cliente (regla de negocio) — se toma del JWT, no
   // del body: nadie puede crear una marca a nombre de otro usuario.
-  async createBrand(dto: CreateBrandDto, user: CurrentUser): Promise<BrandWithConnection> {
+  async createBrand(dto: CreateBrandDto, user: CurrentUser): Promise<BrandResponse> {
     if (user.role !== 'cliente' && user.role !== 'administrador') {
       throw new ForbiddenException('Solo un Cliente puede crear una marca');
     }
@@ -69,27 +75,36 @@ export class BrandsService {
       }),
     );
 
+    let profileKey: string | undefined;
     try {
       const profile = await this.createAyrshareProfile(brand.name);
+      profileKey = profile.profileKey;
       const connectUrl = await this.createAyrshareConnectUrl(profile.profileKey, dto.allowedSocial);
 
       const updatedBrand = await prisma.brand.update({
         where: { id: brand.id },
-        data: { refId: profile.refId, profileKey: profile.profileKey } as any,
+        data: { refId: profile.refId, profileKey: profile.profileKey },
       });
 
-      return { ...updatedBrand, connectUrl };
+      return this.toBrandResponse(updatedBrand, connectUrl);
     } catch (error) {
+      if (profileKey) {
+        await this.deleteAyrshareProfile(profileKey).catch((cleanupError) => {
+          this.logger.warn(
+            `No se pudo limpiar el perfil huérfano de Ayrshare (profileKey=${profileKey}): ${cleanupError}`,
+          );
+        });
+      }
       await prisma.brand.update({ where: { id: brand.id }, data: { deletedAt: new Date() } });
       throw error;
     }
   }
 
-  async updateBrand(id: string, dto: UpdateBrandDto) {
+  async updateBrand(id: string, dto: UpdateBrandDto): Promise<BrandResponse> {
     await this.getBrand(id);
     this.assertAtLeastOneProvided(dto);
 
-    return this.runWithUniqueGuard(() =>
+    const updated = await this.runWithUniqueGuard(() =>
       prisma.brand.update({
         where: { id },
         data: {
@@ -101,11 +116,18 @@ export class BrandsService {
         },
       }),
     );
+    return this.toBrandResponse(updated);
   }
 
-  async removeBrand(id: string) {
+  async removeBrand(id: string): Promise<BrandResponse> {
     await this.getBrand(id);
-    return prisma.brand.update({ where: { id }, data: { deletedAt: new Date() } });
+    const removed = await prisma.brand.update({ where: { id }, data: { deletedAt: new Date() } });
+    return this.toBrandResponse(removed);
+  }
+
+  private toBrandResponse(brand: Brand, connectUrl?: string): BrandResponse {
+    const { refId, profileKey, ...rest } = brand;
+    return connectUrl ? { ...rest, connectUrl } : rest;
   }
 
   private async runWithUniqueGuard<T>(operation: () => Promise<T>): Promise<T> {
@@ -127,7 +149,7 @@ export class BrandsService {
   }
 
   private async createAyrshareProfile(title: string): Promise<{ refId: string; profileKey: string }> {
-    const { apiKey, baseUrl } = this.getAyrshareConfig();
+    const { apiKey, baseUrl } = getAyrshareConfig();
 
     const response = await fetch(`${baseUrl}/profiles`, {
       method: 'POST',
@@ -140,14 +162,14 @@ export class BrandsService {
 
     const payload = (await response.json()) as AyrshareCreateProfileResponse;
     if (!response.ok || payload.status !== 'success') {
-      throw new BadRequestException(this.getAyrshareErrorMessage(payload, 'No se pudo crear el perfil de Ayrshare'));
+      throw new BadRequestException(getAyrshareErrorMessage(payload, 'No se pudo crear el perfil de Ayrshare'));
     }
 
     return { refId: payload.refId, profileKey: payload.profileKey };
   }
 
   private async createAyrshareConnectUrl(profileKey: string, allowedSocial: string[]): Promise<string> {
-    const { apiKey, domain, privateKey, baseUrl } = this.getAyrshareConfig();
+    const { apiKey, domain, privateKey, baseUrl } = getAyrshareConfig();
 
     const response = await fetch(`${baseUrl}/profiles/generateJWT`, {
       method: 'POST',
@@ -165,42 +187,30 @@ export class BrandsService {
 
     const payload = (await response.json()) as AyrshareGenerateJwtResponse;
     if (!response.ok || payload.status !== 'success') {
-      throw new BadRequestException(this.getAyrshareErrorMessage(payload, 'No se pudo generar la URL de conexión de Ayrshare'));
+      throw new BadRequestException(getAyrshareErrorMessage(payload, 'No se pudo generar la URL de conexión de Ayrshare'));
     }
 
     return payload.url;
   }
 
-  private getAyrshareConfig(): { apiKey: string; domain: string; privateKey: string; baseUrl: string } {
-    const apiKey = process.env.AYRSHARE_API_KEY;
-    const domain = process.env.AYRSHARE_DOMAIN;
-    const privateKey = Buffer.from(
-        process.env.AYRSHARE_PRIVATE_KEY!,
-        'base64',
-      ).toString('utf8');
-    const baseUrl = process.env.AYRSHARE_API_BASE_URL;
+  // Compensación cuando createAyrshareConnectUrl falla después de que el
+  // perfil ya se creó — sin esto, queda un perfil huérfano en Ayrshare que
+  // nadie más referencia (ni refId ni profileKey llegan a guardarse local).
+  private async deleteAyrshareProfile(profileKey: string): Promise<void> {
+    const { apiKey, baseUrl } = getAyrshareConfig();
 
-    if (!apiKey) {
-      throw new BadRequestException('Falta configurar AYRSHARE_API_KEY');
-    }
-    if (!domain) {
-      throw new BadRequestException('Falta configurar AYRSHARE_DOMAIN');
-    }
-    if (!privateKey) {
-      throw new BadRequestException('Falta configurar AYRSHARE_PRIVATE_KEY');
-    }
-    if (!baseUrl) {
-      throw new BadRequestException('Falta configurar AYRSHARE_API_BASE_URL');
-    }
+    const response = await fetch(`${baseUrl}/profiles`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Profile-Key': profileKey,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    return { apiKey, domain, privateKey, baseUrl };
-  }
-
-  private getAyrshareErrorMessage(
-    payload: { message?: string; code?: number; status?: string },
-    fallback: string,
-  ): string {
-    const prefix = payload.code ? `Ayrshare ${payload.code}: ` : '';
-    return `${prefix}${payload.message ?? fallback}`;
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as AyrshareCreateProfileResponse | Record<string, never>;
+      throw new Error(getAyrshareErrorMessage(payload, 'No se pudo eliminar el perfil huérfano de Ayrshare'));
+    }
   }
 }
