@@ -23,6 +23,7 @@
     { "key": "adminUserId", "value": "" },
     { "key": "roleId", "value": "" },
     { "key": "brandId", "value": "" },
+    { "key": "brandConnectUrl", "value": "", "description": "connectUrl que devuelve Create brand — ábrela en el navegador para conectar de verdad una red en Ayrshare antes de correr Sync social accounts." },
     { "key": "campaignId", "value": "" },
     { "key": "designerUserId", "value": "", "description": "userId de un Diseñador ya existente (ver admin/users) — CampaignDesigner no crea usuarios, solo vincula uno ya dado de alta." },
     { "key": "cmUserId", "value": "", "description": "userId de un Community Manager ya existente — Campaign.cmId lo requiere al crear." },
@@ -488,7 +489,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const body = pm.response.json();",
-                  "if (body.id) { pm.collectionVariables.set('brandId', body.id); }"
+                  "if (body.id) { pm.collectionVariables.set('brandId', body.id); }",
+                  "if (body.connectUrl) { pm.collectionVariables.set('brandConnectUrl', body.connectUrl); }"
                 ]
               }
             }
@@ -498,10 +500,10 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Marca de prueba\",\n  \"slug\": \"marca-de-prueba\"\n}"
+              "raw": "{\n  \"name\": \"Marca de prueba\",\n  \"slug\": \"marca-de-prueba\",\n  \"allowedSocial\": [\"facebook\", \"instagram\", \"linkedin\"]\n}"
             },
             "url": { "raw": "{{coreBaseUrl}}/brands", "host": ["{{coreBaseUrl}}"], "path": ["brands"] },
-            "description": "ownerId sale del JWT (user.sub), no del body. Requiere permiso marcas:crear (Cliente o Administrador en el seed)."
+            "description": "ownerId sale del JWT (user.sub), no del body. Requiere permiso marcas:crear (Cliente o Administrador en el seed). Requiere las 4 env vars de Ayrshare (AYRSHARE_API_KEY/DOMAIN/PRIVATE_KEY/API_BASE_URL) configuradas en core-service — sin ellas responde 500. La respuesta trae `connectUrl` (URL de onboarding para conectar redes en Ayrshare) pero NUNCA `refId`/`profileKey` (son internos, no se exponen). Abre `connectUrl` en el navegador para conectar de verdad una red social antes de probar el sync."
           }
         },
         {
@@ -526,6 +528,35 @@
           "request": {
             "method": "DELETE",
             "url": { "raw": "{{coreBaseUrl}}/brands/{{brandId}}", "host": ["{{coreBaseUrl}}"], "path": ["brands", "{{brandId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "core-service - social accounts",
+      "item": [
+        {
+          "name": "Sync social accounts (Ayrshare)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{coreBaseUrl}}/brands/{{brandId}}/social-accounts/sync",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["brands", "{{brandId}}", "social-accounts", "sync"]
+            },
+            "description": "Consulta GET /user en Ayrshare (scoped al profileKey de la marca) y sincroniza SocialAccount local contra el catálogo de SocialNetwork. Prerrequisitos: 1) haber corrido `Create brand` (la marca necesita profileKey); 2) haber abierto la `connectUrl` devuelta y conectado de verdad al menos una red en Ayrshare; 3) que exista en `core-service - catalogos → Social Networks` un registro cuyo `code` coincida EXACTO con el identificador de Ayrshare (ej. `facebook`, `instagram`, `twitter`, `linkedin`, `tiktok`, `youtube`) — si no existe, esa red se ignora (se loguea un warning) en vez de fallar el sync completo. Requiere permiso marcas:editar."
+          }
+        },
+        {
+          "name": "List social accounts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{coreBaseUrl}}/brands/{{brandId}}/social-accounts",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["brands", "{{brandId}}", "social-accounts"]
+            },
+            "description": "Lee el estado local (sin llamar a Ayrshare) — corre `Sync social accounts` primero para reflejar el estado real."
           }
         }
       ]
