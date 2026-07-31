@@ -44,6 +44,7 @@ servicios (sin mensajería async).
 cp .env.example .env      # valores por defecto ya sirven para desarrollo local
 pnpm install
 docker compose up -d      # levanta solo Postgres + Adminer
+set -a && source .env && set +a   # para cargar las variables de entorno antes de migrate y seed
 pnpm db:migrate           # aplica las migraciones (auth-service y core-service)
 pnpm seed                 # carga roles, permisos y usuarios de prueba
 ```

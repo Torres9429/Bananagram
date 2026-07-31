@@ -1,7 +1,26 @@
-import { IsString, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ArrayUnique, IsArray, IsIn, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpsertUserProfileDto {
   @ApiProperty() @IsString() userId: string;
   @ApiProperty() @IsString() @MinLength(1) name: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() avatarUrl?: string;
+  @ApiProperty({ enum: ['cliente', 'cm', 'disenador'] })
+  @IsString()
+  @IsIn(['cliente', 'cm', 'disenador'])
+  roleName: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  categoryIds?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  specialtyIds?: string[];
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionGuard } from '../guards/permission.guard';
@@ -16,8 +16,8 @@ export class UsersController {
 
   @Get()
   @RequirePermission('usuarios', 'ver')
-  findAll() {
-    return this.users.listUsers();
+  findAll(@Query('roleName') roleName?: string) {
+    return this.users.listUsers(roleName);
   }
 
   @Get(':id')

@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "Ayrshare MCP": {
+      "type": "http",
+      "url": "https://www.ayrshare.com/docs/mcp"
+    }
+  }
+}

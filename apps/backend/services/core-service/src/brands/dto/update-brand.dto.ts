@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateBrandDto {
@@ -10,7 +10,6 @@ export class UpdateBrandDto {
   @IsIn(['brand', 'profile'])
   profileType?: string;
 
-  @ApiPropertyOptional() @IsOptional() @IsUUID() categoryId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() logoUrl?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() primaryColor?: string;
 }

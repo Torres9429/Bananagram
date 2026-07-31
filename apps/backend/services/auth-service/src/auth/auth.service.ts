@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
@@ -8,14 +8,16 @@ import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
-// Rol que recibe quien se auto-registra: el flujo de alta espontánea de este
-// sistema es "un Cliente pide que le gestionen sus redes", así que nace
-// Cliente. CM/Diseñador se incorporan asignados por un Admin, no por
-// auto-registro (evita que cualquiera se dé de alta como staff interno).
-const DEFAULT_REGISTER_ROLE = process.env.DEFAULT_REGISTER_ROLE || 'cliente';
+const REGISTER_ROLE_MAP = {
+  cliente: 'cliente',
+  cm: 'community_manager',
+  disenador: 'disenador',
+} as const;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly repo: AuthRepository,
     private readonly jwtService: JwtService,
@@ -25,9 +27,9 @@ export class AuthService {
     const existing = await this.repo.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email ya registrado');
 
-    const role = await this.repo.findRoleByName(DEFAULT_REGISTER_ROLE);
+    const role = await this.repo.findRoleByName(REGISTER_ROLE_MAP[dto.roleName]);
     if (!role) {
-      throw new UnauthorizedException(`Rol por defecto '${DEFAULT_REGISTER_ROLE}' no existe — corre el seed`);
+      throw new UnauthorizedException(`Rol '${REGISTER_ROLE_MAP[dto.roleName]}' no existe — corre el seed`);
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -37,20 +39,24 @@ export class AuthService {
     // core-service (servicios separados, sin @relation real — ver
     // docs/base/modelo2.txt). No bloqueamos el registro si core-service está
     // caído: el login/JWT no depende de este dato, solo el nombre en UI.
-    await this.createProfileBestEffort(user.id, dto.name);
+    await this.createProfileBestEffort(user.id, dto);
 
     return this.issueTokens(user);
   }
 
-  private async createProfileBestEffort(userId: string, name: string) {
+  private async createProfileBestEffort(
+    userId: string,
+    dto: { name: string; avatarUrl?: string; roleName: string; categoryIds?: string[]; specialtyIds?: string[] },
+  ) {
     const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
     try {
       await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, name }),
+        body: JSON.stringify({ userId, ...dto }),
       });
-    } catch {
+    } catch (error) {
+      this.logger.error('Error al crear perfil en core-service (no bloquea registro):', error);
       // core-service caído: el perfil se puede crear/actualizar después
       // (el endpoint es un upsert), no vale la pena tumbar el registro por esto.
     }
