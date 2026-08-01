@@ -8,4 +8,11 @@ module.exports = {
   testMatch: ['**/*.spec.ts'],
   testPathIgnorePatterns: ['/node_modules/'],
   setupFiles: ['<rootDir>/env-setup.js'],
+  // Varios specs (auth.integration/campaigns-flow) llaman cleanDatabase()
+  // sobre la misma Postgres real — correrlos en paralelo (default de Jest)
+  // hace que un archivo borre filas que otro está usando a la mitad de una
+  // prueba (FK violation intermitente en refresh_tokens). Un solo worker
+  // evita la condición de carrera; no hay tests puramente unitarios que
+  // dependan de paralelismo para ser rápidos.
+  maxWorkers: 1,
 };
