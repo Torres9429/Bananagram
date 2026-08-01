@@ -19,6 +19,7 @@ CREATE TABLE "user_profiles" (
     "userId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "avatarUrl" TEXT,
+    "roleName" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -86,8 +87,8 @@ CREATE TABLE "brands" (
     "logoUrl" TEXT,
     "primaryColor" TEXT,
     "ownerId" TEXT NOT NULL,
-    "categoryId" TEXT,
-    "ayrshareProfileKey" TEXT,
+    "refId" TEXT,
+    "profileKey" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -196,7 +197,6 @@ CREATE TABLE "post_social_accounts" (
 CREATE TABLE "media" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
-    "uploadedBy" TEXT NOT NULL,
     "fileName" TEXT NOT NULL,
     "originalName" TEXT NOT NULL,
     "mimeType" TEXT NOT NULL,
@@ -309,7 +309,10 @@ CREATE UNIQUE INDEX "social_networks_code_key" ON "social_networks"("code");
 CREATE UNIQUE INDEX "brands_slug_key" ON "brands"("slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "brands_ayrshareProfileKey_key" ON "brands"("ayrshareProfileKey");
+CREATE UNIQUE INDEX "brands_refId_key" ON "brands"("refId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "brands_profileKey_key" ON "brands"("profileKey");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "social_accounts_brandId_socialNetworkId_key" ON "social_accounts"("brandId", "socialNetworkId");
@@ -331,9 +334,6 @@ ALTER TABLE "user_profile_specialties" ADD CONSTRAINT "user_profile_specialties_
 
 -- AddForeignKey
 ALTER TABLE "user_profile_specialties" ADD CONSTRAINT "user_profile_specialties_specialtyId_fkey" FOREIGN KEY ("specialtyId") REFERENCES "specialties"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "brands" ADD CONSTRAINT "brands_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "social_accounts" ADD CONSTRAINT "social_accounts_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "brands"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
