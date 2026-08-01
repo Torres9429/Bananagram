@@ -29,11 +29,13 @@ export class UserProfilesController {
         update: {
           name: dto.name,
           avatarUrl: dto.avatarUrl,
+          roleName: dto.roleName,
         },
         create: {
           userId: dto.userId,
           name: dto.name,
           avatarUrl: dto.avatarUrl,
+          roleName: dto.roleName,
         },
       });
 

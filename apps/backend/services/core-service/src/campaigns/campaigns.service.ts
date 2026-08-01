@@ -32,7 +32,7 @@ export class CampaignsService {
 
   async getCampaign(id: string): Promise<any> {
     const campaign = await prisma.campaign.findFirst({ where: { id, deletedAt: null }, include: INCLUDE });
-    if (!campaign) throw new NotFoundException(`Campaign ${id} no existe`);
+    if (!campaign) throw new NotFoundException(`Campaña no encontrada`);
     return campaign;
   }
 
@@ -54,11 +54,13 @@ export class CampaignsService {
   // sigue siendo un acto del dueño de la marca (o de un Administrador).
   async createCampaign(dto: CreateCampaignDto, user: CurrentUser): Promise<any> {
     const brand = await prisma.brand.findFirst({ where: { id: dto.brandId, deletedAt: null } });
-    if (!brand) throw new BadRequestException('brandId inválido');
+    if (!brand) throw new BadRequestException('La marca especificada no existe o fue eliminada');
 
     if (user.role !== 'administrador' && brand.ownerId !== user.sub) {
       throw new ForbiddenException('Solo el dueño de la marca puede crear campañas para ella');
     }
+
+    await this.assertUserHasRole(dto.cmId, 'cm', 'El usuario seleccionado no corresponde a un Community Manager');
 
     return prisma.campaign.create({
       data: {
@@ -83,13 +85,19 @@ export class CampaignsService {
     await this.assertCanManage(campaign, user);
     this.assertAtLeastOneProvided(dto);
 
+    // Regla de negocio (RF-2.3): el Community Manager queda bloqueado
+    // permanentemente tras la creación de la campaña — a diferencia del
+    // resto de los campos, no se ignora en silencio, se rechaza la request.
+    if (dto.cmId !== undefined) {
+      throw new BadRequestException('El community manager de una campaña no se puede reasignar después de creada');
+    }
+
     return prisma.campaign.update({
       where: { id },
       data: {
         name: dto.name,
         description: dto.description,
         objective: dto.objective,
-        cmId: dto.cmId,
         status: dto.status as CampaignStatus | undefined,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
@@ -109,6 +117,7 @@ export class CampaignsService {
   async assignDesigner(campaignId: string, designerUserId: string, user: CurrentUser) {
     const campaign = await this.getCampaign(campaignId);
     this.assertIsAssignedCm(campaign, user);
+    await this.assertUserHasRole(designerUserId, 'disenador', 'El usuario asignado no tiene rol de Diseñador');
 
     return this.runWithUniqueGuard(() =>
       prisma.campaignDesigner.create({ data: { campaignId, userId: designerUserId } }),
@@ -123,6 +132,33 @@ export class CampaignsService {
       where: { campaignId_userId: { campaignId, userId: designerUserId } },
     });
     return { removed: true };
+  }
+
+  // Selectores de RF-2.1/RF-2.2 (elegir CM al crear la campaña, elegir
+  // Diseñador al asignarlo). No se puede reusar GET /admin/users?roleName=
+  // de auth-service: ese endpoint requiere el permiso `usuarios:ver`, que en
+  // el seed solo tiene `administrador` — ni Cliente (crea la campaña) ni CM
+  // (asigna diseñadores) lo tienen. roleName se lee de UserProfile, que
+  // core-service ya guarda localmente (ver POST /internal/user-profiles).
+  async listEligibleCommunityManagers(): Promise<any> {
+    return this.listProfilesByRole('cm');
+  }
+
+  async listEligibleDesigners(): Promise<any> {
+    return this.listProfilesByRole('disenador');
+  }
+
+  private listProfilesByRole(roleName: string) {
+    return prisma.userProfile.findMany({
+      where: { roleName, deletedAt: null },
+      select: { userId: true, name: true, avatarUrl: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  private async assertUserHasRole(userId: string, roleName: string, errorMessage: string): Promise<void> {
+    const profile = await prisma.userProfile.findFirst({ where: { userId, roleName, deletedAt: null } });
+    if (!profile) throw new BadRequestException(errorMessage);
   }
 
   private assertIsAssignedCm(campaign: { cmId: string }, user: CurrentUser) {
