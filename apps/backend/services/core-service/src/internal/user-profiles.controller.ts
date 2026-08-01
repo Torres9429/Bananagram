@@ -11,14 +11,30 @@ import { UpsertUserProfileDto } from './dto/upsert-user-profile.dto';
 @Controller('internal/user-profiles')
 export class UserProfilesController {
   @Post()
-  upsert(@Body() dto: UpsertUserProfileDto) {
-    const requiresProfileTaxonomies = dto.roleName !== 'cliente';
+  async upsert(@Body() dto: UpsertUserProfileDto) {
+    const existing = await prisma.userProfile.findUnique({
+      where: { userId: dto.userId },
+      include: { categories: true, specialties: true },
+    });
 
+    // Solo se exige categoría/especialidad cuando el perfil quedaría sin
+    // ninguna al terminar esta llamada — perfil nuevo, o el caller mandó
+    // explícitamente un array vacío. Si el campo viene undefined en una
+    // actualización, se conserva lo que ya había (no es obligatorio
+    // reenviar todo el perfil solo para cambiar, por ejemplo, avatarUrl).
+    const requiresProfileTaxonomies = dto.roleName !== 'cliente';
     if (requiresProfileTaxonomies) {
-      if (!dto.categoryIds?.length) {
+      const categoriesEmpty =
+        dto.categoryIds !== undefined ? dto.categoryIds.length === 0 : !existing || existing.categories.length === 0;
+      const specialtiesEmpty =
+        dto.specialtyIds !== undefined
+          ? dto.specialtyIds.length === 0
+          : !existing || existing.specialties.length === 0;
+
+      if (categoriesEmpty) {
         throw new BadRequestException('Las categorías son obligatorias para community manager y diseñador');
       }
-      if (!dto.specialtyIds?.length) {
+      if (specialtiesEmpty) {
         throw new BadRequestException('Las especialidades son obligatorias para community manager y diseñador');
       }
     }
@@ -39,19 +55,22 @@ export class UserProfilesController {
         },
       });
 
-      await tx.userProfileCategory.deleteMany({ where: { userProfileId: profile.id } });
-      await tx.userProfileSpecialty.deleteMany({ where: { userProfileId: profile.id } });
-
-      if (dto.categoryIds?.length) {
-        await tx.userProfileCategory.createMany({
-          data: dto.categoryIds.map((categoryId) => ({ userProfileId: profile.id, categoryId })),
-        });
+      if (dto.categoryIds !== undefined) {
+        await tx.userProfileCategory.deleteMany({ where: { userProfileId: profile.id } });
+        if (dto.categoryIds.length) {
+          await tx.userProfileCategory.createMany({
+            data: dto.categoryIds.map((categoryId) => ({ userProfileId: profile.id, categoryId })),
+          });
+        }
       }
 
-      if (dto.specialtyIds?.length) {
-        await tx.userProfileSpecialty.createMany({
-          data: dto.specialtyIds.map((specialtyId) => ({ userProfileId: profile.id, specialtyId })),
-        });
+      if (dto.specialtyIds !== undefined) {
+        await tx.userProfileSpecialty.deleteMany({ where: { userProfileId: profile.id } });
+        if (dto.specialtyIds.length) {
+          await tx.userProfileSpecialty.createMany({
+            data: dto.specialtyIds.map((specialtyId) => ({ userProfileId: profile.id, specialtyId })),
+          });
+        }
       }
 
       return tx.userProfile.findUnique({
