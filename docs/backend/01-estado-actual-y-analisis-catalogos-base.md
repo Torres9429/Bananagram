@@ -1,4 +1,4 @@
-# Estado del backend — bases separadas + catálogos protegidos (al día: 2026-07-27)
+# Estado del backend — bases separadas + catálogos protegidos (al día: 2026-07-27, parche 2026-08-01 en §0bis)
 
 > Este documento arrancó como un análisis de la rama `feat/catalogos-base` antes de mergearla. Esa rama
 > ya se mergeó, y desde entonces se hizo trabajo real de fondo (separación de bases de datos completa,
@@ -70,6 +70,47 @@ Además de catálogos (§1, sin cambios), esta ronda construyó:
 
 Pendiente de correr tras esta ronda: `pnpm seed` (la matriz de permisos cambió — se agregó `catalogos` y
 se amplió `marcas` para cliente/CM/diseñador).
+
+## 0bis. Actualización 2026-08-01 — validaciones de campaigns/perfil + squash de migraciones
+
+Sobre la rama `feat/campaings` (un solo commit real: validaciones de campañas + completar perfil de
+CM/Diseñador) se encontraron y corrigieron 5 problemas, todos verificados en vivo (no especulativos):
+
+- **`ProfileModule` nuevo en `auth-service`** (`PATCH /me/profile`) — para que un CM/Diseñador dado de alta
+  por el Admin (solo email+password+rol, sin nombre) complete nombre/categorías/especialidades. Llama a
+  `POST /internal/user-profiles` de `core-service` (mismo endpoint que ya usaba `register()`).
+- **`UserProfile.roleName`** (campo nuevo, migración aparte) — `CampaignsService.assertUserHasRole` lo usa
+  para validar que `cmId`/designerId de una campaña correspondan a un perfil real con ese rol antes de
+  crear la campaña o asignar un diseñador; `GET /campaigns/eligible-community-managers`/
+  `eligible-designers` lo filtran para exponer selectores. El CM de una campaña ya no se puede reasignar
+  después de creada (`PATCH /campaigns/:id` rechaza `cmId` explícitamente, incluso al mismo valor).
+- **Bug encontrado — `AuthService.createProfileBestEffort()` tragaba 400 de core-service en silencio**:
+  `fetch()` no rechaza la promesa en 4xx/5xx, así que un CM/Diseñador que se registra sin
+  `categoryIds`/`specialtyIds` quedaba con un 201 de registro "exitoso" pero sin `UserProfile` creado, sin
+  ningún error visible. Corregido: ahora revisa `response.ok` y loguea el motivo real (sigue sin bloquear
+  el registro — decisión de diseño ya tomada, solo se arregló el swallow).
+- **Bug encontrado — `UserProfilesController.upsert()` exigía categorías/especialidades en cada llamada**,
+  no solo la primera: un CM que ya completó su perfil y solo quería cambiar `avatarUrl` recibía 400 igual.
+  Corregido: solo se exige si el perfil quedaría sin ninguna (perfil nuevo, o se manda un array vacío a
+  propósito) — omitir el campo en una actualización posterior conserva lo que ya había.
+- **Bug encontrado — `packages/seed/src/index.js` nunca seteaba `roleName`**: las cuentas demo
+  `cm@bananagram.mx`/`disenador@bananagram.mx` quedaban con `roleName: null`, y `assertUserHasRole` las
+  rechazaba siempre — con datos de seed no se podía crear una campaña ni asignar un diseñador, el flujo
+  insignia de esta rama. `seedUsers()` ya setea `roleName` (mismo mapeo que `ROLE_NAME_TO_SHORT`/
+  `REGISTER_ROLE_MAP`). No se reintrodujo seed de `categoryIds`/`specialtyIds` (se quitó a propósito en
+  `b30edb9`, ver §3 punto 5).
+
+Además:
+- **Migraciones squasheadas**: `auth-service` (2→1) y `core-service` (4→1) — una sola `..._init` por
+  servicio que refleja el `schema.prisma` completo actual. BD local reseteada desde cero
+  (`docker compose down -v`). No hay ambiente desplegado dependiendo del historial granular; cualquiera
+  con una BD local basada en las migraciones viejas necesita resetear la suya.
+- **`apps/backend/test/jest.config.js`: `maxWorkers: 1`** — con el nuevo `campaigns-flow.spec.ts` ya son 2
+  specs llamando `cleanDatabase()` sobre la misma Postgres; en paralelo (default de Jest) causaba una
+  condición de carrera intermitente (`FK violation` en `refresh_tokens`). Un solo worker la elimina.
+- **Frontend (mock, sin conectar al backend real)**: `RegisterForm`/`ActivateForm` de `auth-front` ya
+  reflejan `roleName`/categorías/especialidades — ver `.claude/INVENTORY.md` §2.4 y
+  `docs/docs-front/frontend-functional-documentation.md` §7.1 para el detalle.
 
 ## 1. Qué está hecho y verificado hoy (no solo "debería funcionar")
 
@@ -172,7 +213,8 @@ aplicar) ya está hecho — ver §0. Lo que sigue de verdad pendiente:
   exactamente para esto.
 - **Frontend**: sigue 100% en modo mock, cero consumo de cualquier endpoint real (ni siquiera los que ya
   existían antes de esta ronda). Fuera de alcance a propósito, no se tocó.
-- `.claude/INVENTORY.md` §2 (Frontend) sigue con fecha 2026-07-19, sin actualizar.
+- `.claude/INVENTORY.md` §2 (Frontend) sigue con fecha 2026-07-19, salvo un parche puntual 2026-08-01 en
+  `auth-front` (`RegisterForm`/`ActivateForm`, ver §0bis) — el resto de la sección no se tocó.
 
 ## 3. Cosas importantes a tener en cuenta antes de escribir el siguiente módulo
 

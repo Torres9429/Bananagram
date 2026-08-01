@@ -2,7 +2,7 @@
   "info": {
     "name": "Bananagram - Backend (auth-service + core-service catalogos)",
     "_postman_id": "b4n4n4gr4m-0000-0000-0000-000000000001",
-    "description": "Colección para probar en local auth-service (3001) y core-service (3002). El login guarda accessToken/refreshToken en variables de colección automáticamente (ver script de test en 'Login'). Auth Bearer configurado a nivel de colección (usa {{accessToken}}) — cualquier request nueva que agregues hereda el token automáticamente sin que tengas que poner el header a mano; solo Login, Register y Refresh lo desactivan explícitamente (auth: noauth) porque no los necesitan. Actualizada 2026-07-27 con los módulos construidos en esa ronda: brands, campaigns (+ designers), reports, ideas, admin (users/roles/permisos) y register/password-reset de auth-service.",
+    "description": "Colección para probar en local auth-service (3001) y core-service (3002). El login guarda accessToken/refreshToken en variables de colección automáticamente (ver script de test en 'Login'). Auth Bearer configurado a nivel de colección (usa {{accessToken}}) — cualquier request nueva que agregues hereda el token automáticamente sin que tengas que poner el header a mano; solo Login, Register y Refresh lo desactivan explícitamente (auth: noauth) porque no los necesitan. Actualizada 2026-07-27 con los módulos construidos en esa ronda: brands, campaigns (+ designers), reports, ideas, admin (users/roles/permisos) y register/password-reset de auth-service. Actualizada de nuevo 2026-08-01 con 'Complete profile' (PATCH /me/profile) y los selectores eligible-community-managers/eligible-designers de campaigns, y otra vez ese mismo día con notas sobre las validaciones de roleName (Create campaign/Assign designer), el bloqueo de reasignar cmId (Update campaign) y el squash de migraciones + fix de roleName en el seed (ver .claude/INVENTORY.md, nota 2026-08-01).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -120,6 +120,19 @@
             "method": "GET",
             "url": { "raw": "{{authBaseUrl}}/me/permissions", "host": ["{{authBaseUrl}}"], "path": ["me", "permissions"] },
             "description": "Fuente de verdad del menú dinámico del frontend (usePermissions()). Hereda el Bearer {{accessToken}} del auth de la colección."
+          }
+        },
+        {
+          "name": "Complete profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ana García\",\n  \"categoryIds\": [\"{{categoryId}}\"],\n  \"specialtyIds\": [\"{{specialtyId}}\"]\n}"
+            },
+            "url": { "raw": "{{authBaseUrl}}/me/profile", "host": ["{{authBaseUrl}}"], "path": ["me", "profile"] },
+            "description": "Para un CM/Diseñador dado de alta por el Admin (solo email+password, sin nombre): completa su UserProfile en core-service (POST internal/user-profiles) para que aparezca en /campaigns/eligible-community-managers|eligible-designers. categoryIds/specialtyIds son obligatorios para cm/disenador solo si el perfil no los tiene ya — omitirlos en una actualización posterior conserva los que ya existían."
           }
         },
         {
@@ -572,6 +585,30 @@
           }
         },
         {
+          "name": "List eligible community managers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{coreBaseUrl}}/campaigns/eligible-community-managers",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["campaigns", "eligible-community-managers"]
+            },
+            "description": "Selector para 'Create campaign' (cmId). Devuelve los UserProfile con roleName 'cm' — un CM dado de alta por el Admin no aparece aquí hasta que completa su perfil (ver 'Complete profile' en auth-service)."
+          }
+        },
+        {
+          "name": "List eligible designers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{coreBaseUrl}}/campaigns/eligible-designers",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["campaigns", "eligible-designers"]
+            },
+            "description": "Selector para 'Assign designer' (userId). Devuelve los UserProfile con roleName 'disenador'."
+          }
+        },
+        {
           "name": "Create campaign",
           "event": [
             {
@@ -593,7 +630,7 @@
               "raw": "{\n  \"brandId\": \"{{brandId}}\",\n  \"name\": \"Campaña de prueba\",\n  \"cmId\": \"{{cmUserId}}\"\n}"
             },
             "url": { "raw": "{{coreBaseUrl}}/campaigns", "host": ["{{coreBaseUrl}}"], "path": ["campaigns"] },
-            "description": "Solo el dueño de la marca (o Administrador) puede crear campañas para ella — verificado en CampaignsService, no solo por el permiso de módulo. cmId es un userId real de un Community Manager (ver admin/users)."
+            "description": "Solo el dueño de la marca (o Administrador) puede crear campañas para ella — verificado en CampaignsService, no solo por el permiso de módulo. cmId debe ser el userId de un usuario con UserProfile.roleName='cm' (assertUserHasRole) — no basta con que su rol de auth-service sea community_manager. Con pnpm seed ya corrido (roleName se setea desde 2026-08-01), el userId de cm@bananagram.mx sirve tal cual; si el CM se dio de alta por Admin, primero necesita completar su perfil (ver 'Complete profile')."
           }
         },
         {
@@ -610,7 +647,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"status\": \"paused\"\n}" },
             "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}"] },
-            "description": "Dueño de la marca, CM asignado o Administrador. No usa BrandAccessGuard (el :id de esta ruta es un campaignId, no un brandId) — la pertenencia se resuelve en CampaignsService.assertCanManage."
+            "description": "Dueño de la marca, CM asignado o Administrador. No usa BrandAccessGuard (el :id de esta ruta es un campaignId, no un brandId) — la pertenencia se resuelve en CampaignsService.assertCanManage. RF-2.3: mandar cmId en el body siempre se rechaza (400) — el CM no se puede reasignar después de creada la campaña, ni siquiera al mismo valor ya asignado."
           }
         },
         {
@@ -627,7 +664,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{designerUserId}}\"\n}" },
             "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}/designers", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}", "designers"] },
-            "description": "Regla de negocio #3: solo el CM asignado a esta campaña (o Administrador) puede agregar/quitar Diseñadores."
+            "description": "Regla de negocio #3: solo el CM asignado a esta campaña (o Administrador) puede agregar/quitar Diseñadores. userId debe tener UserProfile.roleName='disenador' (assertUserHasRole) — con el seed ya corrido, disenador@bananagram.mx sirve tal cual."
           }
         },
         {

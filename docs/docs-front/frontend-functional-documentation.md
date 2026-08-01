@@ -13,7 +13,7 @@ Bananagram es una plataforma SaaS de **gestión de redes sociales y puntuación 
 - **Cliente**: dueño de la marca. Se auto-registra, crea su marca, elige las redes sociales que quiere gestionar, selecciona un Community Manager y aprueba o rechaza el contenido antes de que se publique.
 - **Community Manager (CM)**: líder operativo de una campaña. Es seleccionado por el Cliente, arma su equipo de Diseñadores, crea/programa/publica contenido y coordina el flujo de aprobación.
 - **Diseñador**: colaborador creativo. Es incorporado por el CM a una campaña, crea borradores de publicaciones (copy + contenido visual) que el CM revisa antes de enviarlos a aprobación del Cliente.
-- **Administrador**: no participa en el flujo de contenido. Configura el sistema: registra usuarios operativos (CM/Diseñador), mantiene los catálogos (redes sociales, categorías, especialidades) y accede al log de auditoría completo.
+- **Administrador**: no participa en el flujo de contenido. Configura el sistema: registra usuarios operativos (CM/Diseñador), mantiene los catálogos (redes sociales, categorías, especialidades) y accede al log de auditoría completo. **Nota 2026-08-01**: el backend real (`POST /auth/register` acepta `roleName: 'cm'|'disenador'`) y el mock del front (`/register`, ver §7.1) ya permiten que CM/Diseñador se auto-registren también — el modelo de negocio descrito aquí (Admin como único punto de alta) sigue siendo el flujo primario documentado, pero técnicamente ya no es el único camino posible; confirmar con el usuario si el auto-registro de CM/Diseñador debe seguir habilitado o restringirse solo a Cliente.
 
 Estos cuatro roles giran alrededor de un mismo eje de datos: una Marca agrupa Campañas, las Campañas agrupan Publicaciones, las Publicaciones ocurren en Redes Sociales concretas, y el rendimiento de todo ese contenido se consulta en Analytics.
 
@@ -323,8 +323,8 @@ Leyenda de permisos: `—` = sin gate explícito en la pantalla (solo gateada po
 | Pantalla | Ruta | Objetivo | Acciones | Permisos | Datos | Navega a |
 |---|---|---|---|---|---|---|
 | Login | `/login` | Autenticar contra `MOCK_USERS` | Submit, "Crea tu cuenta", "¿Olvidaste tu contraseña?" | — | `MOCK_USERS` (`@repo/ui`) | `web-shell/dashboard`, `/register`, `/forgot-password` |
-| Registro | `/register` | Auto-registro de Cliente (mock: siempre reutiliza la cuenta demo) | Submit | — | `MOCK_CLIENT_EMAIL` fijo | `brands-front/onboarding` |
-| Activación | `/activate?email=` | CM/Diseñador crean su primera contraseña | Submit | — | `findUserByEmail` | `web-shell/dashboard` |
+| Registro | `/register` | Auto-registro con selector de rol (Cliente/CM/Diseñador, **2026-08-01**: antes fijo a Cliente) — paso 2 pide perfil de marca (Cliente) o categorías+especialidades multi-select (CM/Diseñador) | Submit | — | `MOCK_CLIENT_EMAIL`/`MOCK_CM_EMAIL`/`MOCK_DESIGNER_EMAIL` según el rol elegido | `brands-front/profile` (Cliente) o `brands-front/my-campaigns` (CM/Diseñador), vía `getPostAuthDestination` |
+| Activación | `/activate?email=` | CM/Diseñador crean su primera contraseña; si el perfil no tiene categorías/especialidades, **2026-08-01**: gana un 2º paso de "completar perfil" (mismo multi-select que Registro) antes de entrar | Submit (x1 o x2 pasos) | — | `findUserByEmail` | `web-shell/dashboard` |
 | Recuperar contraseña | `/forgot-password` | Solicitar reseteo (sin backend) | Submit (no-op real) | — | — | `/login` |
 | Restablecer contraseña | `/reset-password` | Definir nueva contraseña (sin backend, sin token) | Submit (no-op real) | — | — | auto-redirect `/login` (1.2s) |
 
