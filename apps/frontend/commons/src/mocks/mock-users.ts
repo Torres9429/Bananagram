@@ -92,6 +92,25 @@ export const MOCK_USERS: MockUser[] = [
       [AppModule.REPORTS]:   [AppAction.EXPORT],
     },
   },
+  {
+    // Dado de alta por el Admin (CreateUserDialog), sin activar todavía —
+    // 'pending' + sin categoryIds/specialtyIds simula exactamente al CM/
+    // Diseñador real que el backend crea con solo email+password+rol (ver
+    // CreateUserDto, auth-service) y que debe completar su perfil después
+    // (PATCH /me/profile) — usado por ActivateForm para demostrar ese paso.
+    id: 'user-cm-002',
+    email: 'diego.fernandez@bananagram.mx',
+    password: '',
+    role: AppRole.COMMUNITY_MANAGER,
+    name: 'Diego Fernández',
+    status: 'pending',
+    permissions: {
+      [AppModule.POST]:      [AppAction.CREATE, AppAction.SCHEDULE, AppAction.PUBLISH],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
+      [AppModule.METRICS]:   [AppAction.VIEW],
+      [AppModule.SCORE]:     [AppAction.VIEW],
+    },
+  },
 ];
 
 function normalizeEmail(email: string): string {
