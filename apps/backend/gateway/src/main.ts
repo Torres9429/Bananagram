@@ -34,6 +34,7 @@ async function bootstrap() {
   app.use(
     createProxyMiddleware({ pathFilter: '/api/campaigns', target: coreServiceUrl, changeOrigin: true }),
   );
+  app.use(createProxyMiddleware({ pathFilter: '/api/posts', target: coreServiceUrl, changeOrigin: true }));
   app.use(
     createProxyMiddleware({ pathFilter: '/api/reports', target: coreServiceUrl, changeOrigin: true }),
   );

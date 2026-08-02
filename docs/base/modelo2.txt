@@ -531,10 +531,11 @@ model Post {
   id         String    @id @default(uuid())
   brandId    String
   brand      Brand     @relation(fields: [brandId], references: [id])
-  campaignId String?
-  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id])
 
   content     String     @db.Text
+  instructions String?   @db.Text
   status      PostStatus @default(borrador)
   scheduledAt DateTime?
   publishedAt DateTime?
