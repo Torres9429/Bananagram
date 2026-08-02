@@ -133,6 +133,17 @@ async function seedRolesAndPermissions(modulesBySlug, actionsBySlug) {
   return rolesByName;
 }
 
+// Mismo criterio que ROLE_NAME_TO_SHORT (auth-service/profile.service.ts) y
+// REGISTER_ROLE_MAP (auth.service.ts) — 'cliente'|'cm'|'disenador', los
+// mismos valores que espera UserProfile.roleName en core-service.
+// administrador -> null: un Admin nunca tiene perfil de CM/Diseñador.
+const ROLE_TO_PROFILE_ROLE_NAME = {
+  administrador: null,
+  community_manager: 'cm',
+  disenador: 'disenador',
+  cliente: 'cliente',
+};
+
 async function seedUsers(rolesByName) {
   for (const u of USERS) {
     const passwordHash = await bcrypt.hash(u.password, 10);
@@ -148,10 +159,14 @@ async function seedUsers(rolesByName) {
 
     // El nombre para mostrar vive en UserProfile, en la base de core-service
     // (distinta de la de auth-service) — enlazado por userId, sin FK real.
+    // roleName es lo que CampaignsService.assertUserHasRole usa para validar
+    // cmId/designerId — sin esto, los CM/Diseñador demo no pueden usarse en
+    // campañas aunque el seed los haya creado.
+    const roleName = ROLE_TO_PROFILE_ROLE_NAME[u.role];
     await corePrisma.userProfile.upsert({
       where: { userId: user.id },
-      update: { name: `${u.firstName} ${u.lastName}` },
-      create: { userId: user.id, name: `${u.firstName} ${u.lastName}` },
+      update: { name: `${u.firstName} ${u.lastName}`, roleName },
+      create: { userId: user.id, name: `${u.firstName} ${u.lastName}`, roleName },
     });
   }
 }

@@ -71,7 +71,7 @@ identidad (auth-service ↔ core-service):
 | # | Cadena | Dirección | Estrategia | Razón |
 |---|---|---|---|---|
 | 1 | `Brand.ownerId → User` | core → auth | FK sin constraint. Validar propiedad = comparar `ownerId` contra el `userId` del JWT (sin llamada). Mostrar nombre/email del dueño = HTTP GET puntual. | ADR-0002 ya embebe identidad en el JWT; solo el *display* necesita una lectura en vivo, y es de bajo volumen (vistas de detalle de marca). |
-| 2 | `Campaign.cmId`, `CampaignDesigner.userId`, `Campaign.createdBy → User` | core → auth | FK sin constraint + HTTP en ambas direcciones: (i) resolver nombres para mostrar, (ii) core-service pide a auth-service la lista de CM/Diseñadores elegibles por categoría al armar el equipo. | `docs/docs-front/frontend-db-alignment.md` ya estableció que el equipo de campaña vive en `Campaign`/`CampaignDesigner`, nunca denormalizado en `User` — este es el equivalente a nivel de backend de esa misma regla. |
+| 2 | `Campaign.cmId`, `CampaignDesigner.userId`, `Campaign.createdBy → User` | core → auth | **Implementado 2026-08-01, distinto de lo que decía esta fila antes**: FK sin constraint, sin HTTP en ningún sentido. `UserProfile.roleName` (denormalizado, sincronizado one-way vía `POST /internal/user-profiles` al registrar/completar perfil) es lo que `CampaignsService.assertUserHasRole` valida al crear una campaña o asignar un diseñador, y también lo que filtran `GET /campaigns/eligible-community-managers`/`eligible-designers` (devuelven `userId`/`name`/`avatarUrl`, ya no hace falta resolver nombres por HTTP tampoco). | Evita HTTP síncrono en el camino caliente de crear campañas/asignar equipo — el costo es que `roleName` puede desincronizarse si el rol de un usuario cambia después en `auth-service` (nada lo re-sincroniza hoy, ver nota en `modelo2.txt`). El matching por categoría (no solo por rol) sigue sin implementarse — ver §3. |
 | 3 | `Post.createdBy`, `PostStatusHistory.changedBy`, `Media.uploadedBy`, `Report.requestedBy`, `ContentIdea.createdBy → User` | core → auth | Escritura: FK poblada desde el JWT, sin llamada. Lectura: **endpoint nuevo** `GET /internal/users?ids=...` (bulk) en auth-service, para evitar N+1 al renderizar listas. | El camino de escritura es gratis; el de lectura requiere una pieza nueva — se deja marcado como trabajo real, no se asume que ya existe. |
 | 4 | `Brand.categoryId`, `Campaign→CampaignCategory.categoryId → Category` | core → core | Ya no es FK cruzada: categorías viven en core-service junto con brand/campaign. |
 | 5 | `AuditLog.performedBy → User` | auth-service y core-service → auth | FK sin constraint, poblada desde el JWT al escribir (sin llamada). Lectura de nombre reutiliza el mismo bulk endpoint de la cadena #3, si algún día se construye una vista unificada. | Cubierto por la decisión de `AuditLog` en la sección 4. |
@@ -111,6 +111,13 @@ skill.
   moverse a backend — los tres puntos ya señalados en
   `docs/docs-front/frontend-functional-documentation.md` §17.2–17.3, se
   referencian aquí como deuda de backend, no se rediseñan en este documento.
+  **Actualización 2026-08-01**: el backend ya expone selectores reales
+  (`GET /campaigns/eligible-community-managers`/`eligible-designers`, ver
+  fila #2 de la tabla de arriba) pero **solo filtran por rol**
+  (`UserProfile.roleName`), no por categoría — el matching CM↔categoría en
+  sí sigue sin moverse del frontend (regla de negocio #8: es orientativo, no
+  restrictivo, así que no bloquea nada, pero tampoco se usa para acotar la
+  lista todavía).
 - `docs/profile-domain-and-analytics-v2-impact-analysis.md` (v3) es una
   propuesta de rediseño de dominio **separada y no adoptada** (Brand→Profile,
   el usuario *es* un perfil, campañas con `socialAccountIds` explícito). El

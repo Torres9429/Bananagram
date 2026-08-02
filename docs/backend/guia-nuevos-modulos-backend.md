@@ -219,6 +219,28 @@ entonces la pertenencia real (¿esta idea es de una campaña a la que tengo acce
 el service, el permiso por módulo solo cubre "¿tiene este rol el privilegio en general?", no "¿es SU
 campaña?".
 
+## 7ter. Validar un atributo/rol que vive en el otro servicio — patrón `UserProfile.roleName` (nuevo 2026-08-01)
+
+Cuando un módulo de `core-service` necesita saber algo de identidad que solo `auth-service` conoce de
+verdad (ej. "¿este userId tiene rol CM?"), hay dos caminos: llamar por HTTP en cada lectura, o denormalizar
+el dato una vez y consultarlo local. `campaigns/` (`CampaignsService.assertUserHasRole`,
+`listEligibleCommunityManagers`/`listEligibleDesigners`) usó el segundo:
+
+1. `UserProfile.roleName` (`'cliente'|'cm'|'disenador'`, nullable) se escribe **una sola vez**, en
+   `POST /internal/user-profiles` (el mismo endpoint interno que ya usaba `register()` para crear el
+   nombre) — nunca se vuelve a leer de auth-service después.
+2. Cualquier validación posterior (¿este userId es CM? ¿qué diseñadores existen?) es un `findFirst`/
+   `findMany` local contra `core-service`'s propia BD, filtrando por `roleName` — cero HTTP, cero
+   circuit breaker.
+3. **Trade-off real, no lo ocultes si construyes algo similar**: si el rol de un usuario cambia en
+   `auth-service` después de su registro (`AdminUsersService.updateUser` lo permite), `roleName` en
+   `core-service` queda desactualizado — nada lo re-sincroniza hoy. Es una decisión consciente (evita HTTP
+   síncrono en el camino caliente de crear campañas), pero documéntala igual si reusas el patrón en un
+   módulo nuevo.
+
+Ver `docs/base/modelo2.txt` (modelo `UserProfile`) y `docs/base/service-boundaries.md` (fila #2 de la
+tabla de FKs cruzadas) para el detalle completo de esta decisión.
+
 ## 8. Wiring — de código muerto a endpoint real
 
 1. Registra el módulo en `app.module.ts` del servicio:

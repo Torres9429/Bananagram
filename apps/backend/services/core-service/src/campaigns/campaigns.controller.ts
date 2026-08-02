@@ -24,6 +24,20 @@ export class CampaignsController {
     return this.campaigns.listCampaigns(user);
   }
 
+  // Antes de ':id': si se declararan después, Nest intentaría matchear
+  // "eligible-community-managers"/"eligible-designers" contra la ruta parametrizada.
+  @Get('eligible-community-managers')
+  @RequirePermission('campanas', 'ver')
+  findEligibleCommunityManagers() {
+    return this.campaigns.listEligibleCommunityManagers();
+  }
+
+  @Get('eligible-designers')
+  @RequirePermission('campanas', 'ver')
+  findEligibleDesigners() {
+    return this.campaigns.listEligibleDesigners();
+  }
+
   @Get(':id')
   @RequirePermission('campanas', 'ver')
   findOne(@Param('id', ParseUUIDPipe) id: string) {

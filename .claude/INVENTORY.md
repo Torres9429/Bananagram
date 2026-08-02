@@ -9,8 +9,39 @@ paquete del monorepo. Se generó leyendo el código fuente completo (no se infie
 para Y", "consume tal servicio desde tal front", "elimina/cambia el flujo de Z" — así no hay que re-explorar
 el árbol de archivos correspondiente.
 
-**Última actualización**: sección 1 (Backend) actualizada 2026-07-23; sección 2 (Frontend) sigue en su
-estado de 2026-07-19. Si el código diverge de lo aquí descrito, confía en el código y actualiza este archivo.
+**Última actualización**: sección 1 (Backend) actualizada 2026-07-23, con un parche puntual 2026-08-01 (ver
+nota abajo — solo lo tocado esa ronda, el resto de la sección sigue reflejando 2026-07-23 y no incluye
+`brands`/`reports`/`ideas`/`admin` construidos después); sección 2 (Frontend) sigue en su estado de
+2026-07-19 salvo el parche puntual de `auth-front` (misma nota). Si el código diverge de lo aquí descrito,
+confía en el código y actualiza este archivo.
+
+**⚠️ 2026-08-01 — fixes de campaigns/perfil + squash de migraciones + registro con rol en el front (mock)**:
+- `auth-service`: nuevo `ProfileModule` (`PATCH /me/profile`, `src/profile/`) para que un CM/Diseñador dado
+  de alta por el Admin (solo email+password+rol) complete nombre/categorías/especialidades — llama a
+  `POST /internal/user-profiles` de `core-service`. `AuthService.createProfileBestEffort()` (usada también
+  por `register()`) ya revisa `response.ok` y loguea el motivo real de un 400 de core-service — antes lo
+  perdía en silencio (fetch no rechaza en 4xx/5xx).
+- `core-service`: `UserProfile.roleName` (migración, antes inexistente) — `CampaignsService` ya valida que
+  `cmId`/designerId correspondan a un perfil real con ese rol (`assertUserHasRole`) antes de crear una
+  campaña o asignar un diseñador, y expone `GET /campaigns/eligible-community-managers` /
+  `GET /campaigns/eligible-designers` como selectores. El CM de una campaña ya no se puede reasignar
+  después de creada (`PATCH /campaigns/:id` rechaza `cmId`). `UserProfilesController.upsert` ya no exige
+  categoryIds/specialtyIds en cada actualización — solo si el perfil quedaría sin ninguna (perfil nuevo, o
+  se manda un array vacío a propósito).
+- `packages/seed/src/index.js`: `seedUsers()` ahora sí setea `UserProfile.roleName` (antes solo `name` —
+  las cuentas demo `cm@bananagram.mx`/`disenador@bananagram.mx` quedaban con `roleName: null` y
+  `assertUserHasRole` las rechazaba siempre, rompiendo el flujo de campañas con datos de seed).
+- **Migraciones squasheadas**: `auth-service` y `core-service` pasaron de 2 y 4 migraciones respectivamente
+  a **una sola `..._init` por servicio** que refleja el `schema.prisma` actual completo (BD local reseteada
+  desde cero). No hay ambiente desplegado que dependa del historial granular — si tienes una BD local
+  basada en las migraciones viejas, tienes que resetearla (`docker compose down -v` + `up -d postgres` +
+  `pnpm db:migrate` + `pnpm seed`).
+- `apps/backend/test/jest.config.js`: `maxWorkers: 1` — con 2+ specs llamando `cleanDatabase()` sobre la
+  misma Postgres, correrlos en paralelo (default de Jest) causaba una condición de carrera intermitente
+  (`FK violation` en `refresh_tokens`). Nuevo spec `campaigns-flow.spec.ts` cubre lo de arriba.
+- `auth-front` (`RegisterForm.tsx`/`ActivateForm.tsx`, ver §2.4) — mock: registro ahora deja elegir rol
+  (Cliente/CM/Diseñador) con categorías/especialidades para los 2 últimos; `ActivateForm` gana un paso de
+  "completar perfil" para ese mismo caso. Sigue sin conectar al backend real.
 
 **⚠️ 2026-07-19 — Alineación de mocks/tipos del frontend a `modelo.txt`**: la sección 2 (Frontend) de este
 documento refleja el frontend **post-alineación** (tipos/mocks de `@repo/ui` y las 6 apps reescritos para
@@ -181,6 +212,10 @@ como lo que TODAVÍA no se ha duplicado en ningún lado:
 - `GET auth/me` — requiere `JwtAuthGuard`, devuelve el payload del JWT tal cual.
 - `GET me/permissions` (`PermissionsController`) — requiere `JwtAuthGuard`, devuelve `{ permissions, brandIds }` del JWT. **Esta es la ruta que el frontend consulta como fuente de verdad del menú.**
 - `PermissionsService.updateRolePermission(...)` — lógica de upsert lista, sin controller/endpoint que la exponga todavía.
+- `PATCH me/profile` (`ProfileModule`, agregado 2026-08-01, ver nota de esa fecha arriba) — requiere
+  `JwtAuthGuard`; para CM/Diseñador completa nombre/categorías/especialidades llamando a
+  `POST /internal/user-profiles` de `core-service` (upsert). Para `administrador` responde 400 (no tiene
+  perfil de CM/Diseñador que completar).
 - Refresh tokens: 7 días, single-use, `usedAt` marca consumo.
 - `JwtStrategy`/`JwtAuthGuard`/`CurrentUser` — copias **locales** en `src/strategies/`, `src/guards/`, `src/decorators/` (ya no se importan de `commons/`).
 - **BD propia**: `apps/backend/services/auth-service/prisma/schema.prisma`, base `gestor_redes_auth`. Prisma Client con `output` personalizado en `node_modules/.prisma-client` (ver comentario en el schema — necesario para no chocar con el de `core-service`).
@@ -193,7 +228,11 @@ como lo que TODAVÍA no se ha duplicado en ningún lado:
   validación a mano). `core-service` no tenía ninguna infraestructura JWT propia — se creó
   `src/guards/jwt-auth.guard.ts`, `src/strategies/jwt.strategy.ts`, `src/auth/jwt-auth.module.ts` (valida
   el mismo `JWT_SECRET` que emite `auth-service`, no hace login propio).
-- **`campaigns/`, `reports/`, `ideas/`** — controller/service/module/DTOs **totalmente vacíos**, sin tocar.
+- **`campaigns/`** — ya NO está vacío (esto quedó desactualizado por el resto de esta subsección, que sigue
+  fechada 2026-07-23; `campaigns/` se implementó después y se le agregaron validaciones 2026-08-01, ver
+  nota de esa fecha arriba): CRUD completo + asignación de diseñadores + selectores `eligible-*`, con
+  `assertUserHasRole` validando `UserProfile.roleName` de core-service. `reports/`, `ideas/` — sin
+  verificar en esta ronda, no se tocaron.
 - **`posts/state-machine/`** — sin controller. `transitions.map.ts` cubre ahora 10 estados (antes 6, ver
   §1.6): `borrador→en_revision→{aprobado|rechazado}`, `rechazado→borrador`, `aprobado→programado`,
   `programado→{publicando|cancelado}`, `publicando→{publicado|parcial|error|cancelado}` (el tramo nuevo es
@@ -279,6 +318,11 @@ compartido — se eliminó junto con `commons/prisma/`). Crea (idempotente, `ups
   categorías/especialidades/redes sociales. Si hace falta data de catálogos para probar algo, hay que
   crearla a mano vía `POST /api/catalogs/*` (ahora protegido con `JwtAuthGuard`, ver §1.4) o volver a
   agregar esa función si se decide revertir esto.
+- **`roleName` en `UserProfile` (2026-08-01)** — `seedUsers()` ahora también setea `roleName`
+  (`'cm'`/`'disenador'`/`'cliente'`/`null` para admin) al crear el `UserProfile` de cada usuario demo; antes
+  solo guardaba `name`, y `cm@bananagram.mx`/`disenador@bananagram.mx` quedaban con `roleName: null` —
+  `CampaignsService.assertUserHasRole` los rechazaba siempre como `cmId`/designerId de una campaña. No se
+  agrega seed de `categoryIds`/`specialtyIds` (sigue fuera a propósito, ver punto anterior).
 
 ---
 
@@ -467,10 +511,14 @@ social/Campaña, consumida por `brands-front` y `posts-front` (ver §3 "Mock dat
 - Todas las páginas comparten `AuthLayout` (panel izquierdo decorativo `BrandPanel` + panel derecho con el form).
 - `LoginForm` — usa `findUserByCredentials`/`buildTokenFromUser`/`setCookieToken` de `@repo/ui` (mock real,
   no llama backend), redirige vía `getPostAuthDestination(role)`.
-- `RegisterForm` — wizard 2 pasos (cuenta → perfil); al final usa el usuario demo fijo `cliente@bananagram.mx`
-  (comentario: futuro `POST /auth/register {name,email,password,type,profileName,category}`). El campo de
-  categoría ahora guarda `categoryId` (contra `MOCK_CATEGORIES: {id,name}[]`, antes `string[]`), y
-  `ProfileType` se importa de `@repo/ui/types` en vez de una unión local duplicada.
+- `RegisterForm` — wizard 2 pasos (cuenta → perfil). **2026-08-01**: paso 1 ahora tiene un selector de rol
+  (Cliente/Community Manager/Diseñador, `ToggleButtonGroup`) — antes el rol quedaba fijo a Cliente y el
+  form le decía a CM/Diseñador que su cuenta la creaba el Admin. Según el rol, el paso 2 pide o bien
+  `profileType`/`profileName`/`categoryId` (Cliente, sin cambios) o bien dos multi-select nuevos
+  (`categoryIds`/`specialtyIds`, de `MOCK_CATEGORIES`/`MOCK_SPECIALTIES` en `lib/mock-data.ts`) para
+  CM/Diseñador — mismo criterio de obligatoriedad que `UserProfilesController.upsert` en core-service. Al
+  final usa el usuario demo fijo correspondiente al rol elegido (`cliente@bananagram.mx`/
+  `cm@bananagram.mx`/`disenador@bananagram.mx`), sigue sin llamar al backend real.
 - `ForgotPasswordForm` — sigue siendo mock (solo cambia estado local), pero `useForgotPasswordMutation`/
   `useResetPasswordMutation` **ya existen** en `@repo/ui`'s `auth.api.ts` desde el 2026-07-19 (respaldados
   por `PasswordResetToken` de `modelo.txt`), sin cablear obligatoriamente.
@@ -479,7 +527,12 @@ social/Campaña, consumida por `brands-front` y `posts-front` (ver §3 "Mock dat
   `<Suspense>` en `app/reset-password/page.tsx`; muestra "Enlace inválido" si no hay `token`.
 - `ActivateForm` — flujo de activación de cuenta para usuarios creados por Admin (llega desde el link que
   genera `CreateUserDialog` en admin-front); busca el usuario mock por email (query param), pide nueva
-  contraseña, activa sesión.
+  contraseña, activa sesión. **2026-08-01**: si el usuario es CM/Diseñador y le faltan
+  `categoryIds`/`specialtyIds` (mismos multi-select que `RegisterForm`), gana un paso extra de "completar
+  perfil" antes de redirigir — refleja `PATCH /me/profile` del backend real. Se agregó un `MockUser`
+  `pending` nuevo (`diego.fernandez@bananagram.mx`, `commons/src/mocks/mock-users.ts`) para poder probar
+  este paso — sigue sin arreglarse la desconexión ya conocida entre `CreateUserDialog` (escribe a un
+  `useState` local de `admin-front`) y `mock-users.ts` (de donde lee `ActivateForm`).
 - Sin RTK Query local, sin `middleware.ts`, sin slice Redux local, sin `globals.css` (única app sin Tailwind
   configurado en devDeps).
 

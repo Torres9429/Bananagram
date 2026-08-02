@@ -264,13 +264,24 @@ datasource db {
 
 
 // CORE
+// Nota (implementación real, 2026-08-01): sin `user User @relation(...)` — no
+// es posible, `User` vive en la BD de auth-service y Prisma no soporta
+// `@relation` cruzando datasources. `userId` es una FK "tonta" más, igual que
+// ownerId/cmId/createdBy en el resto de este archivo.
 model UserProfile {
   id            String   @id @default(uuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
+  userId        String   @unique // FK → auth-service.User.id (sin constraint de BD)
 
   name          String
   avatarUrl     String?
+
+  // Denormalizado desde auth-service.User.role al registrar/completar perfil
+  // (POST /internal/user-profiles) — 'cliente'|'cm'|'disenador'. Sin esto,
+  // core-service no tiene forma de saber el rol de un usuario para validar
+  // que un cmId/designerId de Campaign corresponda a un CM/Diseñador real
+  // (ver CampaignsService.assertUserHasRole). Nullable: sigue siendo
+  // best-effort, como el resto del perfil.
+  roleName      String?
 
   categories    UserProfileCategory[]
   specialties   UserProfileSpecialty[]
@@ -438,9 +449,15 @@ model Campaign {
   endDate     DateTime?
 
   // El CM vive directo aquí — FK única garantiza "solo un CM por campaña"
-  // en BD. FK → auth-service.User.id (sin constraint; para asignar/mostrar
-  // candidatos elegibles por categoría, core-service llama a auth-service
-  // vía HTTP — es la única forma irreducible de obtener esa lista).
+  // en BD. FK → auth-service.User.id (sin constraint). Actualización
+  // 2026-08-01: la lista de candidatos elegibles (CM/Diseñador) NO se
+  // resuelve con una llamada HTTP a auth-service en tiempo de lectura, como
+  // se planeaba aquí originalmente — se resuelve 100% local filtrando
+  // UserProfile.roleName (denormalizado, ver modelo de UserProfile arriba),
+  // vía GET /campaigns/eligible-community-managers y
+  // /campaigns/eligible-designers. El único costo de esta decisión es que
+  // roleName puede quedar desactualizado si el rol de un usuario cambia
+  // en auth-service después de su registro (nada lo re-sincroniza hoy).
   cmId String
 
   designers  CampaignDesigner[]

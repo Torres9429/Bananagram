@@ -50,11 +50,21 @@ export class AuthService {
   ) {
     const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
     try {
-      await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
+      const response = await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, ...dto }),
       });
+
+      if (!response.ok) {
+        // fetch() no rechaza la promesa en 4xx/5xx — hay que revisar
+        // response.ok a mano o un fallo de validación (ej. CM sin
+        // categoryIds) queda invisible y el usuario se registra sin perfil.
+        const payload = await response.json().catch(() => ({}));
+        this.logger.error(
+          `No se pudo crear el perfil en core-service (status ${response.status}): ${payload?.message ?? 'sin detalle'}`,
+        );
+      }
     } catch (error) {
       this.logger.error('Error al crear perfil en core-service (no bloquea registro):', error);
       // core-service caído: el perfil se puede crear/actualizar después

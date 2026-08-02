@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "pretest": "npm --prefix ../services/auth-service run db:generate && npm --prefix ../services/core-service run db:generate",
     "test": "jest"
   },
   "devDependencies": {

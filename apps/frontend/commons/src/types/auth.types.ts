@@ -48,4 +48,9 @@ export interface MockUser {
   avatarUrl?: string | null;
   ownedBrandIds?: string[]; // solo poblado para Cliente — ver AuthState
   permissions: Record<string, string[]>;
+  // Solo tiene sentido para community_manager/disenador — mismo criterio que
+  // UserProfile.categories/specialties (core-service). Ausente o vacío en un
+  // usuario 'pending' significa "perfil sin completar" (ver ActivateForm).
+  categoryIds?: string[];
+  specialtyIds?: string[];
 }

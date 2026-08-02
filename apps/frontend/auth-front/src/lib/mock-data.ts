@@ -11,11 +11,26 @@ export const MOCK_CATEGORIES: { id: string; name: string }[] = [
   { id: 'cat8', name: 'Arte' },
 ];
 
-// Mock: el registro usa la cuenta demo de Cliente.
-// Backend: POST /auth/register { name, email, password, type, profileName, category } → JWT real + Perfil creado.
+// Catálogo de especialidades — exclusivo de community_manager/disenador (no
+// aplica a Cliente ni a marcas), mismo shape que MOCK_CATEGORIES de arriba.
+// Ver UserProfile.specialties (core-service) / CompleteProfileDto (auth-service).
+export const MOCK_SPECIALTIES: { id: string; name: string }[] = [
+  { id: 'sp1', name: 'Diseño gráfico' },
+  { id: 'sp2', name: 'Copywriting' },
+  { id: 'sp3', name: 'Video y edición' },
+  { id: 'sp4', name: 'Paid media' },
+  { id: 'sp5', name: 'Fotografía' },
+  { id: 'sp6', name: 'Community management' },
+];
+
+// Mock: el registro usa la cuenta demo correspondiente al rol elegido.
+// Backend: POST /auth/register { name, email, password, roleName, categoryIds?, specialtyIds? } → JWT real + Perfil creado.
 export const MOCK_CLIENT_EMAIL = 'cliente@bananagram.mx';
+export const MOCK_CM_EMAIL = 'cm@bananagram.mx';
+export const MOCK_DESIGNER_EMAIL = 'disenador@bananagram.mx';
 
 export const ROLE_LABEL: Record<string, string> = {
+  cliente: 'Cliente',
   community_manager: 'Community Manager',
   disenador: 'Diseñador',
 };

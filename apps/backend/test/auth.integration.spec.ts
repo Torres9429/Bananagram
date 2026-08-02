@@ -33,6 +33,7 @@ describe('Auth Integration', () => {
       email: 'auth-test@example.com',
       password: 'ChangeMe123!',
       name: 'Test User',
+      roleName: 'cliente',
     });
     expect(registered.accessToken).toEqual(expect.any(String));
     expect(registered.refreshToken.token).toEqual(expect.any(String));

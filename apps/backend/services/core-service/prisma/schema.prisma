@@ -33,6 +33,17 @@ model UserProfile {
   name      String
   avatarUrl String?
 
+  // Denormalizado desde auth-service.User.role al momento del registro (ver
+  // POST /internal/user-profiles) — 'cliente' | 'cm' | 'disenador', mismos
+  // valores que RegisterDto.roleName. Necesario porque core-service no tiene
+  // ninguna otra forma de conocer el rol de un usuario (Role vive solo en
+  // auth-service, sin @relation cruzando datasources) y las campañas
+  // necesitan validar que cmId/designerId correspondan a un CM/Diseñador
+  // real. Nullable porque sigue siendo best-effort (igual que el resto del
+  // perfil): si core-service estaba caído durante el registro, este dato
+  // puede faltar hasta que el upsert se reintente.
+  roleName String?
+
   categories  UserProfileCategory[]
   specialties UserProfileSpecialty[]
 
