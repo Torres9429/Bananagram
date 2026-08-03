@@ -162,4 +162,40 @@ describe('Posts Flow Integration', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('envía un post de borrador a revisión y registra el historial', async () => {
+    const post = await postsService.createPost(
+      {
+        brandId,
+        campaignId,
+        content: 'Pendiente de revisión',
+      } as any,
+      cmClaims,
+    );
+
+    const updatedPost = await postsService.submitPostForReview(post.id, cmClaims);
+
+    expect(updatedPost.status).toBe(PostStatus.EN_REVISION);
+
+    const history = await corePrisma.postStatusHistory.findMany({ where: { postId: post.id } });
+    expect(history).toHaveLength(1);
+    expect(history[0].fromStatus).toBe(PostStatus.BORRADOR);
+    expect(history[0].toStatus).toBe(PostStatus.EN_REVISION);
+    expect(history[0].changedBy).toBe(cmUserId);
+  });
+
+  it('rechaza enviar a revisión un post que no pertenece al CM asignado', async () => {
+    const post = await postsService.createPost(
+      {
+        brandId,
+        campaignId,
+        content: 'Pendiente de revisión ajena',
+      } as any,
+      ownerClaims,
+    );
+
+    await expect(postsService.submitPostForReview(post.id, ownerClaims)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
 });

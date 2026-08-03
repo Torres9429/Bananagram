@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { RequirePermission } from '../decorators/require-permission.decorator';
@@ -20,5 +20,11 @@ export class PostsController {
   @RequirePermission('publicaciones', 'crear')
   create(@Body() dto: CreatePostDto, @CurrentUser() user: Claims) {
     return this.posts.createPost(dto, user);
+  }
+
+  @Post(':id/submit-for-review')
+  @RequirePermission('publicaciones', 'editar')
+  submitForReview(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
+    return this.posts.submitPostForReview(id, user);
   }
 }
