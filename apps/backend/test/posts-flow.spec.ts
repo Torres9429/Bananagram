@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, UnprocessableEntityException }
 import { randomUUID } from 'crypto';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { CloudinaryService, UploadableFile } from '../services/core-service/src/cloudinary/cloudinary.service';
 import { PostsModule } from '../services/core-service/src/posts/posts.module';
 import { PostsService } from '../services/core-service/src/posts/posts.service';
 import { prisma as corePrisma } from '../services/core-service/src/prisma/client';
@@ -19,10 +20,21 @@ describe('Posts Flow Integration', () => {
   let brandId: string;
   let campaignId: string;
   let inactiveCampaignId: string;
+  let socialNetworkIds: string[];
 
   const ownerClaims = { sub: ownerUserId, role: 'cliente' };
   const cmClaims = { sub: cmUserId, role: 'community_manager' };
   const outsiderClaims = { sub: outsiderUserId, role: 'cliente' };
+  const cloudinaryMock = {
+    uploadFile: jest.fn(async (file: UploadableFile) => ({
+      public_id: `bananagram/posts/${file.originalname}`,
+      secure_url: `https://res.cloudinary.com/demo/${file.originalname}`,
+      width: 1200,
+      height: 800,
+      duration: file.mimetype.startsWith('video/') ? 9 : undefined,
+    })),
+    deleteFile: jest.fn(async () => undefined),
+  };
 
   beforeAll(async () => {
     await cleanDatabase();
@@ -48,7 +60,28 @@ describe('Posts Flow Integration', () => {
     });
     inactiveCampaignId = inactiveCampaign.id;
 
-    const moduleRef = await Test.createTestingModule({ imports: [PostsModule] }).compile();
+    const socialNetworks = await Promise.all([
+      corePrisma.socialNetwork.create({
+        data: {
+          name: 'Instagram de prueba',
+          code: `instagram-test-${randomUUID()}`,
+          baseEngagementRate: 0.12,
+        },
+      }),
+      corePrisma.socialNetwork.create({
+        data: {
+          name: 'TikTok de prueba',
+          code: `tiktok-test-${randomUUID()}`,
+          baseEngagementRate: 0.18,
+        },
+      }),
+    ]);
+    socialNetworkIds = socialNetworks.map((socialNetwork) => socialNetwork.id);
+
+    const moduleRef = await Test.createTestingModule({ imports: [PostsModule] })
+      .overrideProvider(CloudinaryService)
+      .useValue(cloudinaryMock)
+      .compile();
     postsService = moduleRef.get(PostsService);
   }, 30000);
 
@@ -109,6 +142,7 @@ describe('Posts Flow Integration', () => {
       {
         brandId,
         campaignId,
+        socialNetworkIds,
         content: 'Texto base de la publicación',
         instructions: 'Usar formato visual limpio',
         scheduledAt: '2026-08-10T10:00:00.000Z',
@@ -121,6 +155,7 @@ describe('Posts Flow Integration', () => {
     expect(post.campaignId).toBe(campaignId);
     expect(post.createdBy).toBe(ownerUserId);
     expect(post.instructions).toBe('Usar formato visual limpio');
+    expect(post.socialNetworks).toHaveLength(2);
   });
 
   it('permite crear la publicación al CM asignado a la campaña', async () => {
@@ -128,6 +163,7 @@ describe('Posts Flow Integration', () => {
       {
         brandId,
         campaignId,
+        socialNetworkIds,
         content: 'Otro borrador',
       } as any,
       cmClaims,
@@ -143,6 +179,7 @@ describe('Posts Flow Integration', () => {
         {
           brandId,
           campaignId: inactiveCampaignId,
+          socialNetworkIds,
           content: 'Borrador no permitido',
         } as any,
         ownerClaims,
@@ -156,6 +193,7 @@ describe('Posts Flow Integration', () => {
         {
           brandId,
           campaignId,
+          socialNetworkIds,
           content: 'Intento ajeno',
         } as any,
         outsiderClaims,
@@ -168,6 +206,7 @@ describe('Posts Flow Integration', () => {
       {
         brandId,
         campaignId,
+        socialNetworkIds,
         content: 'Pendiente de revisión',
       } as any,
       cmClaims,
@@ -189,6 +228,7 @@ describe('Posts Flow Integration', () => {
       {
         brandId,
         campaignId,
+        socialNetworkIds,
         content: 'Pendiente de revisión ajena',
       } as any,
       ownerClaims,
@@ -197,5 +237,45 @@ describe('Posts Flow Integration', () => {
     await expect(postsService.submitPostForReview(post.id, ownerClaims)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+
+  it('adjunta recursos multimedia al borrador y guarda el orden', async () => {
+    const post = await postsService.createPost(
+      {
+        brandId,
+        campaignId,
+        socialNetworkIds,
+        content: 'Post con multimedia',
+      } as any,
+      cmClaims,
+    );
+
+    const updatedPost = await postsService.attachMediaToPost(
+      post.id,
+      [
+        {
+          buffer: Buffer.from('image-1'),
+          originalname: 'imagen-1.png',
+          mimetype: 'image/png',
+          size: 1200,
+        } as UploadableFile,
+        {
+          buffer: Buffer.from('video-1'),
+          originalname: 'video-1.mp4',
+          mimetype: 'video/mp4',
+          size: 2400,
+        } as UploadableFile,
+      ],
+      cmClaims,
+    );
+
+    expect(updatedPost.media).toHaveLength(2);
+    expect(updatedPost.media[0].order).toBe(1);
+    expect(updatedPost.media[1].order).toBe(2);
+    expect(updatedPost.media[0].media.brandId).toBe(brandId);
+
+    const storedMedia = await corePrisma.media.findMany({ where: { brandId }, orderBy: { createdAt: 'asc' } });
+    expect(storedMedia).toHaveLength(2);
+    expect(storedMedia[0].originalName).toBe('imagen-1.png');
   });
 });
