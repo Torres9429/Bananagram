@@ -8,6 +8,7 @@ export async function cleanDatabase() {
   await corePrisma.auditLog.deleteMany();
   await corePrisma.postMetric.deleteMany();
   await corePrisma.postSocialAccount.deleteMany();
+  await corePrisma.postSocialNetwork.deleteMany();
   await corePrisma.postStatusHistory.deleteMany();
   await corePrisma.postMedia.deleteMany();
   await corePrisma.post.deleteMany();

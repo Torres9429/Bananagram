@@ -26,16 +26,38 @@ export class PostsService {
       throw new ForbiddenException('No tienes permiso para crear esta publicación');
     }
 
-    return prisma.post.create({
-      data: {
-        brandId: dto.brandId,
-        campaignId: dto.campaignId,
-        content: dto.content.trim(),
-        instructions: dto.instructions?.trim() || undefined,
-        scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
-        createdBy: user.sub,
-        status: PostStatus.BORRADOR,
-      },
+    const socialNetworks = await prisma.socialNetwork.findMany({
+      where: { id: { in: dto.socialNetworkIds }, deletedAt: null },
+      select: { id: true },
+    });
+    if (socialNetworks.length !== dto.socialNetworkIds.length) {
+      throw new BadRequestException('Una o más redes sociales indicadas no son válidas');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const post = await tx.post.create({
+        data: {
+          brandId: dto.brandId,
+          campaignId: dto.campaignId,
+          content: dto.content.trim(),
+          instructions: dto.instructions?.trim() || undefined,
+          scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
+          createdBy: user.sub,
+          status: PostStatus.BORRADOR,
+          socialNetworks: {
+            create: dto.socialNetworkIds.map((socialNetworkId) => ({
+              socialNetwork: { connect: { id: socialNetworkId } },
+            })),
+          },
+        },
+      });
+
+      return tx.post.findUniqueOrThrow({
+        where: { id: post.id },
+        include: {
+          socialNetworks: { include: { socialNetwork: true } },
+        },
+      });
     });
   }
 

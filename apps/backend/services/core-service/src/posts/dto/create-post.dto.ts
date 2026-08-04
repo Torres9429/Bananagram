@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ArrayNotEmpty, ArrayUnique, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreatePostDto {
   @ApiProperty()
@@ -10,6 +10,12 @@ export class CreatePostDto {
   @ApiProperty()
   @IsUUID()
   campaignId!: string;
+
+  @ApiProperty({ type: [String] })
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsUUID(undefined, { each: true })
+  socialNetworkIds!: string[];
 
   @ApiProperty()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
