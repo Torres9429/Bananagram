@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CampaignStatus } from '../../node_modules/.prisma-client';
+import { CloudinaryService, UploadableFile } from '../cloudinary/cloudinary.service';
 import { prisma } from '../prisma/client';
 import { PostStatus } from '../types/post-status.enum';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -9,6 +10,8 @@ type CurrentUser = { sub: string; role: string };
 
 @Injectable()
 export class PostsService {
+  constructor(private readonly cloudinary: CloudinaryService) {}
+
   async createPost(dto: CreatePostDto, user: CurrentUser): Promise<any> {
     const brand = await prisma.brand.findFirst({ where: { id: dto.brandId, deletedAt: null } });
     if (!brand) {
@@ -94,5 +97,89 @@ export class PostsService {
 
       return updatedPost;
     });
+  }
+
+  async attachMediaToPost(postId: string, files: UploadableFile[] | undefined, user: CurrentUser): Promise<any> {
+    if (!files?.length) {
+      throw new BadRequestException('Debes adjuntar al menos un archivo');
+    }
+
+    const invalidFile = files.find(
+      (file) => !file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/'),
+    );
+    if (invalidFile) {
+      throw new BadRequestException('Solo se admiten imágenes o videos');
+    }
+
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { brand: true, campaign: { include: { designers: true } } },
+    });
+
+    if (!post) {
+      throw new NotFoundException('La publicación indicada no existe o fue eliminada');
+    }
+
+    if (post.status !== PostStatus.BORRADOR) {
+      throw new BadRequestException('Solo se pueden adjuntar recursos a una publicación en borrador');
+    }
+
+    if (
+      user.role !== 'administrador' &&
+      post.brand.ownerId !== user.sub &&
+      post.campaign.cmId !== user.sub &&
+      !post.campaign.designers.some((designer) => designer.userId === user.sub)
+    ) {
+      throw new ForbiddenException('No tienes permiso para adjuntar recursos a esta publicación');
+    }
+
+    const uploadedFiles = [] as Array<{
+      public_id?: string;
+      secure_url?: string;
+      url?: string;
+      width?: number;
+      height?: number;
+      duration?: number;
+    }>;
+
+    try {
+      for (const file of files) {
+        uploadedFiles.push(await this.cloudinary.uploadFile(file));
+      }
+
+      return await prisma.$transaction(async (tx) => {
+        const updatedPost = await tx.post.update({
+          where: { id: postId },
+          data: {
+            media: {
+              create: uploadedFiles.map((uploadedFile, index) => ({
+                order: index + 1,
+                media: {
+                  create: {
+                    brandId: post.brandId,
+                    fileName: uploadedFile.public_id || files[index].originalname,
+                    originalName: files[index].originalname,
+                    mimeType: files[index].mimetype,
+                    url: uploadedFile.secure_url || uploadedFile.url || '',
+                    size: files[index].size,
+                    width: uploadedFile.width,
+                    height: uploadedFile.height,
+                    duration: uploadedFile.duration,
+                  },
+                },
+              })),
+            },
+          },
+          include: {
+            media: { include: { media: true }, orderBy: { order: 'asc' } },
+          },
+        });
+
+        return updatedPost;
+      });
+    } catch (error) {
+      await Promise.all(uploadedFiles.map((uploadedFile) => uploadedFile.public_id && this.cloudinary.deleteFile(uploadedFile.public_id)));
+      throw error;
+    }
   }
 }
