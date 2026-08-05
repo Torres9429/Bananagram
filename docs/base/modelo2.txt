@@ -372,6 +372,7 @@ model SocialNetwork {
   baseEngagementRate Float
 
   socialAccounts SocialAccount[]
+  postSocialNetworks PostSocialNetwork[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -531,10 +532,11 @@ model Post {
   id         String    @id @default(uuid())
   brandId    String
   brand      Brand     @relation(fields: [brandId], references: [id])
-  campaignId String?
-  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id])
 
   content     String     @db.Text
+  instructions String?   @db.Text
   status      PostStatus @default(borrador)
   scheduledAt DateTime?
   publishedAt DateTime?
@@ -546,6 +548,7 @@ model Post {
   ayrsharePostId String? @unique
 
   socialAccounts PostSocialAccount[]
+  socialNetworks PostSocialNetwork[]
   statusHistory  PostStatusHistory[]
   media          PostMedia[]
 
@@ -592,6 +595,17 @@ model PostSocialAccount {
 
   @@unique([postId, socialAccountId])
   @@map("post_social_accounts")
+}
+
+model PostSocialNetwork {
+  postId          String
+  socialNetworkId String
+
+  post          Post          @relation(fields: [postId], references: [id])
+  socialNetwork SocialNetwork @relation(fields: [socialNetworkId], references: [id])
+
+  @@id([postId, socialNetworkId])
+  @@map("post_social_networks")
 }
 
 // ── Biblioteca de medios ────────────────────────────────────────────────
