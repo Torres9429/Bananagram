@@ -1,1 +1,18 @@
-# Swagger alexa-service — generado automáticamente por NestJS Swagger
+openapi: 3.0.0
+paths: {}
+info:
+  title: alexa-service
+  description: >-
+    Consumidor de API para la Alexa Skill: traduce intents de voz a llamadas
+    HTTP contra core-service y auth-service
+  version: '1.0'
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas: {}
