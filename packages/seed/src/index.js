@@ -1,6 +1,6 @@
 const { PrismaClient: AuthPrismaClient } = require('../../../apps/backend/services/auth-service/node_modules/.prisma-client');
 const { PrismaClient: CorePrismaClient } = require('../../../apps/backend/services/core-service/node_modules/.prisma-client');
-const bcrypt = require('bcrypt');
+const argon2 = require('argon2');
 
 // auth-service y core-service ya no comparten base de datos (ver
 // docs/base/modelo2.txt) — el seed necesita un Prisma Client por servicio,
@@ -74,12 +74,16 @@ const ROLE_PERMISSIONS = {
 // funcionando con las mismas cuentas de prueba que ya usa el modo mock.
 // firstName/lastName ya no viven en auth-service.User (ver modelo2.txt) —
 // se usan para componer UserProfile.name en core-service.
+// roles es un array (multi-rol, ver auth-service UserRole) — hasta ahora
+// cada usuario de prueba tenía exactamente uno; multi@bananagram.mx es el
+// único con dos, para demostrar la unión de permisos en vivo.
 const USERS = [
-  { email: '20233tn102@utez.edu.mx', password: 'admin123', firstName: 'Laura', lastName: 'Méndez', role: 'administrador' },
-  { email: 'cm@bananagram.mx', password: 'cm123456', firstName: 'Ana', lastName: 'García', role: 'community_manager' },
-  { email: 'disenador@bananagram.mx', password: 'diseno123', firstName: 'Carlos', lastName: 'Ruiz', role: 'disenador' },
-  { email: 'cliente@bananagram.mx', password: 'cliente123', firstName: 'Roberto', lastName: 'Fernández', role: 'cliente' },
-  { email: 'alex@bananagram.mx', password: 'alex12345', firstName: 'Alex', lastName: 'Rivera', role: 'cliente' },
+  { email: '20233tn102@utez.edu.mx', password: 'admin123', firstName: 'Laura', lastName: 'Méndez', roles: ['administrador'] },
+  { email: 'cm@bananagram.mx', password: 'cm123456', firstName: 'Ana', lastName: 'García', roles: ['community_manager'] },
+  { email: 'disenador@bananagram.mx', password: 'diseno123', firstName: 'Carlos', lastName: 'Ruiz', roles: ['disenador'] },
+  { email: 'cliente@bananagram.mx', password: 'cliente123', firstName: 'Roberto', lastName: 'Fernández', roles: ['cliente'] },
+  { email: 'alex@bananagram.mx', password: 'alex12345', firstName: 'Alex', lastName: 'Rivera', roles: ['cliente'] },
+  { email: 'multi@bananagram.mx', password: 'multi12345', firstName: 'Sofía', lastName: 'Delgado', roles: ['community_manager', 'disenador'] },
 ];
 
 async function seedModulesAndActions() {
@@ -146,27 +150,33 @@ const ROLE_TO_PROFILE_ROLE_NAME = {
 
 async function seedUsers(rolesByName) {
   for (const u of USERS) {
-    const passwordHash = await bcrypt.hash(u.password, 10);
+    const passwordHash = await argon2.hash(u.password);
     const user = await authPrisma.user.upsert({
       where: { email: u.email },
-      update: { roleId: rolesByName[u.role].id },
-      create: {
-        email: u.email,
-        passwordHash,
-        roleId: rolesByName[u.role].id,
-      },
+      update: {},
+      create: { email: u.email, passwordHash },
+    });
+
+    // Multi-rol: se reconcilian los UserRole del usuario en cada corrida
+    // (deleteMany + createMany) en vez de un upsert por rol — idempotente
+    // y sin dejar roles viejos colgados si un rerun del seed le quita uno.
+    await authPrisma.userRole.deleteMany({ where: { userId: user.id } });
+    await authPrisma.userRole.createMany({
+      data: u.roles.map((roleName) => ({ userId: user.id, roleId: rolesByName[roleName].id })),
     });
 
     // El nombre para mostrar vive en UserProfile, en la base de core-service
     // (distinta de la de auth-service) — enlazado por userId, sin FK real.
-    // roleName es lo que CampaignsService.assertUserHasRole usa para validar
-    // cmId/designerId — sin esto, los CM/Diseñador demo no pueden usarse en
-    // campañas aunque el seed los haya creado.
-    const roleName = ROLE_TO_PROFILE_ROLE_NAME[u.role];
+    // roleNames es lo que CampaignsService.assertUserHasRole/listProfilesByRole
+    // usa para validar cmId/designerId y listar CM/Diseñador elegibles — sin
+    // esto, los usuarios demo no pueden usarse en campañas aunque el seed
+    // los haya creado. administrador no tiene perfil de CM/Diseñador, así
+    // que se filtra (ROLE_TO_PROFILE_ROLE_NAME[...] === null para ese caso).
+    const roleNames = u.roles.map((roleName) => ROLE_TO_PROFILE_ROLE_NAME[roleName]).filter(Boolean);
     await corePrisma.userProfile.upsert({
       where: { userId: user.id },
-      update: { name: `${u.firstName} ${u.lastName}`, roleName },
-      create: { userId: user.id, name: `${u.firstName} ${u.lastName}`, roleName },
+      update: { name: `${u.firstName} ${u.lastName}`, roleNames },
+      create: { userId: user.id, name: `${u.firstName} ${u.lastName}`, roleNames },
     });
   }
 }
@@ -183,7 +193,7 @@ async function main() {
 
   console.log('✅ Seed completo. Cuentas de prueba (mismas que el modo mock del frontend):');
   for (const u of USERS) {
-    console.log(`   ${u.email} / ${u.password} (${u.role})`);
+    console.log(`   ${u.email} / ${u.password} (${u.roles.join(', ')})`);
   }
 }
 
