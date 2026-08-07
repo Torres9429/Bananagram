@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { AppModule } from './app.module';
 
@@ -7,8 +8,15 @@ async function bootstrap() {
   // body antes de llegar al proxy, el stream del request ya estaría
   // consumido y http-proxy-middleware no podría reenviarlo al servicio
   // destino (POST/PATCH llegarían con body vacío).
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.enableCors();
+
+  // Solo cuando hay un proxy/LB propio delante que escriba X-Forwarded-For
+  // (nunca confiar en ese header si viene directo del cliente, que puede
+  // falsear su IP y saltarse el rate-limit — ver rate-limit.middleware.ts).
+  if (process.env.TRUST_PROXY === 'true') {
+    app.set('trust proxy', 1);
+  }
 
   const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
   const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';

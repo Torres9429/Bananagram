@@ -29,3 +29,8 @@ infra
 *.md
 .env
 .env.*
+
+# Llaves RSA (RS256/JWKS): nunca deben quedar horneadas en una capa de imagen.
+# auth-service las recibe por volumen en runtime (docker-compose.yml), no por COPY.
+keys
+*.pem
