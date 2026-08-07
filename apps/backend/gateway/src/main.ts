@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { AppModule } from './app.module';
+import { RateLimitMiddleware } from './rate-limit/rate-limit.middleware';
+import { JwtEdgeMiddleware } from './auth/jwt-edge.middleware';
+import { CorrelationIdMiddleware } from './middleware/correlation-id.middleware';
 
 async function bootstrap() {
   // bodyParser: false — este servicio es un proxy puro. Si Nest parseara el
@@ -17,6 +20,29 @@ async function bootstrap() {
   if (process.env.TRUST_PROXY === 'true') {
     app.set('trust proxy', 1);
   }
+
+  // Montaje manual (NO vía AppModule.configure()/MiddlewareConsumer) — esto
+  // importa por el orden real de la cadena de Express, no solo por el orden
+  // en que se "declaran" en Nest:
+  //   1) nuestros middlewares (rate-limit, jwt-edge, correlation-id)
+  //   2) los proxies hacia auth-service/core-service
+  //   3) recién ahí Nest arma su propio router de controllers + su 404
+  //      catch-all, como parte de app.init() (invocado implícito dentro de
+  //      app.listen(), al final)
+  // Si el 404 catch-all de Nest queda ANTES que los proxies en la cadena
+  // (p. ej. llamando a app.init() antes de montar los app.use(proxy...)),
+  // absorbe la respuesta de cualquier ruta que no sea /health y los proxies
+  // nunca se alcanzan — confirmado en vivo (todas las rutas /api/* daban
+  // "Cannot POST ..." de Nest en vez de llegar al servicio real). Por eso
+  // acá se resuelven las instancias directo del contenedor de DI
+  // (ya están listas después de NestFactory.create(), no hace falta init())
+  // y se montan con app.use() antes que nada más.
+  const rateLimit = app.get(RateLimitMiddleware);
+  const jwtEdge = app.get(JwtEdgeMiddleware);
+  const correlationId = app.get(CorrelationIdMiddleware);
+  app.use((req: any, res: any, next: any) => rateLimit.use(req, res, next));
+  app.use((req: any, res: any, next: any) => jwtEdge.use(req, res, next));
+  app.use((req: any, res: any, next: any) => correlationId.use(req, res, next));
 
   const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
   const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
