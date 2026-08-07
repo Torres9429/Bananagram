@@ -24,7 +24,7 @@ datasource db {
 model Role {
   id          String           @id @default(uuid())
   name        String           @unique
-  users       User[]
+  users       UserRole[]
   permissions RolePermission[]
 
   createdAt DateTime  @default(now())
@@ -32,6 +32,20 @@ model Role {
   deletedAt DateTime?
 
   @@map("roles")
+}
+
+// Multirol: tabla puente pura (sin columnas propias) entre User y Role. Los
+// privilegios efectivos de un usuario son la UNIÓN de los permisos de todos
+// sus roles (ver AuthRepository.getPermissions) — reemplaza el viejo
+// User.roleId escalar (un usuario solo podía tener un rol a la vez).
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
 }
 
 model Module {
@@ -86,6 +100,18 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// Respaldo en Postgres de la denylist de access tokens revocados por logout
+// (ver TokenDenylistService). El hot path de cada request autenticado
+// consulta Redis (O(1)); esta tabla es el fallback si Redis está caído, y
+// registro por si hace falta auditar revocaciones después.
+model RevokedAccessToken {
+  jti       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("revoked_access_tokens")
+}
+
 // Bandeja de notificaciones (todos los roles). El evento que dispara una
 // notificación nace en core-service (post rechazado, campaña asignada,
 // reporte listo), pero la tabla vive aquí porque el dato es userId-céntrico.
@@ -115,10 +141,9 @@ model User {
   id           String     @id @default(uuid())
   email        String     @unique
   passwordHash String
-  roleId       String
-  role         Role       @relation(fields: [roleId], references: [id])
   status       UserStatus @default(active)
 
+  roles               UserRole[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   notifications       Notification[]

@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '../prisma/client';
 import { UserStatus } from '../../node_modules/.prisma-client';
-import * as bcrypt from 'bcrypt';
+import * as argon2 from 'argon2';
+import { AuthRepository } from '../auth/auth.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -9,8 +10,7 @@ const SELECT_SAFE = {
   id: true,
   email: true,
   status: true,
-  roleId: true,
-  role: true,
+  roles: { select: { role: { select: { id: true, name: true } } } },
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -26,13 +26,15 @@ const ROLE_ALIASES: Record<string, string> = {
 
 @Injectable()
 export class AdminUsersService {
+  constructor(private readonly authRepo: AuthRepository) {}
+
   listUsers(roleName?: string): Promise<any> {
     const normalizedRoleName = roleName ? this.resolveRoleName(roleName) : undefined;
 
     return prisma.user.findMany({
       where: {
         deletedAt: null,
-        ...(normalizedRoleName ? { role: { name: normalizedRoleName } } : {}),
+        ...(normalizedRoleName ? { roles: { some: { role: { name: normalizedRoleName } } } } : {}),
       },
       select: SELECT_SAFE,
       orderBy: { createdAt: 'desc' },
@@ -49,10 +51,10 @@ export class AdminUsersService {
     const role = await prisma.role.findUnique({ where: { name: dto.roleName } });
     if (!role) throw new BadRequestException(`Rol '${dto.roleName}' no existe`);
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await argon2.hash(dto.password);
     try {
       return await prisma.user.create({
-        data: { email: dto.email, passwordHash, roleId: role.id },
+        data: { email: dto.email, passwordHash, roles: { create: [{ roleId: role.id }] } },
         select: SELECT_SAFE,
       });
     } catch (error) {
@@ -64,17 +66,10 @@ export class AdminUsersService {
   async updateUser(id: string, dto: UpdateUserDto): Promise<any> {
     await this.getUser(id);
 
-    let roleId: string | undefined;
-    if (dto.roleName) {
-      const role = await prisma.role.findUnique({ where: { name: dto.roleName } });
-      if (!role) throw new BadRequestException(`Rol '${dto.roleName}' no existe`);
-      roleId = role.id;
-    }
-
     try {
       return await prisma.user.update({
         where: { id },
-        data: { email: dto.email, roleId, status: dto.status as UserStatus | undefined },
+        data: { email: dto.email, status: dto.status as UserStatus | undefined },
         select: SELECT_SAFE,
       });
     } catch (error) {
@@ -92,6 +87,20 @@ export class AdminUsersService {
       prisma.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } }),
     ]);
     return { removed: true };
+  }
+
+  // --- Multirol: asignación puntual (POST/DELETE /admin/users/:id/roles) ---
+
+  async assignRole(userId: string, roleId: string) {
+    await this.getUser(userId);
+    await this.authRepo.addRoleToUser(userId, roleId);
+    return this.getUser(userId);
+  }
+
+  async unassignRole(userId: string, roleId: string) {
+    await this.getUser(userId);
+    await this.authRepo.removeRoleFromUser(userId, roleId);
+    return this.getUser(userId);
   }
 
   private isUniqueConstraintError(error: unknown): error is { code: string } {
