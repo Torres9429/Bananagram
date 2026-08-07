@@ -9,11 +9,52 @@ paquete del monorepo. Se generó leyendo el código fuente completo (no se infie
 para Y", "consume tal servicio desde tal front", "elimina/cambia el flujo de Z" — así no hay que re-explorar
 el árbol de archivos correspondiente.
 
-**Última actualización**: sección 1 (Backend) actualizada 2026-07-23, con un parche puntual 2026-08-01 (ver
-nota abajo — solo lo tocado esa ronda, el resto de la sección sigue reflejando 2026-07-23 y no incluye
-`brands`/`reports`/`ideas`/`admin` construidos después); sección 2 (Frontend) sigue en su estado de
-2026-07-19 salvo el parche puntual de `auth-front` (misma nota). Si el código diverge de lo aquí descrito,
-confía en el código y actualiza este archivo.
+**Última actualización**: sección 1 (Backend) actualizada 2026-07-23, con parches puntuales 2026-08-01 y
+2026-08-05/07 (ver notas abajo — solo lo tocado en cada ronda, el resto de la sección sigue reflejando
+2026-07-23 salvo lo corregido explícitamente); sección 2 (Frontend) sigue en su estado de 2026-07-19 salvo
+el parche puntual de `auth-front` (misma nota, sin cambios del backend en esta ronda). Si el código diverge
+de lo aquí descrito, confía en el código y actualiza este archivo.
+
+**⚠️ 2026-08-05/07 — multi-rol real + RS256/JWKS + argon2 + denylist en Redis + gateway con rate-limit y
+JWT-edge (reemplaza casi todo lo dicho más abajo sobre JWT_SECRET/bcrypt/JwtStrategy — ver ADR-0004)**:
+- **Multi-rol**: `User.roleId` (FK escalar) reemplazado por la tabla puente `UserRole` — un usuario puede
+  tener N roles. El JWT pasa de `role: string` a `roles: string[]`; los permisos efectivos son la unión de
+  los permisos de todos los roles (`AuthRepository.getPermissions`). Nuevos endpoints
+  `POST`/`DELETE /admin/users/:id/roles` (bloquea dejar a alguien con 0 roles). `core-service.UserProfile.
+  roleName` (String?) pasó a `roleNames` (String[], `@default([])`) — `CampaignsService.assertUserHasRole`/
+  `listProfilesByRole` ahora filtran con `{ has: roleName }`.
+- **RS256/JWKS reemplaza HS256/`JWT_SECRET`**: solo `auth-service` tiene la llave privada
+  (`pnpm generate-keys`, `keys/`, nunca commiteada); `core-service`/`alexa-service`/el gateway verifican
+  contra `GET /.well-known/jwks.json` (jose `createRemoteJWKSet`). **`src/strategies/jwt.strategy.ts` y
+  `passport-jwt` se eliminaron de los 3 servicios** — `JwtAuthGuard` ahora es `implements CanActivate`
+  propio, sin passport. auth-service usa `TokenSignerService` (firma) — `@nestjs/jwt` ya no se usa en
+  ningún lado.
+- **argon2 reemplaza bcrypt** en los 3 lugares que hasheaban password (`AuthService`, `AdminUsersService`,
+  `packages/seed`).
+- **Denylist de access tokens en Redis** (`TokenDenylistService`, nuevo en los 3 servicios + el gateway):
+  logout revoca el `jti` específico; Postgres (`RevokedAccessToken`, solo en auth-service) es respaldo si
+  Redis cae. Todos los puntos que consultan Redis (denylist + rate-limit del gateway) **fallan abierto**
+  si Redis no responde (verificado en vivo).
+- **Gateway gana una capa de seguridad propia** (antes proxy 100% puro): `RateLimitMiddleware` (ventana
+  fija por IP en Redis, 429 al exceder `RATE_LIMIT_MAX`) + `JwtEdgeMiddleware` (misma denylist, rechaza
+  antes de proxear). **Bug real encontrado y corregido en vivo**: los proxies (`http-proxy-middleware`) se
+  registraban antes que estos middlewares Y antes del router interno de Nest (su propio catch-all 404) —
+  ninguno de los dos protegía ninguna ruta real del negocio hasta que se corrigió montándolos a mano en
+  `main.ts` (antes de los proxies, sin pasar por `configure()`/`MiddlewareConsumer`) — ver comentario largo
+  en `gateway/src/main.ts`.
+- **`BrandAccessGuard` (core-service) no tenía bypass de `administrador`** — un admin con el permiso de
+  módulo correcto igual quedaba bloqueado por no ser dueño/CM/diseñador. Corregido.
+- **Documentación interactiva real**: los 3 servicios con Swagger ganaron Scalar en `/docs` (UI principal)
+  + Swagger UI clásico/JSON/YAML en `/api` (antes solo Swagger UI clásico en `/api/docs`, plugin de
+  introspección de `class-validator` agregado en `nest-cli.json`). Nuevo `scripts/generate-swagger.sh`
+  (`pnpm generate-swagger`) exporta `docs/swagger/*.yaml` real desde los servicios corriendo (antes eran
+  stubs de una línea, apuntaban a servicios que ya no existen).
+- Nuevo `apps/backend/tsconfig.base.json` — auth-service/core-service/alexa-service/gateway ya no
+  duplican las 16 opciones de compilador, cada `tsconfig.json` es solo `{ "extends": ... }` +
+  `rootDir`/`outDir` propios (las rutas se resuelven relativas al archivo que las declara, no al que
+  extiende — por eso esos 2 campos no se pudieron mover al base).
+- `packages/seed/src/index.js`: nuevo usuario demo **`multi@bananagram.mx` / `multi12345`** (roles
+  `community_manager` + `disenador` a la vez) — el único con multi-rol en el seed.
 
 **⚠️ 2026-08-01 — fixes de campaigns/perfil + squash de migraciones + registro con rol en el front (mock)**:
 - `auth-service`: nuevo `ProfileModule` (`PATCH /me/profile`, `src/profile/`) para que un CM/Diseñador dado
@@ -100,9 +141,11 @@ Antes de asumir que algo "ya funciona", verifica contra esta lista:
     `password: ''`, lo cual siempre fallaba; ahora arma el JWT directo desde el usuario del refresh token
     (método privado `issueTokens()`, compartido con `login()`).
 - **Guards**: `JwtAuthGuard` se usa en `auth-service` (rutas propias) y ahora también en `core-service`
-  (catálogos) — `core-service` tuvo que ganar su propia infraestructura JWT
-  (`src/guards/jwt-auth.guard.ts`, `src/strategies/jwt.strategy.ts`, `src/auth/jwt-auth.module.ts`, todo
-  nuevo 2026-07-23) porque no tenía nada de esto antes (solo `auth-service` hacía login). `PermissionGuard`
+  (catálogos) — `core-service` tuvo que ganar su propia infraestructura JWT (`src/guards/jwt-auth.guard.ts`,
+  `src/auth/jwt-auth.module.ts`, nuevo 2026-07-23) porque no tenía nada de esto antes (solo `auth-service`
+  hacía login). **Desde 2026-08-05 ya no usa `passport-jwt`/`src/strategies/`** — verifica RS256 directo
+  contra el JWKS remoto de auth-service (`jose` `createRemoteJWKSet`), mismo cambio en `alexa-service`.
+  `PermissionGuard`
   sigue sin usarse en ningún lado. `BrandAccessGuard` **ya no vive en `commons/`** — se reescribió en
   `core-service/src/guards/brand-access.guard.ts` (valida acceso a una marca con una consulta LOCAL contra
   `Brand.ownerId`/`Campaign.cmId`/`CampaignDesigner.userId` usando el `sub` del JWT, sin depender de
@@ -152,26 +195,47 @@ correspondiente con endpoints reales y reemplazar el `useState`/mock-data por ho
 
 ## 1. Backend
 
-### 1.1 Gateway (`apps/backend/gateway/`, puerto 4000, paquete `@repo/api-gateway`) — proxea de verdad desde 2026-07-23
+### 1.1 Gateway (`apps/backend/gateway/`, puerto 4000, paquete `@repo/api-gateway`) — proxea de verdad desde 2026-07-23; capa de seguridad propia desde 2026-08-05
 - `src/main.ts` — `NestFactory.create(AppModule, { bodyParser: false })` (el `false` es necesario: si Nest
   parseara el body antes de llegar al proxy, `http-proxy-middleware` reenviaría POST/PATCH con el body ya
   consumido/vacío). `app.enableCors()`, `listen(4000)`. Sin Swagger, sin prefix global.
-- Monta 3 proxies con `app.use(createProxyMiddleware({ pathFilter, target, changeOrigin: true }))` — **sin**
-  pasar el path a `app.use()` (si se hiciera `app.use('/api/auth', ...)`, Express recortaría ese prefijo de
+- **Desde 2026-08-05, `RateLimitMiddleware`/`JwtEdgeMiddleware`/`CorrelationIdMiddleware` se montan A MANO
+  en `main.ts` con `app.use()`, ANTES de los proxies** (no vía `AppModule.configure()`/`MiddlewareConsumer`
+  como antes) — bug real encontrado y corregido en vivo: si se dejaba que Nest los registrara vía
+  `configure()` (lo que pasa recién al llamar `app.init()`/`app.listen()`), quedaban DESPUÉS de los
+  `app.use(createProxyMiddleware(...))` en la cadena real de Express, y además el router interno de Nest
+  (con su catch-all 404) también quedaba antes que los proxies si se llamaba `app.init()` temprano — en
+  ambos casos, ninguna ruta real del negocio (`/api/auth/*`, `/api/campaigns/*`, etc.) pasaba por
+  rate-limit/JWT-edge, solo rutas inexistentes. Los 3 middlewares se resuelven vía `app.get(...)` del
+  contenedor de DI (siguen siendo `providers` de `AppModule`, ya no vía `configure()`).
+- `RateLimitMiddleware` (`src/rate-limit/`) — ventana fija por IP en Redis (`SET NX EX` + `INCR`),
+  `RATE_LIMIT_WINDOW_SECONDS`/`RATE_LIMIT_MAX` (defaults 60/100), 429 al exceder, headers
+  `X-RateLimit-Limit`/`X-RateLimit-Remaining`. `/health` excluido. Falla abierto si Redis está caído
+  (verificado en vivo, con Redis apagado a propósito).
+- `JwtEdgeMiddleware` (`src/auth/`) — verifica RS256 contra el JWKS remoto de auth-service + consulta la
+  misma denylist de Redis que usan los backends; rutas públicas (`PUBLIC_EXACT`): `/health`,
+  `/favicon.ico`, `register`/`login`/`refresh`/`password-reset/*` de auth — **`logout` NO es pública a
+  propósito** (necesita el token para revocar su propio `jti`). Verificado en vivo: login sin token pasa,
+  ruta protegida sin token da 401 antes de llegar al microservicio, y tras logout el mismo token da
+  específicamente `"Token revocado (logout)"` (mensaje distinto al de los backends, confirma que el
+  rechazo pasa en el edge, no en el microservicio).
+- Proxies con `app.use(createProxyMiddleware({ pathFilter, target, changeOrigin: true }))` — **sin** pasar
+  el path a `app.use()` (si se hiciera `app.use('/api/auth', ...)`, Express recortaría ese prefijo de
   `req.url` antes de pasarlo al middleware, y el proxy reenviaría `/login` en vez de `/api/auth/login`).
-  `pathFilter` matchea sobre la URL completa sin tocarla:
-  - `/api/auth` → `AUTH_SERVICE_URL`
-  - `/api/me` → `AUTH_SERVICE_URL`
-  - `/api/catalogs` → `CORE_SERVICE_URL`
-  Faltan agregar rutas nuevas conforme se construyan (`/api/campaigns`, `/api/posts`, etc. → `CORE_SERVICE_URL`).
+  `pathFilter` matchea sobre la URL completa sin tocarla — `/api/auth`, `/api/me`, `/api/admin` →
+  `AUTH_SERVICE_URL`; `/api/catalogs`, `/api/brands`, `/api/campaigns`, `/api/posts`, `/api/reports`,
+  `/api/ideas` → `CORE_SERVICE_URL` (las últimas 5 se agregaron después de la fecha original de esta
+  sección, según se fueron construyendo los módulos de dominio).
 - `AUTH_SERVICE_URL`/`CORE_SERVICE_URL` — mismo patrón host-vs-Docker que `DATABASE_URL_AUTH`/`CORE`:
   `.env` trae `localhost:3001`/`3002` (para `pnpm dev`), `docker-compose.yml` los override con
   `http://auth-service:3001`/`http://core-service:3002` (nombre del servicio en la red de compose).
-- `src/app.module.ts` — `controllers: [HealthController]`, aplica `CorrelationIdMiddleware` a `'*'`.
+- `src/app.module.ts` — `controllers: [HealthController]`, `providers: [RateLimitMiddleware,
+  JwtEdgeMiddleware, CorrelationIdMiddleware]` (ver arriba — ya no usa `configure()`).
 - `src/health/health.controller.ts` — `GET /health` → `{ status: 'ok', timestamp }`.
 - `src/middleware/correlation-id.middleware.ts` — genera/propaga `X-Request-Id` (uuid) en cada request.
-- Verificado en vivo y en Docker real (3 contenedores separados, comunicándose por nombre de servicio):
-  login, `/me/permissions`, catálogos (incluyendo `POST` con body) todo a través de `localhost:4000/api/...`.
+- Verificado en vivo (host, `node dist/main.js` — no en Docker en esta ronda): login, endpoints protegidos
+  con y sin token, rate-limit (429 en la request 101 sobre 100), denylist tras logout, fail-open con Redis
+  apagado a propósito, todo a través de `localhost:4000/api/...`.
 
 ### 1.2 `commons` (`apps/backend/commons/`) — ya NO incluye Prisma, y va perdiendo piezas conforme cada servicio se vuelve autocontenido
 Desde `feat/catalogos-base` (mergeada) + la separación de bases del 2026-07-23, cada servicio duplica
@@ -192,7 +256,7 @@ como lo que TODAVÍA no se ha duplicado en ningún lado:
 - `interceptors/logging.interceptor.ts` — loguea `METHOD url — Nms` con `Logger('HTTP')`.
 - `filters/http-exception.filter.ts` — formatea `HttpException` a `{statusCode, timestamp, path, message}`.
 - `circuit-breaker/opossum.factory.ts` — `createCircuitBreaker(fn, options)` con defaults `timeout:5000, errorThresholdPercentage:50, resetTimeout:30000`. Sin caller todavía (ADR-0003).
-- `types/jwt-payload.type.ts` — `JwtPayload { sub, email, role, brandIds: string[], permissions: Record<string,string[]> }` — `brandIds` siempre `[]` en la práctica, ver §1.3/§1.4.
+- `types/jwt-payload.type.ts` — `JwtPayload { sub, email, roles: string[], brandIds: string[], permissions: Record<string,string[]>, jti: string }` — **`roles` array desde 2026-08-05** (antes `role` singular); `brandIds` siempre `[]` en la práctica, ver §1.3/§1.4.
 - `types/roles.enum.ts`, `types/modules.enum.ts`, `types/actions.enum.ts` — slugs en español (distinto del frontend, que usa inglés — ver §2.1).
 - `types/post-status.enum.ts` — **ya no se usa** para el enum real; `core-service` tiene su propia copia local en `src/types/post-status.enum.ts` con los 10 valores nuevos (ver §1.4/§1.6).
 
@@ -201,14 +265,18 @@ como lo que TODAVÍA no se ha duplicado en ningún lado:
 - `POST auth/login` — `LoginDto { email (IsEmail), password (IsString, MinLength(6)) }` →
   `{accessToken, refreshToken}` (`refreshToken` es el registro completo de `refresh_tokens`, no un
   string — el campo real a mandar a `/auth/refresh` es `refreshToken.token`). Valida contra `prisma.user`
-  (bcrypt) — el `User` de este servicio **ya no tiene `firstName`/`lastName`** (ver §1.6), ni `brandUsers`
-  (`BrandUser` ya no existe). `permissions` se arma desde `role_permissions`; `brandIds` siempre `[]`
-  (Brand vive en la BD de `core-service` — ver `CLAUDE.md` para el detalle de por qué y cómo se resolvió
-  vía `BrandAccessGuard` en core-service en vez de esto).
+  (**argon2 desde 2026-08-05, antes bcrypt**) — el `User` de este servicio **ya no tiene
+  `firstName`/`lastName`** (ver §1.6), ni `brandUsers` (`BrandUser` ya no existe), ni `roleId` escalar
+  (multi-rol vía `UserRole` desde 2026-08-05, ver aviso arriba). `permissions` se arma desde la UNIÓN de
+  `role_permissions` de todos los roles del usuario; `brandIds` siempre `[]` (Brand vive en la BD de
+  `core-service` — ver `CLAUDE.md` para el detalle de por qué y cómo se resolvió vía `BrandAccessGuard` en
+  core-service en vez de esto).
 - `POST auth/refresh` — `RefreshDto { refreshToken: string }` → **bug corregido 2026-07-23** (antes
   re-llamaba `login()` con `password: ''`, siempre fallaba). Ahora `AuthService.issueTokens(user)` es un
   método privado compartido por `login()` y `refresh()` que arma el JWT directo, sin volver a checar contraseña.
-- `POST auth/logout` — requiere `JwtAuthGuard`, revoca todos los refresh tokens del usuario.
+- `POST auth/logout` — requiere `JwtAuthGuard`, revoca todos los refresh tokens del usuario **y desde
+  2026-08-05 también el `jti` del access token actual en la denylist de Redis** (`TokenDenylistService`) —
+  antes un access token seguía siendo válido hasta expirar (15 min) aunque se hiciera logout.
 - `GET auth/me` — requiere `JwtAuthGuard`, devuelve el payload del JWT tal cual.
 - `GET me/permissions` (`PermissionsController`) — requiere `JwtAuthGuard`, devuelve `{ permissions, brandIds }` del JWT. **Esta es la ruta que el frontend consulta como fuente de verdad del menú.**
 - `PermissionsService.updateRolePermission(...)` — lógica de upsert lista, sin controller/endpoint que la exponga todavía.
@@ -217,7 +285,10 @@ como lo que TODAVÍA no se ha duplicado en ningún lado:
   `POST /internal/user-profiles` de `core-service` (upsert). Para `administrador` responde 400 (no tiene
   perfil de CM/Diseñador que completar).
 - Refresh tokens: 7 días, single-use, `usedAt` marca consumo.
-- `JwtStrategy`/`JwtAuthGuard`/`CurrentUser` — copias **locales** en `src/strategies/`, `src/guards/`, `src/decorators/` (ya no se importan de `commons/`).
+- `JwtAuthGuard`/`CurrentUser` — copias **locales** en `src/guards/`, `src/decorators/` (ya no se importan
+  de `commons/`). **`src/strategies/` (con `JwtStrategy`, passport) se eliminó por completo el
+  2026-08-05** — `JwtAuthGuard` ahora es `implements CanActivate` propio, verifica RS256 directo con
+  `TokenSignerService` (auth-service tiene la llave privada) y consulta `TokenDenylistService`.
 - **BD propia**: `apps/backend/services/auth-service/prisma/schema.prisma`, base `gestor_redes_auth`. Prisma Client con `output` personalizado en `node_modules/.prisma-client` (ver comentario en el schema — necesario para no chocar con el de `core-service`).
 
 ### 1.4 `core-service` (puerto 3002, paquete `@repo/core-service`) — fusiona brands+content+analytics-service; único módulo de dominio wireado hoy: catálogos
@@ -226,13 +297,15 @@ como lo que TODAVÍA no se ha duplicado en ningún lado:
   **protegido con `JwtAuthGuard`** (2026-07-23 — antes no tenía ningún guard) y **DTOs con
   `class-validator`** (`@IsString`/`@IsNotEmpty`/`@IsNumber`/`@Min(0)`, antes eran clases vacías con
   validación a mano). `core-service` no tenía ninguna infraestructura JWT propia — se creó
-  `src/guards/jwt-auth.guard.ts`, `src/strategies/jwt.strategy.ts`, `src/auth/jwt-auth.module.ts` (valida
-  el mismo `JWT_SECRET` que emite `auth-service`, no hace login propio).
+  `src/guards/jwt-auth.guard.ts`, `src/auth/jwt-auth.module.ts` (**desde 2026-08-05 verifica RS256 contra
+  el JWKS remoto de `auth-service`, sin secreto compartido ni `passport-jwt`**; no hace login propio).
 - **`campaigns/`** — ya NO está vacío (esto quedó desactualizado por el resto de esta subsección, que sigue
   fechada 2026-07-23; `campaigns/` se implementó después y se le agregaron validaciones 2026-08-01, ver
   nota de esa fecha arriba): CRUD completo + asignación de diseñadores + selectores `eligible-*`, con
-  `assertUserHasRole` validando `UserProfile.roleName` de core-service. `reports/`, `ideas/` — sin
-  verificar en esta ronda, no se tocaron.
+  `assertUserHasRole` validando `UserProfile.roleNames` (array desde 2026-08-05, antes `roleName` singular)
+  de core-service. `reports/`, `ideas/` — sin verificar en esta ronda, no se tocaron. `posts/` (agregada
+  por otra rama, mergeada 2026-08-06) ya usa `user.roles.includes(...)` correctamente en sus 3 métodos —
+  verificado en vivo, no requirió cambios de multi-rol.
 - **`posts/state-machine/`** — sin controller. `transitions.map.ts` cubre ahora 10 estados (antes 6, ver
   §1.6): `borrador→en_revision→{aprobado|rechazado}`, `rechazado→borrador`, `aprobado→programado`,
   `programado→{publicando|cancelado}`, `publicando→{publicado|parcial|error|cancelado}` (el tramo nuevo es
@@ -270,8 +343,11 @@ como lo que TODAVÍA no se ha duplicado en ningún lado:
 `apps/backend/services/{auth,core}-service/prisma/schema.prisma`.
 
 **auth-service** (`gestor_redes_auth`): `Role`, `Module`, `Action`, `RolePermission` (RBAC dinámico),
-`User` (ya **sin** `firstName`/`lastName`), `RefreshToken`, `PasswordResetToken` (nuevo), `Notification`,
-`AuditLog` (BIGINT, inmutable). `UserStatus` enum nuevo (`pending`/`active`/`suspended`, todos nacen `active`).
+`User` (ya **sin** `firstName`/`lastName`, y desde 2026-08-05 **sin** `roleId` escalar — ver `UserRole`),
+`UserRole` (**nuevo 2026-08-05** — tabla puente `{userId, roleId}`, multi-rol), `RevokedAccessToken`
+(**nuevo 2026-08-05** — respaldo en Postgres de la denylist de Redis, PK `jti`), `RefreshToken`,
+`PasswordResetToken` (nuevo), `Notification`, `AuditLog` (BIGINT, inmutable). `UserStatus` enum nuevo
+(`pending`/`active`/`suspended`, todos nacen `active`).
 
 **core-service** (`gestor_redes_core`): `Category`/`Specialty`/`SocialNetwork` (catálogos, dueño
 core-service, ya no auth-service), `UserProfile` (nuevo — `name`/`avatarUrl`, vinculado a `User` por
@@ -301,15 +377,18 @@ Prisma Clients (`authPrisma`/`corePrisma`), importados directo desde
 compartido — se eliminó junto con `commons/prisma/`). Crea (idempotente, `upsert`):
 - 9 módulos / 9 acciones (mismos slugs que `commons/types/modules.enum.ts` / `actions.enum.ts`), en `authPrisma`.
 - 4 roles con matriz de permisos, en `authPrisma` — sin cambios en la matriz.
-- **5 usuarios demo**, en `authPrisma` (ya sin `firstName`/`lastName` — el nombre se compone y se guarda
-  aparte en `UserProfile.name`, en `corePrisma`, vinculado por `userId`):
-  | Email | Password | Rol |
+- **6 usuarios demo** (antes 5, ver aviso 2026-08-05/07 arriba), en `authPrisma` (ya sin
+  `firstName`/`lastName` — el nombre se compone y se guarda aparte en `UserProfile.name`, en `corePrisma`,
+  vinculado por `userId`). Password hasheado con **argon2** (antes bcrypt), roles vía `UserRole` (multi-rol,
+  reconciliados con `deleteMany`+`createMany` en cada corrida — idempotente):
+  | Email | Password | Roles |
   |---|---|---|
   | 20233tn102@utez.edu.mx | admin123 | administrador |
   | cm@bananagram.mx | cm123456 | community_manager |
   | disenador@bananagram.mx | diseno123 | disenador |
   | cliente@bananagram.mx | cliente123 | cliente |
   | alex@bananagram.mx | alex12345 | cliente |
+  | multi@bananagram.mx | multi12345 | community_manager **+** disenador (único con 2 roles) |
   (el admin ya no es `admin@bananagram.mx` — se cambió al correo real del usuario a pedido suyo; esto
   desincroniza ese usuario específico de `apps/frontend/commons/src/mocks/mock-users.ts`, que sigue
   usando el email viejo — nadie lo actualizó ahí, el frontend sigue en modo mock sin conectar al backend real).

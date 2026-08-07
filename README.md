@@ -23,14 +23,16 @@ zonas independientes, sin Module Federation). Cada microservicio con base de dat
 | `web-shell` | 3000 | Host del frontend: sesión, menú dinámico, enrutamiento a cada zona |
 | `admin-front` / `analytics-front` / `auth-front` / `brands-front` / `posts-front` | 3010–3014 | Zonas independientes, cada una app Next.js standalone |
 | `api-gateway` | 4000 | Único punto de entrada HTTP; reenvía a cada microservicio |
-| `auth-service` | 3001 | Identidad, login, RBAC dinámico. Emite el JWT |
+| `auth-service` | 3001 | Identidad, login, RBAC dinámico multi-rol. Emite el JWT (RS256) |
 | `core-service` | 3002 | Marcas, campañas, publicaciones, catálogos, métricas, score, reportes, ideas |
 | `alexa-service` | 3004 | BFF de la Alexa Skill, sin base de datos propia |
 | `postgres` | 5433 | Una instancia, dos bases lógicas: `gestor_redes_auth` / `gestor_redes_core` |
+| `redis` | 6379 | Denylist de access tokens revocados (logout) + rate-limit del gateway |
 
 Decisiones de arquitectura documentadas como ADRs en [`agents/adrs/`](agents/adrs/): multitenancy por
-`brand_id` (row-level, no schema-per-tenant), JWT HS256 stateless sin Redis/OIDC, y REST síncrono entre
-servicios (sin mensajería async).
+`brand_id` (row-level, no schema-per-tenant), JWT RS256/JWKS con multi-rol y denylist en Redis
+([ADR-0004](agents/adrs/ADR-0004-jwt-rs256-multirol.md), supera al HS256 original de ADR-0002), y REST
+síncrono entre servicios (sin mensajería async).
 
 ## Requisitos
 
@@ -43,7 +45,8 @@ servicios (sin mensajería async).
 ```bash
 cp .env.example .env      # valores por defecto ya sirven para desarrollo local
 pnpm install
-docker compose up -d      # levanta solo Postgres + Adminer
+pnpm generate-keys        # genera el par RS256 en keys/ (no sobrescribe si ya existe, nunca se commitea)
+docker compose up -d      # levanta Postgres + Adminer + Redis
 set -a && source .env && set +a   # para cargar las variables de entorno antes de migrate y seed
 pnpm db:migrate           # aplica las migraciones (auth-service y core-service)
 pnpm seed                 # carga roles, permisos y usuarios de prueba
@@ -51,8 +54,15 @@ pnpm seed                 # carga roles, permisos y usuarios de prueba
 
 > [!TIP]
 > `pnpm seed` imprime al final las cuentas de prueba (mismo email/password que usa el modo mock del
-> frontend). No siembra catálogos (categorías/especialidades/redes sociales) a propósito — se crean vía
-> API una vez logueado.
+> frontend), incluida `multi@bananagram.mx` (community_manager + disenador, para probar multi-rol). No
+> siembra catálogos (categorías/especialidades/redes sociales) a propósito — se crean vía API una vez
+> logueado.
+
+> [!IMPORTANT]
+> `auth-service` (y solo él) necesita las llaves RSA de `pnpm generate-keys` para firmar tokens —
+> `core-service`, `alexa-service` y el gateway verifican contra `GET /.well-known/jwks.json`, nunca leen
+> un `.pem` directo. Si `auth-service` no arranca por no encontrar las llaves, corre `pnpm generate-keys`
+> desde la raíz del repo.
 
 ## Correr el proyecto
 
@@ -124,7 +134,10 @@ agents/
 - [`docs/backend/guia-nuevos-modulos-backend.md`](docs/backend/guia-nuevos-modulos-backend.md) — cómo
   construir un módulo de backend nuevo (estructura, DB, DTOs, auth, checklist de verificación).
 - [`docs/base/modelo2.txt`](docs/base/modelo2.txt) — schema de Prisma vigente, repartido por servicio.
-- [`docs/swagger/`](docs/swagger/) — contratos OpenAPI de cada microservicio.
+- [`docs/swagger/`](docs/swagger/) — contratos OpenAPI de cada microservicio (regenerar con
+  `pnpm generate-swagger` mientras los servicios estén corriendo). Cada servicio expone además su propia
+  documentación interactiva en vivo: Scalar en `/docs`, Swagger UI clásico + JSON/YAML crudo en `/api`
+  (ej. `http://localhost:3001/docs`).
 - [`.planning/pitches/`](.planning/pitches/) — shape-up pitches con la Definition of Done de cada feature.
 
 ## Testing y lint
