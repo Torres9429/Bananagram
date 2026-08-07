@@ -4,7 +4,7 @@ import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
 import { getAyrshareConfig, getAyrshareErrorMessage } from './ayrshare.util';
 
-type CurrentUser = { sub: string; role: string };
+type CurrentUser = { sub: string; roles: string[] };
 type Brand = Awaited<ReturnType<typeof prisma.brand.create>>;
 type BrandResponse = Omit<Brand, 'refId' | 'profileKey'> & { connectUrl?: string };
 
@@ -24,7 +24,7 @@ export class BrandsService {
   // que tiene relación — el Administrador ve todas, el resto solo las
   // suyas (dueño) o las de campañas donde participa como CM/Diseñador.
   async listBrands(user: CurrentUser): Promise<BrandResponse[]> {
-    if (user.role === 'administrador') {
+    if (user.roles.includes('administrador')) {
       const brands = await prisma.brand.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } });
       return brands.map((brand) => this.toBrandResponse(brand));
     }
@@ -58,7 +58,7 @@ export class BrandsService {
   // ownerId siempre es un Cliente (regla de negocio) — se toma del JWT, no
   // del body: nadie puede crear una marca a nombre de otro usuario.
   async createBrand(dto: CreateBrandDto, user: CurrentUser): Promise<BrandResponse> {
-    if (user.role !== 'cliente' && user.role !== 'administrador') {
+    if (!user.roles.includes('cliente') && !user.roles.includes('administrador')) {
       throw new ForbiddenException('Solo un Cliente puede crear una marca');
     }
 

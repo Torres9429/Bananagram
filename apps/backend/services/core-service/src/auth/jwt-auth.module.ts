@@ -1,15 +1,16 @@
-import { Module } from '@nestjs/common';
-import { PassportModule } from '@nestjs/passport';
-import { JwtStrategy } from '../strategies/jwt.strategy';
+import { Global, Module } from '@nestjs/common';
+import { TokenDenylistService } from '../guards/token-denylist.service';
 
-// Módulo mínimo para que JwtAuthGuard (AuthGuard('jwt')) tenga una estrategia
-// 'jwt' registrada — core-service no tiene login propio (eso vive en
-// auth-service), solo necesita poder VALIDAR el token que auth-service ya
-// emitió. Cualquier módulo de dominio que proteja endpoints con JwtAuthGuard
-// debe importar este módulo.
+// @Global(): JwtAuthGuard se usa vía @UseGuards(JwtAuthGuard) en controllers
+// de módulos que no siempre importan este módulo (p.ej. InternalModule) —
+// antes funcionaba en cualquier lado porque passport registra su estrategia
+// 'jwt' en un singleton global del proceso, fuera de la DI de Nest. Con DI
+// pura (sin passport), TokenDenylistService necesita estar disponible en
+// TODO módulo que use el guard, así que se declara global una sola vez aquí,
+// importado desde AppModule.
+@Global()
 @Module({
-  imports: [PassportModule],
-  providers: [JwtStrategy],
-  exports: [PassportModule],
+  providers: [TokenDenylistService],
+  exports: [TokenDenylistService],
 })
 export class JwtAuthModule {}

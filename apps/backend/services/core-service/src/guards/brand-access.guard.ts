@@ -23,6 +23,14 @@ export class BrandAccessGuard implements CanActivate {
       return true;
     }
 
+    // administrador gestiona cualquier marca, igual que ya hace
+    // CampaignsService.assertCanManage — sin este bypass, un admin con el
+    // permiso de módulo `marcas:*` (PermissionGuard) igual quedaría
+    // bloqueado aquí por no ser dueño ni CM/diseñador de ninguna campaña.
+    if (user.roles?.includes('administrador')) {
+      return true;
+    }
+
     const hasAccess = await this.userHasBrandAccess(user.sub, brandId);
     if (!hasAccess) {
       throw new ForbiddenException('No tienes acceso a esta marca');

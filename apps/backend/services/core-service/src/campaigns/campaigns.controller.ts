@@ -9,7 +9,7 @@ import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { AssignDesignerDto } from './dto/assign-designer.dto';
 
-type Claims = { sub: string; role: string };
+type Claims = { sub: string; roles: string[] };
 
 @ApiTags('campaigns')
 @ApiBearerAuth()

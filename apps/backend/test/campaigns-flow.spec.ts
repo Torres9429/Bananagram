@@ -6,6 +6,7 @@ import { CampaignsService } from '../services/core-service/src/campaigns/campaig
 import { UserProfilesController } from '../services/core-service/src/internal/user-profiles.controller';
 import { prisma as corePrisma } from '../services/core-service/src/prisma/client';
 import { cleanDatabase } from './helpers/db.helper';
+import { describe, beforeAll, afterAll, it, expect } from '@jest/globals';
 
 // Integración real contra Postgres (docker compose up -d postgres) — sin
 // mocks de Prisma, mismo patrón que auth.integration.spec.ts. Cubre la
@@ -26,7 +27,7 @@ describe('Campaigns Flow Integration', () => {
   let categoryId: string;
   let specialtyId: string;
 
-  const clientClaims = { sub: clientUserId, role: 'cliente' };
+  const clientClaims = { sub: clientUserId, roles: ['cliente'] };
 
   beforeAll(async () => {
     await cleanDatabase();
@@ -51,13 +52,13 @@ describe('Campaigns Flow Integration', () => {
     brandId = brand.id;
 
     await corePrisma.userProfile.create({
-      data: { userId: cmUserId, name: 'CM de prueba', roleName: 'cm' },
+      data: { userId: cmUserId, name: 'CM de prueba', roleNames: ['cm'] },
     });
     await corePrisma.userProfile.create({
-      data: { userId: designerUserId, name: 'Diseñador de prueba', roleName: 'disenador' },
+      data: { userId: designerUserId, name: 'Diseñador de prueba', roleNames: ['disenador'] },
     });
     await corePrisma.userProfile.create({
-      data: { userId: plainClientUserId, name: 'Cliente de prueba', roleName: 'cliente' },
+      data: { userId: plainClientUserId, name: 'Cliente de prueba', roleNames: ['cliente'] },
     });
 
     const moduleRef = await Test.createTestingModule({ imports: [CampaignsModule] }).compile();
@@ -108,7 +109,7 @@ describe('Campaigns Flow Integration', () => {
       { brandId, name: 'Campaña para asignar diseñador', cmId: cmUserId } as any,
       clientClaims,
     );
-    const cmClaims = { sub: cmUserId, role: 'community_manager' };
+    const cmClaims = { sub: cmUserId, roles: ['community_manager'] };
 
     await expect(campaignsService.assignDesigner(campaign.id, cmUserId, cmClaims)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -136,7 +137,7 @@ describe('Campaigns Flow Integration', () => {
 
     it('exige categorías/especialidades al crear un perfil de cm', async () => {
       await expect(
-        profilesController.upsert({ userId: upsertUserId, name: 'CM nuevo', roleName: 'cm' } as any),
+        profilesController.upsert({ userId: upsertUserId, name: 'CM nuevo', roleNames: ['cm'] } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -144,7 +145,7 @@ describe('Campaigns Flow Integration', () => {
       const profile = await profilesController.upsert({
         userId: upsertUserId,
         name: 'CM nuevo',
-        roleName: 'cm',
+        roleNames: ['cm'],
         categoryIds: [categoryId],
         specialtyIds: [specialtyId],
       } as any);
@@ -158,7 +159,7 @@ describe('Campaigns Flow Integration', () => {
         userId: upsertUserId,
         name: 'CM nuevo',
         avatarUrl: 'https://example.com/avatar.png',
-        roleName: 'cm',
+        roleNames: ['cm'],
       } as any);
 
       expect(updated.avatarUrl).toBe('https://example.com/avatar.png');
@@ -173,7 +174,7 @@ describe('Campaigns Flow Integration', () => {
         profilesController.upsert({
           userId: upsertUserId,
           name: 'CM nuevo',
-          roleName: 'cm',
+          roleNames: ['cm'],
           categoryIds: [],
         } as any),
       ).rejects.toBeInstanceOf(BadRequestException);

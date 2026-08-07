@@ -18,7 +18,7 @@ export class BrandsController {
 
   @Get()
   @RequirePermission('marcas', 'ver')
-  findAll(@CurrentUser() user: { sub: string; role: string }) {
+  findAll(@CurrentUser() user: { sub: string; roles: string[] }) {
     return this.brands.listBrands(user);
   }
 
@@ -31,7 +31,7 @@ export class BrandsController {
 
   @Post()
   @RequirePermission('marcas', 'crear')
-  create(@Body() dto: CreateBrandDto, @CurrentUser() user: { sub: string; role: string }) {
+  create(@Body() dto: CreateBrandDto, @CurrentUser() user: { sub: string; roles: string[] }) {
     return this.brands.createBrand(dto, user);
   }
 

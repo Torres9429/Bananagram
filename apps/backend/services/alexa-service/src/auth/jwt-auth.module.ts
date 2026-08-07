@@ -1,13 +1,13 @@
-import { Module } from '@nestjs/common';
-import { PassportModule } from '@nestjs/passport';
-import { JwtStrategy } from '../strategies/jwt.strategy';
+import { Global, Module } from '@nestjs/common';
+import { TokenDenylistService } from '../guards/token-denylist.service';
 
-// Mismo patrón que core-service/src/auth/jwt-auth.module.ts: solo necesita
-// validar el token que la Alexa Skill reenvía como Bearer (obtenido por el
-// usuario al vincular su cuenta), no emitirlo.
+// @Global(): mismo motivo que core-service/src/auth/jwt-auth.module.ts —
+// sin passport, TokenDenylistService debe estar disponible en todo módulo
+// que use JwtAuthGuard vía @UseGuards, no solo en los que importen este
+// módulo explícitamente.
+@Global()
 @Module({
-  imports: [PassportModule],
-  providers: [JwtStrategy],
-  exports: [PassportModule],
+  providers: [TokenDenylistService],
+  exports: [TokenDenylistService],
 })
 export class JwtAuthModule {}

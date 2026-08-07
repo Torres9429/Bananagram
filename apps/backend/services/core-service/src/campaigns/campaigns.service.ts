@@ -4,14 +4,14 @@ import { CampaignStatus } from '../../node_modules/.prisma-client';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 
-type CurrentUser = { sub: string; role: string };
+type CurrentUser = { sub: string; roles: string[] };
 
 const INCLUDE = { designers: true, categories: true } as const;
 
 @Injectable()
 export class CampaignsService {
   async listCampaigns(user: CurrentUser): Promise<any> {
-    if (user.role === 'administrador') {
+    if (user.roles.includes('administrador')) {
       return prisma.campaign.findMany({ where: { deletedAt: null }, include: INCLUDE, orderBy: { createdAt: 'desc' } });
     }
 
@@ -41,7 +41,7 @@ export class CampaignsService {
   // de la ruta es un campaignId, no un brandId), así que se resuelve aquí
   // con una consulta local.
   private async assertCanManage(campaign: { id: string; brandId: string; cmId: string }, user: CurrentUser) {
-    if (user.role === 'administrador' || campaign.cmId === user.sub) return;
+    if (user.roles.includes('administrador') || campaign.cmId === user.sub) return;
 
     const brand = await prisma.brand.findFirst({ where: { id: campaign.brandId, ownerId: user.sub } });
     if (!brand) throw new ForbiddenException('No tienes acceso a esta campaña');
@@ -56,7 +56,7 @@ export class CampaignsService {
     const brand = await prisma.brand.findFirst({ where: { id: dto.brandId, deletedAt: null } });
     if (!brand) throw new BadRequestException('La marca especificada no existe o fue eliminada');
 
-    if (user.role !== 'administrador' && brand.ownerId !== user.sub) {
+    if (!user.roles.includes('administrador') && brand.ownerId !== user.sub) {
       throw new ForbiddenException('Solo el dueño de la marca puede crear campañas para ella');
     }
 
@@ -150,19 +150,21 @@ export class CampaignsService {
 
   private listProfilesByRole(roleName: string) {
     return prisma.userProfile.findMany({
-      where: { roleName, deletedAt: null },
+      where: { roleNames: { has: roleName }, deletedAt: null },
       select: { userId: true, name: true, avatarUrl: true },
       orderBy: { name: 'asc' },
     });
   }
 
   private async assertUserHasRole(userId: string, roleName: string, errorMessage: string): Promise<void> {
-    const profile = await prisma.userProfile.findFirst({ where: { userId, roleName, deletedAt: null } });
+    const profile = await prisma.userProfile.findFirst({
+      where: { userId, roleNames: { has: roleName }, deletedAt: null },
+    });
     if (!profile) throw new BadRequestException(errorMessage);
   }
 
   private assertIsAssignedCm(campaign: { cmId: string }, user: CurrentUser) {
-    if (user.role !== 'administrador' && campaign.cmId !== user.sub) {
+    if (!user.roles.includes('administrador') && campaign.cmId !== user.sub) {
       throw new ForbiddenException('Solo el CM asignado a esta campaña puede gestionar sus diseñadores');
     }
   }

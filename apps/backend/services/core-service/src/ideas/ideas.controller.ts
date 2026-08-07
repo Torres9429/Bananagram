@@ -8,7 +8,7 @@ import { IdeasService } from './ideas.service';
 import { CreateIdeaDto } from './dto/create-idea.dto';
 import { UpdateIdeaDto } from './dto/update-idea.dto';
 
-type Claims = { sub: string; role: string };
+type Claims = { sub: string; roles: string[] };
 
 // Ideas de contenido son un sub-recurso de Campaign (no tienen módulo propio
 // en el catálogo de permisos, ver packages/seed/src/index.js): se autorizan

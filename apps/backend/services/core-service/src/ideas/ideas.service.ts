@@ -4,7 +4,7 @@ import { ContentIdeaSource } from '../../node_modules/.prisma-client';
 import { CreateIdeaDto } from './dto/create-idea.dto';
 import { UpdateIdeaDto } from './dto/update-idea.dto';
 
-type CurrentUser = { sub: string; role: string };
+type CurrentUser = { sub: string; roles: string[] };
 
 @Injectable()
 export class IdeasService {
@@ -52,7 +52,7 @@ export class IdeasService {
   }
 
   private async assertCampaignAccess(campaignId: string, user: CurrentUser) {
-    if (user.role === 'administrador') return;
+    if (user.roles.includes('administrador')) return;
 
     const campaign = await prisma.campaign.findFirst({
       where: {
