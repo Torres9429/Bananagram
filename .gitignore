@@ -10,3 +10,11 @@ coverage/
 *.log
 .dev-pids
 .dev-logs/
+
+# Llaves RSA (RS256/JWKS) — solo auth-service las necesita en runtime (vía
+# volumen, nunca COPY en el Dockerfile). Si alguien las compromete podría
+# firmar tokens falsos: nunca deben viajar en el repo. Se generan con
+# `pnpm generate-keys` (scripts/generate-keys.mjs, no sobrescribe si ya existen).
+keys/*
+!keys/.gitkeep
+*.pem

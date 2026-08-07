@@ -1,20 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { prisma } from '../prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+type UserWithRoles = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  roles: { role: { id: string; name: string } }[];
+};
+
 type RotateResult =
   | { status: 'not_found' }
   | { status: 'reused' }
-  | { status: 'rotated'; user: { id: string; email: string; roleId: string; role: { name: string } }; refreshToken: { token: string } };
+  | { status: 'rotated'; user: UserWithRoles; refreshToken: { token: string } };
 
 @Injectable()
 export class AuthRepository {
   findByEmail(email: string) {
     return prisma.user.findFirst({
       where: { email, deletedAt: null },
-      include: { role: true },
+      include: { roles: { include: { role: true } } },
     });
   }
 
@@ -22,24 +29,35 @@ export class AuthRepository {
     return prisma.role.findUnique({ where: { name } });
   }
 
-  createUser(email: string, passwordHash: string, roleId: string) {
+  // Multirol: un usuario nace con uno o varios roles (el auto-registro
+  // público siempre manda un solo id; el alta desde Admin también, hoy —
+  // roles adicionales se agregan después vía addRoleToUser).
+  createUser(email: string, passwordHash: string, roleIds: string[]) {
     return prisma.user.create({
-      data: { email, passwordHash, roleId },
-      include: { role: true },
+      data: {
+        email,
+        passwordHash,
+        roles: { create: roleIds.map((roleId) => ({ roleId })) },
+      },
+      include: { roles: { include: { role: true } } },
     });
   }
 
-  async getPermissions(roleId: string): Promise<Record<string, string[]>> {
+  // Los privilegios efectivos de un usuario son la UNIÓN de los permisos de
+  // TODOS sus roles — un Set por módulo evita duplicar la misma acción si
+  // dos roles comparten el mismo permiso.
+  async getPermissions(roleIds: string[]): Promise<Record<string, string[]>> {
     const perms = await prisma.rolePermission.findMany({
-      where: { roleId, allowed: true },
+      where: { roleId: { in: roleIds }, allowed: true },
       include: { module: true, action: true },
     });
-    return perms.reduce((acc: Record<string, string[]>, p) => {
+    const byModule: Record<string, Set<string>> = {};
+    for (const p of perms) {
       const mod = p.module.slug;
-      if (!acc[mod]) acc[mod] = [];
-      acc[mod].push(p.action.slug);
-      return acc;
-    }, {});
+      if (!byModule[mod]) byModule[mod] = new Set();
+      byModule[mod].add(p.action.slug);
+    }
+    return Object.fromEntries(Object.entries(byModule).map(([mod, set]) => [mod, [...set]]));
   }
 
   // Nueva sesión (login/register): nace su propia familyId. Todo lo que
@@ -54,7 +72,7 @@ export class AuthRepository {
   findRefreshToken(token: string) {
     return prisma.refreshToken.findUnique({
       where: { token },
-      include: { user: { include: { role: true } } },
+      include: { user: { include: { roles: { include: { role: true } } } } },
     });
   }
 
@@ -68,7 +86,7 @@ export class AuthRepository {
     return prisma.$transaction(async (tx) => {
       const stored = await tx.refreshToken.findUnique({
         where: { token: oldToken },
-        include: { user: { include: { role: true } } },
+        include: { user: { include: { roles: { include: { role: true } } } } },
       });
       if (!stored) return { status: 'not_found' };
 
@@ -132,5 +150,47 @@ export class AuthRepository {
         data: { revokedAt: new Date() },
       }),
     ]);
+  }
+
+  // --- Multirol: asignación puntual de roles a un usuario ya existente ---
+  // (usado por POST/DELETE /admin/users/:id/roles — ver admin-users.service.ts)
+
+  async addRoleToUser(userId: string, roleId: string) {
+    try {
+      return await prisma.userRole.create({
+        data: { userId, roleId },
+        include: { role: true },
+      });
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException('El usuario ya tiene ese rol');
+      }
+      throw error;
+    }
+  }
+
+  async removeRoleFromUser(userId: string, roleId: string) {
+    // Un usuario sin roles se queda sin permisos y con un JWT inútil para
+    // depurar — nunca se permite dejarlo en ese estado.
+    const count = await prisma.userRole.count({ where: { userId } });
+    if (count <= 1) {
+      throw new BadRequestException('El usuario debe conservar al menos un rol');
+    }
+    try {
+      return await prisma.userRole.delete({ where: { userId_roleId: { userId, roleId } } });
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new NotFoundException('El usuario no tiene ese rol asignado');
+      }
+      throw error;
+    }
+  }
+
+  private isUniqueConstraintError(error: unknown): error is { code: string } {
+    return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
+  }
+
+  private isNotFoundError(error: unknown): error is { code: string } {
+    return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025';
   }
 }

@@ -10,7 +10,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { UploadableFile } from '../cloudinary/cloudinary.service';
 
-type Claims = { sub: string; role: string };
+type Claims = { sub: string; roles: string[] };
 
 @ApiTags('posts')
 @ApiBearerAuth()

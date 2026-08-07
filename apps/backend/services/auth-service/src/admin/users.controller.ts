@@ -6,6 +6,7 @@ import { RequirePermission } from '../decorators/require-permission.decorator';
 import { AdminUsersService } from './admin-users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AssignRoleDto } from './dto/assign-role.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -42,5 +43,17 @@ export class UsersController {
   @RequirePermission('usuarios', 'eliminar')
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.users.removeUser(id);
+  }
+
+  @Post(':id/roles')
+  @RequirePermission('usuarios', 'editar')
+  assignRole(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AssignRoleDto) {
+    return this.users.assignRole(id, dto.roleId);
+  }
+
+  @Delete(':id/roles/:roleId')
+  @RequirePermission('usuarios', 'editar')
+  unassignRole(@Param('id', ParseUUIDPipe) id: string, @Param('roleId', ParseUUIDPipe) roleId: string) {
+    return this.users.unassignRole(id, roleId);
   }
 }

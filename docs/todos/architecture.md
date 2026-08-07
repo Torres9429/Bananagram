@@ -12,5 +12,7 @@
 ## ADRs
 
 - ADR-0001: Multi-tenancy por row-level (brand_id en todas las tablas de negocio)
-- ADR-0002: JWT HS256 stateless + refresh token rotation (sin Redis)
+- ADR-0002: JWT HS256 stateless + refresh token rotation (sin Redis) — **superado por ADR-0004**
 - ADR-0003: REST síncrono entre servicios + circuit breaker opossum
+- ADR-0004: JWT RS256/JWKS + multi-rol + denylist de access tokens en Redis (gateway con rate-limit y
+  validación JWT en el edge)

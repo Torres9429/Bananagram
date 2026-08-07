@@ -1,1 +1,928 @@
-# Swagger core-service — generado automáticamente por NestJS Swagger
+openapi: 3.0.0
+paths:
+  /api/catalogs/categories:
+    get:
+      operationId: CategoriesController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    post:
+      operationId: CategoriesController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/categories/{id}:
+    get:
+      operationId: CategoriesController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    patch:
+      operationId: CategoriesController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCategoryDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    delete:
+      operationId: CategoriesController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/specialties:
+    get:
+      operationId: SpecialtiesController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    post:
+      operationId: SpecialtiesController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpecialtyDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/specialties/{id}:
+    get:
+      operationId: SpecialtiesController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    patch:
+      operationId: SpecialtiesController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSpecialtyDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    delete:
+      operationId: SpecialtiesController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/social-networks:
+    get:
+      operationId: SocialNetworksController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    post:
+      operationId: SocialNetworksController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSocialNetworkDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/social-networks/{id}:
+    get:
+      operationId: SocialNetworksController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    patch:
+      operationId: SocialNetworksController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSocialNetworkDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    delete:
+      operationId: SocialNetworksController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/internal/user-profiles:
+    post:
+      operationId: UserProfilesController_upsert
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertUserProfileDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - internal
+  /api/brands:
+    get:
+      operationId: BrandsController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+    post:
+      operationId: BrandsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBrandDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}:
+    get:
+      operationId: BrandsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+    patch:
+      operationId: BrandsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBrandDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+    delete:
+      operationId: BrandsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{brandId}/social-accounts:
+    get:
+      operationId: SocialAccountsController_findAll
+      parameters:
+        - name: brandId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - social-accounts
+      security:
+        - bearer: []
+  /api/brands/{brandId}/social-accounts/sync:
+    post:
+      operationId: SocialAccountsController_sync
+      parameters:
+        - name: brandId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      tags:
+        - social-accounts
+      security:
+        - bearer: []
+  /api/campaigns:
+    get:
+      operationId: CampaignsController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+    post:
+      operationId: CampaignsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCampaignDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/eligible-community-managers:
+    get:
+      operationId: CampaignsController_findEligibleCommunityManagers
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/eligible-designers:
+    get:
+      operationId: CampaignsController_findEligibleDesigners
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}:
+    get:
+      operationId: CampaignsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+    patch:
+      operationId: CampaignsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCampaignDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+    delete:
+      operationId: CampaignsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/designers:
+    post:
+      operationId: CampaignsController_assignDesigner
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignDesignerDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/designers/{userId}:
+    delete:
+      operationId: CampaignsController_unassignDesigner
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: userId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/posts:
+    post:
+      operationId: PostsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/submit-for-review:
+    post:
+      operationId: PostsController_submitForReview
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/media:
+    post:
+      operationId: PostsController_uploadMedia
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/reports:
+    get:
+      operationId: ReportsController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - reports
+      security:
+        - bearer: []
+    post:
+      operationId: ReportsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - reports
+      security:
+        - bearer: []
+  /api/reports/{id}:
+    get:
+      operationId: ReportsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - reports
+      security:
+        - bearer: []
+  /api/ideas:
+    get:
+      operationId: IdeasController_findByCampaign
+      parameters:
+        - name: campaignId
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - ideas
+      security:
+        - bearer: []
+    post:
+      operationId: IdeasController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIdeaDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - ideas
+      security:
+        - bearer: []
+  /api/ideas/{id}:
+    get:
+      operationId: IdeasController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - ideas
+      security:
+        - bearer: []
+    patch:
+      operationId: IdeasController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIdeaDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - ideas
+      security:
+        - bearer: []
+    delete:
+      operationId: IdeasController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - ideas
+      security:
+        - bearer: []
+info:
+  title: core-service
+  description: Marcas, campañas, publicaciones, analítica e ideas de contenido
+  version: '1.0'
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    CreateCategoryDto:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+    UpdateCategoryDto:
+      type: object
+      properties:
+        name:
+          type: string
+    CreateSpecialtyDto:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+    UpdateSpecialtyDto:
+      type: object
+      properties:
+        name:
+          type: string
+    CreateSocialNetworkDto:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        baseEngagementRate:
+          type: number
+      required:
+        - name
+        - code
+        - baseEngagementRate
+    UpdateSocialNetworkDto:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        baseEngagementRate:
+          type: number
+    UpsertUserProfileDto:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+        roleNames:
+          type: array
+          items:
+            type: string
+            enum:
+              - cliente
+              - cm
+              - disenador
+        categoryIds:
+          type: array
+          items:
+            type: string
+        specialtyIds:
+          type: array
+          items:
+            type: string
+      required:
+        - userId
+        - name
+        - roleNames
+    CreateBrandDto:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        profileType:
+          type: string
+          enum:
+            - brand
+            - profile
+        logoUrl:
+          type: string
+        primaryColor:
+          type: string
+        allowedSocial:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+        - slug
+        - allowedSocial
+    UpdateBrandDto:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        profileType:
+          type: string
+          enum:
+            - brand
+            - profile
+        logoUrl:
+          type: string
+        primaryColor:
+          type: string
+    CreateCampaignDto:
+      type: object
+      properties:
+        brandId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        objective:
+          type: string
+        cmId:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        categoryIds:
+          type: array
+          items:
+            type: string
+      required:
+        - brandId
+        - name
+        - cmId
+    UpdateCampaignDto:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        objective:
+          type: string
+        cmId:
+          type: string
+        status:
+          type: string
+          enum:
+            - active
+            - paused
+            - finished
+        startDate:
+          type: string
+        endDate:
+          type: string
+    AssignDesignerDto:
+      type: object
+      properties:
+        userId:
+          type: string
+      required:
+        - userId
+    CreatePostDto:
+      type: object
+      properties:
+        brandId:
+          type: string
+        campaignId:
+          type: string
+        socialNetworkIds:
+          type: array
+          items:
+            type: string
+        content:
+          type: string
+        instructions:
+          type: string
+          nullable: true
+        scheduledAt:
+          type: string
+          nullable: true
+      required:
+        - brandId
+        - campaignId
+        - socialNetworkIds
+        - content
+    CreateReportDto:
+      type: object
+      properties:
+        brandId:
+          type: string
+        format:
+          type: string
+          enum:
+            - csv
+            - pdf
+      required:
+        - brandId
+        - format
+    CreateIdeaDto:
+      type: object
+      properties:
+        campaignId:
+          type: string
+        text:
+          type: string
+        title:
+          type: string
+        source:
+          type: string
+          enum:
+            - sugerida
+            - propia
+      required:
+        - campaignId
+        - text
+    UpdateIdeaDto:
+      type: object
+      properties:
+        text:
+          type: string
+        title:
+          type: string

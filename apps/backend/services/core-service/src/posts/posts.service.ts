@@ -6,7 +6,7 @@ import { PostStatus } from '../types/post-status.enum';
 import { CreatePostDto } from './dto/create-post.dto';
 import { validateTransition } from './state-machine/post-state-machine';
 
-type CurrentUser = { sub: string; role: string };
+type CurrentUser = { sub: string; roles: string[] };
 
 @Injectable()
 export class PostsService {
@@ -25,7 +25,7 @@ export class PostsService {
       throw new BadRequestException('La campaña indicada no es válida para esta marca');
     }
 
-    if (user.role !== 'administrador' && brand.ownerId !== user.sub && campaign.cmId !== user.sub) {
+    if (!user.roles.includes('administrador') && brand.ownerId !== user.sub && campaign.cmId !== user.sub) {
       throw new ForbiddenException('No tienes permiso para crear esta publicación');
     }
 
@@ -74,7 +74,7 @@ export class PostsService {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
 
-    if (user.role !== 'community_manager' || post.campaign.cmId !== user.sub) {
+    if (!user.roles.includes('community_manager') || post.campaign.cmId !== user.sub) {
       throw new ForbiddenException('No tienes permiso para enviar esta publicación a revisión');
     }
 
@@ -125,7 +125,7 @@ export class PostsService {
     }
 
     if (
-      user.role !== 'administrador' &&
+      !user.roles.includes('administrador') &&
       post.brand.ownerId !== user.sub &&
       post.campaign.cmId !== user.sub &&
       !post.campaign.designers.some((designer) => designer.userId === user.sub)

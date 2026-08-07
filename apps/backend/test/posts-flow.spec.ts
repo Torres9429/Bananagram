@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Test } from '@nestjs/testing';
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { CloudinaryService, UploadableFile } from '../services/core-service/src/cloudinary/cloudinary.service';
 import { PostsModule } from '../services/core-service/src/posts/posts.module';
 import { PostsService } from '../services/core-service/src/posts/posts.service';
@@ -22,9 +22,9 @@ describe('Posts Flow Integration', () => {
   let inactiveCampaignId: string;
   let socialNetworkIds: string[];
 
-  const ownerClaims = { sub: ownerUserId, role: 'cliente' };
-  const cmClaims = { sub: cmUserId, role: 'community_manager' };
-  const outsiderClaims = { sub: outsiderUserId, role: 'cliente' };
+  const ownerClaims = { sub: ownerUserId, roles: ['cliente'] };
+  const cmClaims = { sub: cmUserId, roles: ['community_manager'] };
+  const outsiderClaims = { sub: outsiderUserId, roles: ['cliente'] };
   const cloudinaryMock = {
     uploadFile: jest.fn(async (file: UploadableFile) => ({
       public_id: `bananagram/posts/${file.originalname}`,

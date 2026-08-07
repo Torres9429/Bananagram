@@ -5,7 +5,7 @@ import { CurrentUser } from '../decorators/current-user.decorator';
 import { ProfileService } from './profile.service';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 
-type Claims = { sub: string; role: string };
+type Claims = { sub: string; roles: string[] };
 
 @ApiTags('profile')
 @ApiBearerAuth()

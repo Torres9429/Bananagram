@@ -22,7 +22,7 @@ export class UserProfilesController {
     // explícitamente un array vacío. Si el campo viene undefined en una
     // actualización, se conserva lo que ya había (no es obligatorio
     // reenviar todo el perfil solo para cambiar, por ejemplo, avatarUrl).
-    const requiresProfileTaxonomies = dto.roleName !== 'cliente';
+    const requiresProfileTaxonomies = dto.roleNames.some((roleName) => roleName !== 'cliente');
     if (requiresProfileTaxonomies) {
       const categoriesEmpty =
         dto.categoryIds !== undefined ? dto.categoryIds.length === 0 : !existing || existing.categories.length === 0;
@@ -45,13 +45,13 @@ export class UserProfilesController {
         update: {
           name: dto.name,
           avatarUrl: dto.avatarUrl,
-          roleName: dto.roleName,
+          roleNames: dto.roleNames,
         },
         create: {
           userId: dto.userId,
           name: dto.name,
           avatarUrl: dto.avatarUrl,
-          roleName: dto.roleName,
+          roleNames: dto.roleNames,
         },
       });
 

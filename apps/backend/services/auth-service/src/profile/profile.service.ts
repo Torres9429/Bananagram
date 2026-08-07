@@ -11,7 +11,7 @@ const ROLE_NAME_TO_SHORT: Record<string, string> = {
   disenador: 'disenador',
 };
 
-type CurrentUser = { sub: string; role: string };
+type CurrentUser = { sub: string; roles: string[] };
 
 @Injectable()
 export class ProfileService {
@@ -19,11 +19,11 @@ export class ProfileService {
   // email+password+rol, sin nombre) queda fuera de las campañas hasta que
   // completa su propio perfil aquí — este endpoint es lo que hace que
   // aparezca en GET /campaigns/eligible-community-managers|eligible-designers (core-service
-  // filtra por UserProfile.roleName, que recién se guarda con esta llamada).
+  // filtra por UserProfile.roleNames, que recién se guarda con esta llamada).
   async completeProfile(user: CurrentUser, dto: CompleteProfileDto) {
-    const roleName = ROLE_NAME_TO_SHORT[user.role];
-    if (!roleName) {
-      throw new BadRequestException(`El rol '${user.role}' no tiene un perfil que completar`);
+    const roleNames = user.roles.map((r) => ROLE_NAME_TO_SHORT[r]).filter(Boolean);
+    if (roleNames.length === 0) {
+      throw new BadRequestException(`Ninguno de tus roles tiene un perfil que completar`);
     }
 
     const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
@@ -34,7 +34,7 @@ export class ProfileService {
         userId: user.sub,
         name: dto.name,
         avatarUrl: dto.avatarUrl,
-        roleName,
+        roleNames,
         categoryIds: dto.categoryIds,
         specialtyIds: dto.specialtyIds,
       }),

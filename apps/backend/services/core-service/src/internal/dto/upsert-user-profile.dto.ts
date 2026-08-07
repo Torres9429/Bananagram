@@ -5,10 +5,11 @@ export class UpsertUserProfileDto {
   @ApiProperty() @IsString() userId: string;
   @ApiProperty() @IsString() @MinLength(1) name: string;
   @ApiPropertyOptional() @IsOptional() @IsString() avatarUrl?: string;
-  @ApiProperty({ enum: ['cliente', 'cm', 'disenador'] })
-  @IsString()
-  @IsIn(['cliente', 'cm', 'disenador'])
-  roleName: string;
+  @ApiProperty({ enum: ['cliente', 'cm', 'disenador'], isArray: true })
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(['cliente', 'cm', 'disenador'], { each: true })
+  roleNames: string[];
 
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()

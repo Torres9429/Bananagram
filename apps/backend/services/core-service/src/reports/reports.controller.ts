@@ -7,7 +7,7 @@ import { CurrentUser } from '../decorators/current-user.decorator';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
 
-type Claims = { sub: string; role: string };
+type Claims = { sub: string; roles: string[] };
 
 @ApiTags('reports')
 @ApiBearerAuth()

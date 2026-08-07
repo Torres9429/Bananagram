@@ -3,7 +3,7 @@ import { prisma } from '../prisma/client';
 import { ReportFormat } from '../../node_modules/.prisma-client';
 import { CreateReportDto } from './dto/create-report.dto';
 
-type CurrentUser = { sub: string; role: string };
+type CurrentUser = { sub: string; roles: string[] };
 
 // Report no tiene deletedAt/campos editables en el schema (docs/base/modelo2.txt):
 // es un registro de solicitud, no una entidad mutable — por eso este service
@@ -11,7 +11,7 @@ type CurrentUser = { sub: string; role: string };
 @Injectable()
 export class ReportsService {
   async listReports(user: CurrentUser): Promise<any> {
-    if (user.role === 'administrador') {
+    if (user.roles.includes('administrador')) {
       return prisma.report.findMany({ orderBy: { createdAt: 'desc' } });
     }
     return prisma.report.findMany({
@@ -37,7 +37,7 @@ export class ReportsService {
     const brand = await prisma.brand.findFirst({ where: { id: dto.brandId, deletedAt: null } });
     if (!brand) throw new BadRequestException('brandId inválido');
 
-    if (user.role !== 'administrador' && brand.ownerId !== user.sub) {
+    if (!user.roles.includes('administrador') && brand.ownerId !== user.sub) {
       throw new ForbiddenException('Solo el dueño de la marca puede solicitar reportes de ella');
     }
 

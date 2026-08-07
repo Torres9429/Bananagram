@@ -58,7 +58,10 @@
 // ══════════════════════════════════════════════════════════════════════
 // SERVICE: auth-service (puerto 3001)
 // Dueño de: identidad, RBAC, Notification
-// Sin cambios respecto a la versión anterior de este archivo.
+// Actualizado 2026-08-05: multi-rol real (UserRole reemplaza User.roleId) +
+// RS256/JWKS + argon2 + denylist de access tokens en Redis (con
+// RevokedAccessToken como respaldo en Postgres). Ver ADR-0004 (supera a
+// ADR-0002, que documentaba HS256 sin Redis).
 // ══════════════════════════════════════════════════════════════════════
 
 generator client {
@@ -75,7 +78,7 @@ datasource db {
 model Role {
   id          String           @id @default(uuid())
   name        String           @unique
-  users       User[]
+  users       UserRole[]
   permissions RolePermission[]
 
   createdAt DateTime  @default(now())
@@ -83,6 +86,22 @@ model Role {
   deletedAt DateTime?
 
   @@map("roles")
+}
+
+// Multi-rol (2026-08-05): tabla puente que reemplaza el antiguo
+// User.roleId escalar — un usuario puede tener N roles a la vez (ej. un
+// usuario que opera como community_manager y disenador). Los permisos
+// efectivos de un usuario son la UNIÓN de los permisos de TODOS sus roles
+// (ver AuthRepository.getPermissions). No se puede dejar a un usuario con
+// 0 roles (AuthRepository.removeRoleFromUser lo bloquea).
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
 }
 
 model Module {
@@ -171,8 +190,7 @@ model User {
   id                  String    @id @default(uuid())
   email               String    @unique
   passwordHash        String
-  roleId              String
-  role                Role      @relation(fields: [roleId], references: [id])
+  roles               UserRole[]
   status              UserStatus @default(active)
 
   refreshTokens       RefreshToken[]
@@ -185,6 +203,18 @@ model User {
   deletedAt           DateTime?
 
   @@map("users")
+}
+
+// Respaldo en Postgres de la denylist de access tokens revocados por
+// logout (2026-08-05) — el hot path de cada request autenticado consulta
+// Redis (O(1)); esta tabla es el fallback si Redis está caído, y registro
+// para auditar revocaciones. Ver TokenDenylistService.
+model RevokedAccessToken {
+  jti       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("revoked_access_tokens")
 }
 
 model PasswordResetToken {
@@ -275,13 +305,15 @@ model UserProfile {
   name          String
   avatarUrl     String?
 
-  // Denormalizado desde auth-service.User.role al registrar/completar perfil
-  // (POST /internal/user-profiles) — 'cliente'|'cm'|'disenador'. Sin esto,
-  // core-service no tiene forma de saber el rol de un usuario para validar
-  // que un cmId/designerId de Campaign corresponda a un CM/Diseñador real
-  // (ver CampaignsService.assertUserHasRole). Nullable: sigue siendo
-  // best-effort, como el resto del perfil.
-  roleName      String?
+  // Denormalizado desde auth-service.User.roles (multi-rol, 2026-08-05) al
+  // registrar/completar perfil (POST /internal/user-profiles) — valores de
+  // 'cliente'|'cm'|'disenador'. Sin esto, core-service no tiene forma de
+  // saber los roles de un usuario para validar que un cmId/designerId de
+  // Campaign corresponda a un CM/Diseñador real (ver
+  // CampaignsService.assertUserHasRole). Array (antes un solo String?)
+  // porque un usuario puede tener varios roles a la vez — @default([]) en
+  // vez de null, sigue siendo best-effort como el resto del perfil.
+  roleNames     String[] @default([])
 
   categories    UserProfileCategory[]
   specialties   UserProfileSpecialty[]
@@ -454,11 +486,12 @@ model Campaign {
   // 2026-08-01: la lista de candidatos elegibles (CM/Diseñador) NO se
   // resuelve con una llamada HTTP a auth-service en tiempo de lectura, como
   // se planeaba aquí originalmente — se resuelve 100% local filtrando
-  // UserProfile.roleName (denormalizado, ver modelo de UserProfile arriba),
-  // vía GET /campaigns/eligible-community-managers y
-  // /campaigns/eligible-designers. El único costo de esta decisión es que
-  // roleName puede quedar desactualizado si el rol de un usuario cambia
-  // en auth-service después de su registro (nada lo re-sincroniza hoy).
+  // UserProfile.roleNames (array, denormalizado, ver modelo de UserProfile
+  // arriba) con `{ has: roleName }`, vía GET
+  // /campaigns/eligible-community-managers y /campaigns/eligible-designers.
+  // El único costo de esta decisión es que roleNames puede quedar
+  // desactualizado si los roles de un usuario cambian en auth-service
+  // después de su registro (nada lo re-sincroniza hoy).
   cmId String
 
   designers  CampaignDesigner[]

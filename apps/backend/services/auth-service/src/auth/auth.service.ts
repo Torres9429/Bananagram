@@ -1,11 +1,12 @@
-import { Injectable, Logger, UnauthorizedException, ForbiddenException, ConflictException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { TokenSignerService } from './token-signer.service';
+import { TokenDenylistService } from './token-denylist.service';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
 import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
-import * as bcrypt from 'bcrypt';
+import * as argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
 
 const REGISTER_ROLE_MAP = {
@@ -14,13 +15,20 @@ const REGISTER_ROLE_MAP = {
   disenador: 'disenador',
 } as const;
 
+type UserWithRoles = {
+  id: string;
+  email: string;
+  roles: { role: { id: string; name: string } }[];
+};
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
     private readonly repo: AuthRepository,
-    private readonly jwtService: JwtService,
+    private readonly tokens: TokenSignerService,
+    private readonly denylist: TokenDenylistService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -32,8 +40,10 @@ export class AuthService {
       throw new UnauthorizedException(`Rol '${REGISTER_ROLE_MAP[dto.roleName]}' no existe — corre el seed`);
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-    const user = await this.repo.createUser(dto.email, passwordHash, role.id);
+    const passwordHash = await argon2.hash(dto.password);
+    // El auto-registro público siempre nace con un solo rol — roles
+    // adicionales se agregan después vía POST /admin/users/:id/roles.
+    const user = await this.repo.createUser(dto.email, passwordHash, [role.id]);
 
     // Best-effort: el nombre para mostrar vive en UserProfile, en la BD de
     // core-service (servicios separados, sin @relation real — ver
@@ -49,11 +59,15 @@ export class AuthService {
     dto: { name: string; avatarUrl?: string; roleName: string; categoryIds?: string[]; specialtyIds?: string[] },
   ) {
     const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
+    const { roleName, ...rest } = dto;
     try {
       const response = await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, ...dto }),
+        // roleNames en plural: core-service ya soporta multi-rol vía
+        // UserProfile.roleNames (String[]) — el registro público solo manda
+        // el único rol con el que nace el usuario.
+        body: JSON.stringify({ userId, roleNames: [roleName], ...rest }),
       });
 
       if (!response.ok) {
@@ -76,7 +90,7 @@ export class AuthService {
     const user = await this.repo.findByEmail(dto.email);
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) throw new UnauthorizedException('Credenciales inválidas');
 
     return this.issueTokens(user);
@@ -106,36 +120,39 @@ export class AuthService {
   // No hay verificación de contraseña aquí porque para cuando se llega a
   // este punto ya se validó identidad (password correcto en login/register,
   // o refresh token válido/sin usar en refresh).
-  private async issueTokens(
-    user: { id: string; email: string; roleId: string; role: { name: string } },
-    existingRefreshToken?: { token: string },
-  ) {
-    const permissions = await this.repo.getPermissions(user.roleId);
+  private async issueTokens(user: UserWithRoles, existingRefreshToken?: { token: string }) {
+    const roleIds = user.roles.map((r) => r.role.id);
+    const roleNames = user.roles.map((r) => r.role.name);
+    const permissions = await this.repo.getPermissions(roleIds);
 
-    const payload = {
+    const { accessToken } = await this.tokens.signAccess({
       sub: user.id,
       email: user.email,
-      role: user.role.name,
+      roles: roleNames,
       // Bajo el modelo separado (docs/base/modelo2.txt) Brand/Campaign viven
       // en la base de core-service — auth-service ya no puede resolver
       // brandIds con un join local, y ya NO se intenta: queda siempre vacío
-      // a propósito. Decisión tomada: BrandAccessGuard vive y se aplica
-      // dentro de core-service (apps/backend/services/core-service/src/guards/
-      // brand-access.guard.ts) y valida acceso con una consulta LOCAL contra
-      // su propia BD usando el userId del JWT (payload.sub) — sin llamada
-      // HTTP, sin depender de este arreglo. Este campo se deja en el payload
-      // solo por compatibilidad con JwtPayload; nada lo lee.
-      brandIds: [] as string[],
+      // a propósito. BrandAccessGuard vive y se aplica dentro de
+      // core-service y valida acceso con una consulta LOCAL contra su
+      // propia BD usando el userId del JWT (payload.sub) — sin llamada
+      // HTTP, sin depender de este arreglo. Se deja solo por compatibilidad
+      // con JwtPayload; nada lo lee.
+      brandIds: [],
       permissions,
-    };
-
-    const accessToken = this.jwtService.sign(payload);
+    });
     const refreshToken = existingRefreshToken ?? (await this.repo.createRefreshToken(user.id));
 
     return { accessToken, refreshToken };
   }
 
-  async logout(userId: string) {
+  // jti/exp vienen del propio JWT ya verificado por JwtAuthGuard (el logout
+  // de Bananagram se queda protegido, a diferencia de ControlAcceso donde es
+  // público) — no hace falta re-verificar el token crudo aquí, el guard ya
+  // lo hizo antes de llegar a este punto.
+  async logout(userId: string, jti?: string, exp?: number) {
+    if (jti && exp) {
+      await this.denylist.revoke(jti, new Date(exp * 1000));
+    }
     await this.repo.revokeAllTokens(userId);
     return { message: 'Sesión cerrada' };
   }
@@ -157,7 +174,7 @@ export class AuthService {
     const stored = await this.repo.findValidPasswordResetToken(dto.token);
     if (!stored) throw new UnauthorizedException('Token inválido o expirado');
 
-    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    const passwordHash = await argon2.hash(dto.newPassword);
     await this.repo.consumePasswordResetToken(stored.id, stored.userId, passwordHash);
     return { reset: true };
   }
