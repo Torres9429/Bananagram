@@ -9,20 +9,20 @@ import Chip from '@mui/material/Chip';
 import { PrimaryButton } from '@repo/ui/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { CreateCampaignDialog } from '../../../../components/CreateCampaignDialog';
-import {
-  MOCK_PROFILES,
-  MOCK_CAMPAIGNS,
-  CAMPAIGN_STATUS_LABEL,
-  assignTeamToCampaign,
-} from '../../../../lib/mock-data';
-import type { MockCampaign } from '../../../../interfaces/interface';
+import { useListCampaignsQuery } from '../../../../store/api/campaigns.api';
+import { useGetBrandQuery } from '../../../../store/api/brands.api';
+import { CAMPAIGN_STATUS_LABEL } from '../../../../lib/mock-data';
 
 export default function CampaignsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
-  const [campaigns, setCampaigns] = useState<MockCampaign[]>(MOCK_CAMPAIGNS.filter((c) => c.brandId === brand.id));
+  const { data: brand } = useGetBrandQuery(params.id);
+  // El backend no filtra por brandId en la URL — se filtra client-side.
+  const { data: allCampaigns = [] } = useListCampaignsQuery();
+  const campaigns = allCampaigns.filter((c) => c.brandId === params.id);
   const [createOpen, setCreateOpen] = useState(false);
+
+  if (!brand) return null;
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
@@ -48,7 +48,7 @@ export default function CampaignsPage() {
               >
                 <Box>
                   <Typography variant="body1" fontWeight={600}>{c.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{c.startDate} – {c.endDate} · {c.postsCount} publicaciones</Typography>
+                  <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
                 </Box>
                 <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
               </Stack>
@@ -57,16 +57,7 @@ export default function CampaignsPage() {
         </Stack>
       </Box>
 
-      <CreateCampaignDialog
-        open={createOpen}
-        brandId={brand.id}
-        brandCategory={brand.categoryId}
-        onClose={() => setCreateOpen(false)}
-        onCreate={(campaign, team) => {
-          assignTeamToCampaign(campaign.id, team);
-          setCampaigns((prev) => [campaign, ...prev]);
-        }}
-      />
+      <CreateCampaignDialog open={createOpen} brandId={brand.id} onClose={() => setCreateOpen(false)} />
     </Box>
   );
 }
