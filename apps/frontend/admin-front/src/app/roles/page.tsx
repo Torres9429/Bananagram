@@ -21,7 +21,9 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
+import { useSelector } from 'react-redux';
 import { EmptyState, ConfirmDialog, WidgetCard, usePermissions, PrimaryButton } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
 import { AdminTabs } from '../../components/AdminTabs';
 import { MODULES, ACTIONS, type PrivilegeMap, type Module, type Action } from '../../interfaces/interface';
 import { ROLE_LABELS, ROLE_ORDER, DEFAULT_PRIVILEGES, ACTION_LABELS, MODULE_ACTIONS, MODULE_META } from '../../lib/mock-data';
@@ -41,6 +43,7 @@ function countModulesFullAccess(privs: PrivilegeMap): number {
 
 export default function RolesPage() {
   const { can } = usePermissions();
+  const user = useSelector(selectUser);
   const [privileges, setPrivileges] = useState<Record<string, PrivilegeMap>>(() =>
     JSON.parse(JSON.stringify(DEFAULT_PRIVILEGES)),
   );
@@ -48,7 +51,12 @@ export default function RolesPage() {
   const [saved, setSaved] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
-  if (!can('users', 'manage')) {
+  // Mientras la sesión aún no hidrata desde la cookie, `can()` siempre da
+  // false (permissions arranca en {}) — sin este guard se veía un flash de
+  // "No tienes permisos" aunque sí los tuviera. Mismo patrón que profile/page.tsx.
+  if (!user) return null;
+
+  if (!can('usuarios', 'ver')) {
     return (
       <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
         <AdminTabs />

@@ -194,7 +194,7 @@ export default function PostDetailPage() {
             )}
 
             <Stack direction="row" gap={1.5} mt={3} flexWrap="wrap">
-              <ProtectedAction module="post" action="create">
+              <ProtectedAction module="publicaciones" action="crear">
                 <Button
                   variant="outlined"
                   sx={{ borderColor: '#E8E8E8', color: '#6B6B6B' }}
@@ -203,22 +203,22 @@ export default function PostDetailPage() {
                   Editar
                 </Button>
               </ProtectedAction>
-              <ProtectedAction module="post" action="create">
+              <ProtectedAction module="publicaciones" action="crear">
                 <PrimaryButton onClick={() => router.push('/posts/new')}>
                   Enviar a revisión →
                 </PrimaryButton>
               </ProtectedAction>
-              <ProtectedAction module="post" action="schedule">
+              <ProtectedAction module="publicaciones" action="editar">
                 <Button variant="contained" sx={{ bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}>
                   Programar
                 </Button>
               </ProtectedAction>
-              <ProtectedAction module="post" action="reject">
+              <ProtectedAction module="publicaciones" action="rechazar">
                 <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
                   Rechazar
                 </Button>
               </ProtectedAction>
-              <ProtectedAction module="post" action="approve">
+              <ProtectedAction module="publicaciones" action="aprobar">
                 <Button variant="contained" onClick={handleApprove} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
                   Aprobar
                 </Button>

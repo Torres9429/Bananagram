@@ -51,7 +51,7 @@ export default function UsersPage() {
       header: '',
       align: 'right',
       render: () => (
-        <ProtectedAction module="users" action="manage">
+        <ProtectedAction module="usuarios" action="ver">
           <Tooltip title="Editar">
             <IconButton size="small" onClick={(e) => e.stopPropagation()} sx={{ color: 'secondary.main' }}>
               <EditOutlinedIcon fontSize="small" />
@@ -68,7 +68,7 @@ export default function UsersPage() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Usuarios</Typography>
-          <ProtectedAction module="users" action="manage">
+          <ProtectedAction module="usuarios" action="ver">
             <PrimaryButton onClick={() => setCreateOpen(true)}>
               + Nuevo usuario
             </PrimaryButton>

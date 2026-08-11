@@ -86,7 +86,7 @@ export default function CampaignTeamPage() {
               {totalMembers} {totalMembers === 1 ? 'integrante' : 'integrantes'} · {brand.name}
             </Typography>
           </Box>
-          <ProtectedAction module="post" action="schedule">
+          <ProtectedAction module="publicaciones" action="editar">
             <PrimaryButton
               startIcon={<PersonAddOutlinedIcon />}
               onClick={() => setAddOpen(true)}
@@ -146,7 +146,7 @@ export default function CampaignTeamPage() {
                       <Typography variant="body2" fontWeight={700}>{member.name}</Typography>
                       <Typography variant="caption" color="text.secondary">{member.role}</Typography>
                     </Box>
-                    <ProtectedAction module="post" action="schedule">
+                    <ProtectedAction module="publicaciones" action="editar">
                       <Tooltip title="Quitar de la campaña">
                         <IconButton
                           size="small"

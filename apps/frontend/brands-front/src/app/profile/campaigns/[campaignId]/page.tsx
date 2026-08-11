@@ -50,7 +50,9 @@ export default function ProfileCampaignDetailPage() {
   const { can } = usePermissions();
   const params = useParams<{ campaignId: string }>();
   const user = useSelector(selectUser);
-  const role = user?.role ?? '';
+  // Mismo supuesto de un solo rol activo que ProfilePage — fuera de alcance
+  // de esta fase, solo se ajusta el tipo.
+  const role = user?.roles?.[0] ?? '';
   const isClient = role === 'cliente';
   const isDesigner = role === 'disenador';
   const backHref = isClient ? '/profile' : '/my-campaigns';
@@ -107,7 +109,7 @@ export default function ProfileCampaignDetailPage() {
               Ver equipo
             </Button>
           )}
-          {can('post', 'approve') && (
+          {can('publicaciones', 'aprobar') && (
             <Button
               variant="outlined"
               startIcon={<RateReviewOutlinedIcon />}
@@ -117,7 +119,7 @@ export default function ProfileCampaignDetailPage() {
               Ver aprobaciones
             </Button>
           )}
-          {can('post', 'create') && (
+          {can('publicaciones', 'crear') && (
             <PrimaryButton
               startIcon={<AddCircleOutlineIcon />}
               onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/new`; }}
