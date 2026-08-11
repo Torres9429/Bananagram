@@ -1,44 +1,14 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { AuthUser, AuthState, JwtPayload } from '../types/auth.types';
+import { decodeJwt, encodeMockJwt } from './jwt';
 
 export type { AuthUser, AuthState, JwtPayload };
+// Re-exportados para no romper a los consumidores existentes de
+// @repo/ui/state — la implementación real vive en ./jwt (ver ese archivo
+// para por qué está separado: lo importa también el Edge Middleware).
+export { decodeJwt, encodeMockJwt };
 
 type AuthRootState = { auth: AuthState };
-
-// Codifica un payload en base64 seguro para JWT, preservando caracteres no
-// ASCII (nombres con tildes: "Ana García", "Roberto Fernández", "Laura
-// Méndez") — btoa() por sí solo trata el string como Latin-1 y no coincide
-// con el esquema de bytes UTF-8 que decodeJwt() espera al decodificar, lo
-// que hacía fallar el login silenciosamente (decodeJwt devolvía null) para
-// cualquier usuario con un carácter acentuado en el payload. TextEncoder da
-// los bytes UTF-8 reales; btoa() solo empaqueta esos bytes en base64.
-function toBinaryString(str: string): string {
-  const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return binary;
-}
-
-export function encodeMockJwt(payload: object): string {
-  const header = btoa(toBinaryString(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
-  const body = btoa(toBinaryString(JSON.stringify(payload)));
-  return `${header}.${body}.mock-signature`;
-}
-
-export function decodeJwt(token: string): JwtPayload | null {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const json = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
-        .join(''),
-    );
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
 
 const initialState: AuthState = {
   user: null,
@@ -59,14 +29,18 @@ const authSlice = createSlice({
         state.user = {
           id: payload.sub,
           email: payload.email,
-          name: payload.name,
-          role: payload.role,
-          status: payload.status,
+          // El JWT real no trae name/status (viven en UserProfile, otro
+          // servicio) — cae a email/'active' en vez de dejarlos undefined.
+          name: payload.name ?? payload.email,
+          roles: payload.roles ?? [],
+          status: payload.status ?? 'active',
           avatarUrl: payload.avatarUrl ?? null,
         };
         state.permissions = payload.permissions ?? {};
         // Solo tiene sentido para Cliente — ver AuthState.ownedBrandIds.
-        state.ownedBrandIds = payload.ownedBrandIds ?? [];
+        // brandIds es el nombre real del backend (siempre [] hoy, ver
+        // ADR-0004); ownedBrandIds es el nombre que usa el JWT mock.
+        state.ownedBrandIds = payload.brandIds ?? payload.ownedBrandIds ?? [];
         state.isAuthenticated = true;
       }
     },

@@ -9,42 +9,49 @@ import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import { LabeledField } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
-import { setCredentials, setCookieToken } from '@repo/ui/state';
+import { setCredentials, setCookieToken, setRefreshCookieToken, useLoginMutation, decodeJwt } from '@repo/ui/state';
 import { theme } from '@repo/ui/theme';
 import { getPostAuthDestination } from '@repo/ui/utils';
-import { findUserByCredentials, buildTokenFromUser } from '@repo/ui';
 
 export function LoginForm() {
   const dispatch = useDispatch();
+  const [login, { isLoading }] = useLoginMutation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
 
   useEffect(() => {
     console.info(
-      '%cCuentas de prueba (solo desarrollo)',
+      '%cCuentas de prueba (seed real, apps/backend)',
       `font-weight:bold; color:${theme.palette.primary.contrastTextMuted}`,
       '\n  admin@bananagram.mx / admin123',
       '\n  cm@bananagram.mx / cm123456',
       '\n  disenador@bananagram.mx / diseno123',
       '\n  cliente@bananagram.mx / cliente123',
       '\n  alex@bananagram.mx / alex12345 (Cliente, perfil personal)',
+      '\n  multi@bananagram.mx / multi12345 (CM + Diseñador, multi-rol)',
     );
   }, []);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const user = findUserByCredentials(email, password);
-    if (!user) {
-      setError(true);
-      return;
-    }
     setError(false);
-    const token = buildTokenFromUser(user);
-    // La cookie es accesible desde todos los microfronts (mismo host, distintos puertos).
-    setCookieToken(token);
-    dispatch(setCredentials({ accessToken: token }));
-    window.location.href = getPostAuthDestination(user.role);
+    try {
+      const { accessToken, refreshToken } = await login({ email, password }).unwrap();
+      // La cookie es accesible desde todos los microfronts (mismo host,
+      // distintos puertos) — es solo el contenedor de storage cross-zona del
+      // token real, no una cookie de sesión que el navegador adjunte solo
+      // (cada request manda el Bearer explícito, ver auth.api.ts).
+      setCookieToken(accessToken);
+      // Necesario para el refresh automático cuando el access token expira
+      // (15 min) — ver authenticated-base-query.ts.
+      setRefreshCookieToken(refreshToken.token);
+      dispatch(setCredentials({ accessToken }));
+      const payload = decodeJwt(accessToken);
+      window.location.href = getPostAuthDestination(payload?.roles ?? []);
+    } catch {
+      setError(true);
+    }
   }
 
   return (
@@ -76,6 +83,7 @@ export function LoginForm() {
         type="submit"
         fullWidth
         size="large"
+        disabled={isLoading}
         sx={{
           mt: 1, mb: 2, py: 1.25,
           color: '#fff', fontWeight: 700,
@@ -83,7 +91,7 @@ export function LoginForm() {
           '&:hover': { background: '#D4AC40' },
         }}
       >
-        Ingresar
+        {isLoading ? 'Ingresando…' : 'Ingresar'}
       </Button>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>

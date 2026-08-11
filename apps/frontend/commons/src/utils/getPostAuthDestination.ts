@@ -7,15 +7,12 @@ import { ZONE_URLS } from '../config/zone-urls';
  * corresponde (ej. /dashboard siendo Cliente/CM/Diseñador).
  * Solo Administrador tiene Dashboard — el resto va a su vista de negocio.
  */
-export function getPostAuthDestination(role: string): string {
-  switch (role) {
-    case AppRole.ADMINISTRADOR:
-      return `${ZONE_URLS.webShell}/dashboard`;
-    case AppRole.CLIENTE:
-      return `${ZONE_URLS.brandsFront}/profile`;
-    case AppRole.COMMUNITY_MANAGER:
-    case AppRole.DISENADOR:
-    default:
-      return `${ZONE_URLS.brandsFront}/my-campaigns`;
-  }
+// Acepta un solo rol (MockUser.role) o varios (AuthUser.roles, multi-rol
+// real) — un usuario con varios roles va al destino del más "alto" en esta
+// prioridad (Administrador > Cliente > CM/Diseñador).
+export function getPostAuthDestination(role: string | string[]): string {
+  const roles = Array.isArray(role) ? role : [role];
+  if (roles.includes(AppRole.ADMINISTRADOR)) return `${ZONE_URLS.webShell}/dashboard`;
+  if (roles.includes(AppRole.CLIENTE)) return `${ZONE_URLS.brandsFront}/profile`;
+  return `${ZONE_URLS.brandsFront}/my-campaigns`;
 }

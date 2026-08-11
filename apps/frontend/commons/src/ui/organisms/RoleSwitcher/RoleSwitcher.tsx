@@ -22,7 +22,7 @@ export function RoleSwitcher() {
   const theme = useTheme();
   const dispatch = useDispatch();
   const user = useSelector(selectUser);
-  const activeRole = user ? ROLE_KEY_BY_JWT_ROLE[user.role] : undefined;
+  const activeRole = user?.roles?.map((r) => ROLE_KEY_BY_JWT_ROLE[r]).find(Boolean);
 
   // Estos colores se interpolan en CSS plano (border/bgcolor por rol), así
   // que se leen del theme directamente en vez de usar rutas de paleta en sx.
