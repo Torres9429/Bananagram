@@ -55,6 +55,9 @@ export function AnalyticsFilterBar() {
   return (
     <Box mb={3}>
       <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
+        {/* Desde/Hasta ya están duplicados dentro de AnalyticsFilterDrawer —
+            en mobile se ocultan aquí para no competir por espacio con el
+            botón de Filtros (se agrupan ahí en vez de "envolver" sueltos). */}
         <TextField
           type="date"
           size="small"
@@ -62,7 +65,7 @@ export function AnalyticsFilterBar() {
           value={dateRange?.start ?? ''}
           onChange={(e) => setStart(e.target.value)}
           InputLabelProps={{ shrink: true }}
-          sx={{ width: 150 }}
+          sx={{ width: 150, display: { xs: 'none', sm: 'flex' } }}
         />
         <TextField
           type="date"
@@ -71,7 +74,7 @@ export function AnalyticsFilterBar() {
           value={dateRange?.end ?? ''}
           onChange={(e) => setEnd(e.target.value)}
           InputLabelProps={{ shrink: true }}
-          sx={{ width: 150 }}
+          sx={{ width: 150, display: { xs: 'none', sm: 'flex' } }}
         />
 
         <Box sx={{ flex: 1 }} />

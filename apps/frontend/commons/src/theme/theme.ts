@@ -71,9 +71,6 @@ export const theme = createTheme({
         }),
       },
     },
-    MuiDialogActions: {
-      styleOverrides: { root: { padding: '16px 24px' } },
-    },
     MuiOutlinedInput: {
       styleOverrides: {
         root: ({ theme }) => ({
@@ -128,6 +125,31 @@ export const theme = createTheme({
     },
     MuiChip: {
       styleOverrides: { root: { fontWeight: 600 } },
+    },
+    // Stack direction="row" no hace wrap por defecto (CSS flexWrap: nowrap) —
+    // se usa en ~150 lugares de las 6 apps para filas de botones/campos/chips
+    // que, sin esto, se salen de la pantalla en mobile en vez de acomodarse
+    // en más de una línea. Wrap es un default seguro: las filas que ya caben
+    // en una línea no cambian en nada.
+    MuiStack: {
+      styleOverrides: {
+        root: { flexWrap: 'wrap' },
+      },
+    },
+    // Mismo criterio para los botones de acción de los diálogos (Aprobar/
+    // Rechazar/Cancelar, etc.) — sin esto, 3+ botones se salen del diálogo
+    // en mobile en vez de pasar a una segunda línea.
+    MuiDialogActions: {
+      styleOverrides: {
+        root: { padding: '16px 24px', flexWrap: 'wrap', rowGap: 8 },
+      },
+    },
+    // Mismo criterio: grupos de botones tipo "pill" (selector de rol, de
+    // métrica a comparar, etc.) no envuelven por defecto.
+    MuiToggleButtonGroup: {
+      styleOverrides: {
+        root: { flexWrap: 'wrap' },
+      },
     },
   },
 });

@@ -27,16 +27,16 @@ export function AudienceOverview() {
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Audiencia</Typography>
 
       <Grid container spacing={2} mb={3}>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <MetricCard icon={<GroupsOutlinedIcon />} label="Crecimiento (seguidores)" value={data.followersGained} />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <MetricCard icon={<FavoriteBorderOutlinedIcon />} label="Interacciones" value={data.totalInteractions} />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <MetricCard icon={<EventRepeatOutlinedIcon />} label="Frecuencia" value={data.postsPerWeek} unit=" posts/sem" />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={12} sm={6} md={3}>
           <MetricCard
             icon={<VisibilityOutlinedIcon />}
             label="Retención promedio"

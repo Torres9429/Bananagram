@@ -8,6 +8,8 @@ import DialogActions from '@mui/material/DialogActions';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import CloseIcon from '@mui/icons-material/Close';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 interface Props {
   open: boolean;
@@ -32,8 +34,13 @@ export function FormDialog({
   onConfirm,
   children,
 }: Props) {
+  const theme = useTheme();
+  // Mobile: los diálogos van a pantalla completa en vez de quedar como una
+  // caja angosta con márgenes fijos de 32px por lado (patrón estándar de
+  // MUI, ver sus docs de "Full-screen dialogs").
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
   return (
-    <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth fullScreen={fullScreen}>
       <DialogTitle
 
         sx={(theme) => ({

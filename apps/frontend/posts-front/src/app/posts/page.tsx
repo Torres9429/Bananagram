@@ -11,8 +11,12 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
+import Collapse from '@mui/material/Collapse';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { DataTable, type DataTableColumn, StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
 import { MOCK_POSTS, MOCK_CAMPAIGNS, getPostNetworkInfo } from '../../lib/mock-data';
 import type { MockPost, PostStatus } from '../../interfaces/interface';
@@ -58,6 +62,8 @@ function PostsListContent() {
   // auth-front/ActivateForm para leer un param una sola vez al montar.
   // Después de eso vive solo en estado local; limpiar el filtro no navega.
   const [campaignFilter, setCampaignFilter] = useState<string | null>(() => searchParams.get('campaign'));
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const hasActiveFilters = filter !== 'all' || !!campaignFilter;
 
   const campaignName = campaignFilter
     ? MOCK_POSTS.find((p) => p.campaign?.id === campaignFilter)?.campaign?.name ?? campaignFilter
@@ -157,7 +163,7 @@ function PostsListContent() {
       render: (post) => (
         <Stack direction="row" justifyContent="flex-end">
           {(post.status === 'aprobado' || post.status === 'programado') && (
-            <ProtectedAction module="post" action="publish">
+            <ProtectedAction module="publicaciones" action="editar">
               <Tooltip title="Publicar">
                 <IconButton
                   size="small"
@@ -203,42 +209,72 @@ function PostsListContent() {
           />
         </Stack>
       )}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center">
-          {/* Select de Campaña, siempre visible — no solo cuando llega
-              preseleccionada desde el detalle de campaña. */}
-          <Select
-            size="small"
-            displayEmpty
-            value={campaignFilter ?? ''}
-            onChange={(e) => handleCampaignSelectChange(e.target.value)}
-            sx={{ minWidth: 180, bgcolor: '#fff', borderRadius: 1 }}
-          >
-            <MenuItem value="">Todas las campañas</MenuItem>
-            {campaignOptions.map((c) => (
-              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-            ))}
-          </Select>
-          {/* Select de Estado — antes una fila de 11 chips (Todos + los 10
-              PostStatus), reemplazado por un dropdown por consistencia visual
-              con el select de Campaña de al lado. */}
-          <Select
-            size="small"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as 'all' | PostStatus)}
-            sx={{ minWidth: 180, bgcolor: '#fff', borderRadius: 1 }}
-          >
-            {FILTERS.map((f) => (
-              <MenuItem key={f.key} value={f.key}>{f.label}</MenuItem>
-            ))}
-          </Select>
-        </Stack>
-        <ProtectedAction module="post" action="create">
+      <Stack direction="row" justifyContent="flex-end" mb={2}>
+        <ProtectedAction module="publicaciones" action="crear">
           <PrimaryButton onClick={() => router.push('/posts/new')}>
             + Nueva publicación
           </PrimaryButton>
         </ProtectedAction>
       </Stack>
+
+      {/* Filtros — contraíble, mismo patrón que profile/calendar/page.tsx. */}
+      <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1}
+          mb={filtersOpen ? 2 : 0}
+          onClick={() => setFiltersOpen((v) => !v)}
+          sx={{ cursor: 'pointer' }}
+        >
+          <Stack direction="row" alignItems="center" gap={1}>
+            <FilterAltOutlinedIcon fontSize="small" sx={{ color: 'secondary.main' }} />
+            <Typography variant="subtitle2" fontWeight={700}>Filtros</Typography>
+            {hasActiveFilters && !filtersOpen && (
+              <Chip size="small" label="Activos" sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600, height: 20, fontSize: 11 }} />
+            )}
+          </Stack>
+          <IconButton
+            size="small"
+            aria-label={filtersOpen ? 'Contraer filtros' : 'Expandir filtros'}
+            sx={{ transform: filtersOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}
+          >
+            <ExpandMoreIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+        <Collapse in={filtersOpen}>
+          <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center">
+            {/* Select de Campaña, siempre visible — no solo cuando llega
+                preseleccionada desde el detalle de campaña. */}
+            <Select
+              size="small"
+              displayEmpty
+              value={campaignFilter ?? ''}
+              onChange={(e) => handleCampaignSelectChange(e.target.value)}
+              sx={{ minWidth: 180, bgcolor: '#fff', borderRadius: 1 }}
+            >
+              <MenuItem value="">Todas las campañas</MenuItem>
+              {campaignOptions.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </Select>
+            {/* Select de Estado — antes una fila de 11 chips (Todos + los 10
+                PostStatus), reemplazado por un dropdown por consistencia visual
+                con el select de Campaña de al lado. */}
+            <Select
+              size="small"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as 'all' | PostStatus)}
+              sx={{ minWidth: 180, bgcolor: '#fff', borderRadius: 1 }}
+            >
+              {FILTERS.map((f) => (
+                <MenuItem key={f.key} value={f.key}>{f.label}</MenuItem>
+              ))}
+            </Select>
+          </Stack>
+        </Collapse>
+      </Paper>
 
       {rejectedCount > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>

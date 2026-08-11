@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableHead from '@mui/material/TableHead';
@@ -62,6 +63,11 @@ export function DataTable<T>({
 
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden' }}>
+      {/* overflowX en su propio contenedor, no en la página: en pantallas
+          angostas la tabla se desliza horizontalmente adentro de esta caja
+          en vez de romper el layout o forzar scroll horizontal en toda la
+          pantalla (el patrón responsive estándar para tablas). */}
+      <Box sx={{ overflowX: 'auto' }}>
       <Table>
         <TableHead>
           <TableRow>
@@ -114,6 +120,7 @@ export function DataTable<T>({
           )}
         </TableBody>
       </Table>
+      </Box>
       {pagination && rows.length > 0 && (
         <TablePagination
           component="div"

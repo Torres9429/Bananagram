@@ -12,6 +12,8 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import CloseIcon from '@mui/icons-material/Close';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { StatusChip } from '../../atoms/StatusChip/StatusChip';
 import type { PostStatus } from '../../../types/post.types';
 
@@ -59,9 +61,11 @@ export function PostPreviewDialog({
   ];
 
   const hasActions = !!(onViewFull || onApprove || onReject);
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle
         sx={(theme) => ({
           position: 'relative',
