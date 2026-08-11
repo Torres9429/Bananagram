@@ -5,11 +5,15 @@
 ## Contexto
 
 La skill de Alexa se construye por fuera (equipo externo, Lambda ya en desarrollo contra un contrato
-propio: `fetchUserByLinkCode`, `fetchCampaigns`, `fetchCampaignByName`, `fetchContentIdeas`, con las ideas
-dictadas por voz guardándose en la DynamoDB propia del Lambda). Lo único que corresponde a este plan es
-construir, del lado de Bananagram, los endpoints con los que ese Lambda se conecta — y, en paralelo,
-resolver que las métricas de campaña vengan de Ayrshare de verdad, no del simulador (`decay-simulator.ts`),
-porque Ayrshare se integró específicamente para eso.
+propio: `fetchUserByLinkCode`, `fetchCampaigns`, `fetchCampaignByName`, `fetchContentIdeas`). La skill
+**solo consume cosas de nuestro backend** — no tiene persistencia propia relevante para esto: las ideas de
+contenido únicamente se generan por voz (no hay forma de generarlas desde la plataforma web), así que
+deben guardarse en nuestro Postgres (`ContentIdea`) para que la app web pueda mostrarlas y borrarlas
+después — pero la lógica de esa persistencia vive enteramente en `alexa-service`, no en `core-service`
+(ver decisión 6 más abajo: `core-service` solo aporta la base de datos física, ningún código). Lo único
+que corresponde a este plan es construir, del lado de Bananagram, los endpoints con los que ese Lambda se
+conecta — y, en paralelo, resolver que las métricas de campaña vengan de Ayrshare de verdad, no del
+simulador (`decay-simulator.ts`), porque Ayrshare se integró específicamente para eso.
 
 Una auditoría técnica ya existente (`docs/backend/auditoria-integracion-ayrshare.md`, 1090 líneas, leída
 completa) ya resolvió casi todo el diseño de la parte de Ayrshare: dónde vive el módulo, qué campos de
@@ -22,9 +26,10 @@ lo más importante: **los cron de publicación/métricas nunca están registrado
 hoy** — y no existe ninguna llamada real a Ayrshare para publicar o pedir analíticas.
 
 También existe un documento interno "final" (`docs/skill/AlexaSkill-Diseno-Final.md`) que propone un
-diseño distinto (OAuth2 + persistencia de ideas en `ContentIdea`) — **descartado para este plan**: el
-usuario confirmó que el contrato que gobierna es el que ya está usando el equipo externo del Lambda
-(LinkCode + DynamoDB propia), no el documento interno.
+diseño distinto para el account-linking (OAuth2 contra `auth-service` en vez de LinkCode) — **esa parte
+queda descartada para este plan**: el usuario confirmó que el contrato que gobierna el account-linking es
+el que ya está usando el equipo externo del Lambda (LinkCode). En cambio, en la persistencia de ideas
+(`ContentIdea`, no DynamoDB) ambos documentos coinciden con la corrección del usuario — se adopta.
 
 Decisiones ya confirmadas con el usuario para esta fase:
 1. Construir el pipeline completo de Ayrshare ahora (posts real, cron registrado, publish real, métricas
@@ -32,10 +37,29 @@ Decisiones ya confirmadas con el usuario para esta fase:
 2. Posts de **solo texto** por ahora — no se conecta `media`/Cloudinary al publish real todavía (la
    infraestructura ya existe, simplemente no se usa en esta fase).
 3. El account-linking de Alexa sigue el contrato del equipo externo: **LinkCode** corto, de un solo uso,
-   generado desde el frontend logueado, canjeado una vez por el Lambda — no OAuth2.
-4. Las ideas dictadas por voz se guardan en la DynamoDB del propio Lambda — el backend de Bananagram solo
-   expone **lectura** de `ContentIdea` (las creadas desde la app web), nunca recibe escrituras desde
-   Alexa para ideas.
+   generado desde el frontend logueado, canjeado una vez por el Lambda — no OAuth2. Esto sigue siendo vía
+   HTTP contra `auth-service` (base de datos separada, no afectada por la decisión 5).
+4. **Corrección del usuario sobre ideas**: las ideas de contenido solo se generan desde la skill por voz —
+   no existe (ni se va a construir) una forma de generarlas desde la plataforma web. Deben persistirse en
+   `ContentIdea` (misma base física de Postgres que usa `core-service`). La plataforma web únicamente
+   **visualiza y elimina** ideas ya generadas — nunca las crea.
+5. **Corrección sobre arquitectura de `alexa-service`**: sigue siendo su propio
+   microservicio, y para lo que sea genuinamente **propio de la skill** (ideas de contenido) tiene su
+   propio Prisma Client apuntando a la **misma base de datos física** que `core-service`
+   (`gestor_redes_core`), con lectura/escritura directa — no un BFF sobre HTTP para eso. `core-service`
+   sigue siendo el único dueño del schema/migraciones; el de `alexa-service` es una copia de
+   solo-generar-cliente, nunca de migrar.
+6. **Corrección del usuario, acotando el alcance de la decisión 5**: "toda la lógica de la skill" se
+   refiere a lo que es **exclusivo** de la skill — no a todo lo que la skill consume. `campaigns` es un
+   concepto global de la aplicación (lo gestiona la web de verdad: crear, asignar equipo), no algo propio
+   de la skill, así que **no** se combina con acceso directo a la BD desde `alexa-service`: se queda como
+   endpoint HTTP en `core-service`, y `alexa-service` lo reutiliza (BFF normal). Lo mismo aplica a las
+   métricas de campaña (Fase 5): también son un dato global (las usa `analytics-front`/`brands-front`),
+   no algo exclusivo de la skill, así que `alexa-service` las consume por HTTP contra
+   `GET /campaigns/:id/metrics` de `core-service`, sin Prisma propio para esto. **Resultado**: `ideas` es
+   la única pieza que migra a acceso directo por Prisma en `alexa-service` (y se elimina de
+   `core-service` por completo, ver Fase 6) — `campaigns`/`métricas` combinan el patrón BFF-sobre-HTTP de
+   siempre, sin duplicar nada.
 
 ## Fase 0 — Migración de Prisma (aditiva)
 
@@ -141,14 +165,70 @@ singleton importado directo que usan los cron viejos):
 
 Este endpoint es el que consumirá `alexa-service` (Fase 6) para responder con datos reales de campaña.
 
-## Fase 6 — Endpoints backend para el Lambda de Alexa (LinkCode + BFF de lectura)
+## Fase 6 — Endpoints backend para el Lambda de Alexa (LinkCode + ideas por Prisma + campañas/métricas por HTTP)
 
-**Account-linking — nuevo, en `auth-service`** (mismo patrón que `PasswordResetToken`,
-`auth-service/prisma/schema.prisma:158-168`, ya existente: token corto, `userId`, `expiresAt`, `usedAt`):
+**Arquitectura final de esta fase (afinada en varias rondas con el profesor y el usuario)**: `alexa-service`
+combina los dos patrones, cada uno donde corresponde — no hay duplicación de lógica en ningún lado:
+- **`ideas`** (exclusiva de la skill, ver decisión 4/6): acceso directo por Prisma a la misma base física
+  de `core-service`. Se elimina por completo de `core-service` — `alexa-service` queda como único dueño.
+- **`campaigns` y sus métricas** (conceptos globales de la app, no propios de la skill): siguen viviendo
+  solo en `core-service`, y `alexa-service` los consume como cualquier otro cliente, por HTTP — patrón
+  BFF normal, sin acceso a Postgres para esto.
+- **Account-linking**: HTTP contra `auth-service` (base de datos distinta, no compartida) — sin cambios.
+
+### `ideas` — acceso directo por Prisma (única pieza que se mueve a la BD compartida)
+
+Mismo cuidado que ya toman `auth-service`/`core-service` entre sí (ver
+`core-service/prisma/schema.prisma:16-27`, generator con `output` propio para que pnpm no resuelva ambos
+Prisma Client al mismo folder por compartir versión de `@prisma/client`):
+- Nuevo `apps/backend/services/alexa-service/prisma/schema.prisma` — mismo `datasource` que core-service
+  (`url = env("DATABASE_URL_CORE")`, mismo valor de env var, misma base física), con **solo** el modelo
+  `ContentIdea` (su `campaignId` es una FK "tonta", sin `@relation` — mismo patrón que ya usa el proyecto
+  entre bases de auth-service/core-service — así que no hace falta declarar `Campaign`/`Brand`/`User` en
+  este schema para nada).
+- `generator client { output = "../node_modules/.prisma-client" }` — mismo patrón que ya usan
+  `auth-service`/`core-service`, evita el choque de `output` ya documentado.
+- `apps/backend/services/alexa-service/package.json` — agregar `@prisma/client` + `prisma` (dev).
+- **Regla dura**: `alexa-service` **nunca** corre `prisma migrate` contra esta base — solo
+  `prisma generate`. La dueña del schema y de las migraciones sigue siendo `core-service` en exclusiva.
+- Env var nueva en `alexa-service`: `DATABASE_URL_CORE` (mismo valor que usa `core-service`) — agregar a
+  `.env.example`/`turbo.json globalEnv`.
+- **Eliminar de `core-service`**: `src/ideas/ideas.controller.ts`, `ideas.service.ts`, `ideas.module.ts`,
+  `dto/*.ts` de ese módulo, y su import en `app.module.ts`. **El modelo `ContentIdea` NO se borra de
+  `core-service/prisma/schema.prisma`** — sigue siendo la única fuente de verdad de migraciones sobre
+  `gestor_redes_core`; lo que se elimina es el código de aplicación, no la definición de la tabla.
+- **Gateway** (`apps/backend/gateway/src/main.ts`): el proxy que hoy apunta `/api/ideas` → `coreServiceUrl`
+  cambia su `target` a `alexaServiceUrl` — mismo prefijo de URL para el cliente, dueño distinto detrás.
+- `alexa-service/src/ideas/ideas.controller.ts` pasa a ser la API real de ideas para cualquier caller
+  autenticado (web o skill) — mismo `JwtAuthGuard` que ya usa hoy; agregar `PermissionGuard` replicando el
+  patrón del resto del proyecto (no existe slug `ideas` dedicado en el catálogo de RBAC — usar
+  `campanas:ver`/`campanas:crear`/`campanas:eliminar` como el módulo más cercano, o extender el catálogo
+  con un slug `ideas` nuevo — **decisión de producto pendiente, no bloqueante**).
+- **Autorización de campaña al crear/borrar una idea**: como `alexa-service` ya no tiene `Campaign` en su
+  propio Prisma Client, valida pertenencia llamando por HTTP a `core-service`
+  (`GET /campaigns/:id`, que ya aplica sus propios guards/reglas de ownership y responde 403/404 si no
+  corresponde) **antes** de hacer el `create`/`delete` de `ContentIdea` vía Prisma directo. Es la única
+  llamada HTTP que le queda a `alexa-service` para el dominio de ideas, y es deliberada: reutiliza la
+  regla de negocio de pertenencia que ya vive (correcta) en `core-service`, en vez de reimplementarla.
+
+### `campaigns` y métricas — BFF normal sobre HTTP (sin cambios de fondo, sin Prisma propio)
+
+- `alexa-service/src/campaigns/campaigns.service.ts`/`campaigns.controller.ts` (hoy clases vacías) —
+  `fetchCampaigns`/`fetchCampaignByName` llaman por HTTP a `GET /campaigns` de `core-service` (ya filtra
+  por pertenencia server-side, no hay que reimplementar ese filtro en ningún lado), reenviando el
+  `Authorization: Bearer` del request entrante. Mismo patrón para `fetchCampaignMetrics`, contra
+  `GET /campaigns/:id/metrics` (Fase 5) — sin lógica de agregación propia en `alexa-service`.
+- `apps/backend/services/alexa-service/package.json` — agregar un cliente HTTP: se recomienda `fetch`
+  nativo (mismo patrón que ya usa `brands.service.ts`/`social-accounts.service.ts` de `core-service`,
+  consistente con la decisión de Fase 3) en vez de sumar `@nestjs/axios` como dependencia nueva.
+- Env var nueva en `alexa-service`: `CORE_SERVICE_URL` — agregar a `.env.example`/`turbo.json globalEnv`.
+
+**Account-linking — sin cambios respecto al diseño anterior, en `auth-service`** (base de datos distinta,
+`gestor_redes_auth`, no tocada por esta decisión; mismo patrón que `PasswordResetToken`,
+`auth-service/prisma/schema.prisma:158-168`):
 - `schema.prisma` — nuevo modelo `AccountLinkCode { id, userId, code String @unique, expiresAt DateTime,
   usedAt DateTime?, createdAt }`, relación `User.accountLinkCodes`. Código corto (6-8 caracteres
-  alfanuméricos, generado en el service, no UUID completo — el usuario lo puede copiar/pegar o dictar
-  fácilmente), expira en pocos minutos (p. ej. 10).
+  alfanuméricos, generado en el service, no UUID completo), expira en pocos minutos (p. ej. 10).
 - `auth.controller.ts`/`auth.service.ts`/`auth.repository.ts` — dos endpoints nuevos siguiendo el mismo
   patrón que `password-reset`:
   - `POST /auth/link-code` (autenticado, `JwtAuthGuard`) — genera un código nuevo para el usuario actual,
@@ -157,27 +237,16 @@ Este endpoint es el que consumirá `alexa-service` (Fase 6) para responder con d
   - `POST /auth/link-code/redeem` (público, lo llama el Lambda) — recibe `{ code }`, valida
     `expiresAt`/`usedAt`, marca `usedAt`, y responde con el mismo shape que login (`accessToken` +
     `refreshToken`) reutilizando la emisión de tokens ya existente en `AuthService.login` (sin password,
-    a partir del `userId` resuelto por el código) — el Lambda guarda ese `accessToken`/`refreshToken`
-    igual que cualquier otro cliente y los manda como `Authorization: Bearer` en cada llamada siguiente.
-
-**BFF real en `alexa-service`** (hoy `campaigns.controller.ts`/`ideas.controller.ts` son clases vacías, sin
-cliente HTTP en `package.json` — confirmado):
-- `package.json` — agregar `axios` (o `@nestjs/axios`, según lo que ya se decida en Fase 3 para
-  consistencia; se recomienda `fetch` nativo para no agregar dependencia nueva).
-- `src/campaigns/campaigns.service.ts`/`campaigns.controller.ts` — implementar `fetchCampaigns`
-  (`GET /campaigns` de core-service, ya filtra por pertenencia vía el JWT) y `fetchCampaignByName`
-  (filtro por nombre, en el propio BFF o agregando `?name=` opcional a `GET /campaigns` de core-service).
-  Reenvía el `Authorization: Bearer` del request entrante.
-- `src/ideas/ideas.service.ts`/`ideas.controller.ts` — implementar `fetchContentIdeas` (`GET
-  /campaigns/:id/ideas` o `GET /ideas?campaignId=` de core-service, ya CRUD real) — **solo lectura**, no
-  se agrega ningún endpoint de escritura de ideas en `alexa-service` (las ideas por voz se guardan en la
-  DynamoDB del Lambda, no aquí).
-- Métricas para voz: el BFF llama al `GET /campaigns/:id/metrics` construido en Fase 5.
+    a partir del `userId` resuelto por el código) — el Lambda guarda ese `accessToken`/`refreshToken` y lo
+    manda como `Authorization: Bearer` en cada llamada siguiente a `alexa-service` (que sigue validando
+    el JWT con `JwtAuthGuard`, ya aplicado hoy — eso no cambia, solo cambia de dónde saca los datos después
+    de validar el token).
 
 **Gateway**: agregar `pathFilter: '/api/alexa'` → `alexaServiceUrl` en
 `apps/backend/gateway/src/main.ts` (patrón de línea única ya usado para el resto) solo si el Lambda va a
-golpear el gateway en vez de `alexa-service` directo (puerto 3004 hoy no proxeado). Env vars nuevas en
-`alexa-service`: `CORE_SERVICE_URL`, `AUTH_SERVICE_URL` — agregar a `.env.example`/`turbo.json globalEnv`.
+golpear el gateway en vez de `alexa-service` directo (puerto 3004 hoy no proxeado). Env var nueva en
+`alexa-service`: `AUTH_SERVICE_URL` (para el redeem del LinkCode, que sí sigue siendo HTTP) — agregar a
+`.env.example`/`turbo.json globalEnv`.
 
 ## Explícitamente fuera de alcance
 
@@ -185,10 +254,15 @@ golpear el gateway en vez de `alexa-service` directo (puerto 3004 hoy no proxead
   solo texto, decisión ya confirmada).
 - Webhooks de Ayrshare: solo polling vía los cron de Fase 4/5 (auditoría §11).
 - `CampaignMetricSnapshot`, `CampaignGoal`, score de campaña separado: diferidos (auditoría §22.8/12/13).
-- Frontend: nada de esto se conecta a `apps/frontend/*` en esta fase.
+- Frontend: no se toca código de `apps/frontend/*` en esta fase (nadie construyó todavía una pantalla de
+  "mis ideas" en brands-front/posts-front). **Nota para cuando se construya**: esa pantalla futura debe
+  llamar a `alexa-service` (vía gateway, mismo prefijo `/api/ideas`), no a `core-service` — el módulo ya
+  no existe ahí.
 - El Lambda/skill en sí: se construye aparte por el equipo externo.
-- `docs/skill/AlexaSkill-Diseno-Final.md` (OAuth2 + ContentIdea para ideas de voz): descartado para esta
-  fase por decisión explícita del usuario, aunque quede documentado en el repo.
+- `docs/skill/AlexaSkill-Diseno-Final.md`: solo se descarta la parte de **account-linking** (OAuth2) —
+  la parte de persistencia de ideas en `ContentIdea` sí se adopta, coincide con la corrección del usuario.
+- Un formulario/UI de creación manual de ideas en la plataforma web: no existe hoy y no se construye —
+  las ideas solo se crean desde la skill, la web únicamente lista y elimina.
 
 ## Verificación
 
@@ -205,8 +279,18 @@ golpear el gateway en vez de `alexa-service` directo (puerto 3004 hoy no proxead
 4. `POST /auth/link-code` autenticado → confirmar que devuelve un código corto; `POST
    /auth/link-code/redeem` con ese código (sin JWT) → confirmar que devuelve `accessToken`/`refreshToken`
    válidos para ese usuario, y que reusar el mismo código una segunda vez falla.
-5. `alexa-service`: con el `accessToken` obtenido en el paso 4, llamar `GET /campaigns/mine`-equivalente
-   (o el endpoint real que se implemente) y confirmar que devuelve las campañas reales del usuario, no
-   mock.
-6. `pnpm --filter @repo/core-service build` y `pnpm --filter @repo/auth-service build` y `pnpm --filter
+5. `alexa-service`: con el `accessToken` obtenido en el paso 4, llamar al endpoint real de campañas y
+   confirmar que devuelve las campañas reales del usuario, no mock — y confirmar que la respuesta vino de
+   una llamada HTTP real a `GET /campaigns` de `core-service` (revisar logs/`X-Request-ID`), no de una
+   consulta Prisma dentro de `alexa-service` (no debería tener acceso a `Campaign` en absoluto).
+6. Crear una idea vía `POST /api/ideas` (o el path real que quede) con el `accessToken` del paso 4 →
+   confirmar que la fila aparece en la tabla `content_ideas` de Postgres (Adminer/psql), y que
+   `GET /api/ideas?campaignId=` la devuelve de inmediato — todo servido por `alexa-service`, no por
+   `core-service`. Borrarla y confirmar que desaparece.
+7. Confirmar que `core-service` ya **no** responde nada en `/ideas` (404 o ruta inexistente) — prueba de
+   que el módulo quedó eliminado de verdad, no solo duplicado.
+8. Confirmar que `alexa-service` nunca ejecuta `prisma migrate` (revisar que no haya ningún script que lo
+   dispare) — solo `prisma generate`; cualquier cambio de schema debe seguir haciéndose desde
+   `core-service` exclusivamente.
+9. `pnpm --filter @repo/core-service build` y `pnpm --filter @repo/auth-service build` y `pnpm --filter
    @repo/alexa-service build` sin errores de tipo tras los cambios.
