@@ -72,11 +72,11 @@ export default function PostsApprovalPage() {
   const reviewPosts = posts.filter((p) => p.status === 'en_revision');
   const rejectedPosts = posts.filter((p) => p.status === 'rechazado');
 
-  const showDraftsSection = can('post', 'create');
+  const showDraftsSection = can('publicaciones', 'crear');
   // El CM también debe ver esta sección (en espera del cliente), aunque no tenga
-  // approve/reject — solo se le ocultan los botones de acción vía ProtectedAction.
-  const showReviewSection = canAny('post', ['create', 'approve', 'reject']);
-  const showRejectedSection = can('post', 'create');
+  // aprobar/rechazar — solo se le ocultan los botones de acción vía ProtectedAction.
+  const showReviewSection = canAny('publicaciones', ['crear', 'aprobar', 'rechazar']);
+  const showRejectedSection = can('publicaciones', 'crear');
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh' }}>
@@ -183,7 +183,7 @@ export default function PostsApprovalPage() {
                     >
                       Ver detalle
                     </Button>
-                    <ProtectedAction module="post" action="reject">
+                    <ProtectedAction module="publicaciones" action="rechazar">
                       <Button
                         size="small"
                         variant="outlined"
@@ -193,7 +193,7 @@ export default function PostsApprovalPage() {
                         Rechazar
                       </Button>
                     </ProtectedAction>
-                    <ProtectedAction module="post" action="approve">
+                    <ProtectedAction module="publicaciones" action="aprobar">
                       <Button
                         size="small"
                         variant="contained"
@@ -258,7 +258,7 @@ export default function PostsApprovalPage() {
                   >
                     Ver detalle
                   </Button>
-                  <ProtectedAction module="post" action="create">
+                  <ProtectedAction module="publicaciones" action="crear">
                     <PrimaryButton
                       size="small"
                       onClick={(e) => { e.stopPropagation(); router.push('/posts/new'); }}

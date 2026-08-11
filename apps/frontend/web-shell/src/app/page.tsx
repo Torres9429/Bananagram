@@ -12,7 +12,7 @@ export default async function Home() {
   const payload = token ? decodeJwt(token) : null;
 
   if (payload) {
-    redirect(getPostAuthDestination(payload.role));
+    redirect(getPostAuthDestination(payload.roles ?? []));
   }
 
   return <LandingTemplate />;

@@ -14,12 +14,12 @@ export default function DashboardPage() {
   // aún no hidrata, `user` es undefined un instante — no se renderiza nada
   // (nunca un dashboard de negocio como fallback) hasta saber el rol real.
   useEffect(() => {
-    if (user && user.role !== AppRole.ADMINISTRADOR) {
-      window.location.href = getPostAuthDestination(user.role);
+    if (user && !user.roles.includes(AppRole.ADMINISTRADOR)) {
+      window.location.href = getPostAuthDestination(user.roles);
     }
   }, [user]);
 
-  if (user?.role === AppRole.ADMINISTRADOR) {
+  if (user?.roles?.includes(AppRole.ADMINISTRADOR)) {
     return <DashboardAdmin />;
   }
 

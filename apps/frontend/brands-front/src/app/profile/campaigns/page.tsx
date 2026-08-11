@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -11,24 +10,24 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { PrimaryButton } from '@repo/ui/ui';
-import { selectUser } from '@repo/ui/state';
 import { CreateCampaignDialog } from '../../../components/CreateCampaignDialog';
-import {
-  MOCK_CAMPAIGNS,
-  CAMPAIGN_STATUS_LABEL,
-  assignTeamToCampaign,
-  getCurrentClientProfile,
-} from '../../../lib/mock-data';
-import type { MockCampaign } from '../../../interfaces/interface';
+import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
+import { useListMyBrandsQuery } from '../../../store/api/brands.api';
+import { CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
 
 // Listado de campañas del Cliente en /profile — mismo contenido que
-// brands-front/app/brands/[id]/campaigns, pero SIN BrandTabs.
+// brands-front/app/brands/[id]/campaigns, pero SIN BrandTabs. GET /brands ya
+// viene filtrado por el backend a lo que el usuario logueado posee — se toma
+// la primera (mismo supuesto de "un solo perfil activo" que ya tenía el mock).
 export default function ProfileCampaignsPage() {
   const router = useRouter();
-  const user = useSelector(selectUser);
-  const profile = getCurrentClientProfile(user?.email);
-  const [campaigns, setCampaigns] = useState<MockCampaign[]>(MOCK_CAMPAIGNS.filter((c) => c.brandId === profile.id));
+  const { data: myBrands = [] } = useListMyBrandsQuery();
+  const profile = myBrands[0];
+  const { data: allCampaigns = [] } = useListCampaignsQuery();
+  const campaigns = profile ? allCampaigns.filter((c) => c.brandId === profile.id) : [];
   const [createOpen, setCreateOpen] = useState(false);
+
+  if (!profile) return null;
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
@@ -62,7 +61,7 @@ export default function ProfileCampaignsPage() {
               >
                 <Box>
                   <Typography variant="body1" fontWeight={600}>{c.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{c.startDate} – {c.endDate} · {c.postsCount} publicaciones</Typography>
+                  <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
                 </Box>
                 <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
               </Stack>
@@ -71,16 +70,7 @@ export default function ProfileCampaignsPage() {
         </Stack>
       </Box>
 
-      <CreateCampaignDialog
-        open={createOpen}
-        brandId={profile.id}
-        brandCategory={profile.categoryId}
-        onClose={() => setCreateOpen(false)}
-        onCreate={(campaign, team) => {
-          assignTeamToCampaign(campaign.id, team);
-          setCampaigns((prev) => [campaign, ...prev]);
-        }}
-      />
+      <CreateCampaignDialog open={createOpen} brandId={profile.id} onClose={() => setCreateOpen(false)} />
     </Box>
   );
 }

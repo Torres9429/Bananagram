@@ -23,18 +23,18 @@ import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
-import { CampaignCard } from '../campaigns/CampaignCard';
+import { useListMyBrandsQuery } from '../../store/api/brands.api';
+import { useListCampaignsQuery } from '../../store/api/campaigns.api';
 import {
-  MOCK_CAMPAIGNS,
   MOCK_CATEGORIES,
   PROFILE_TYPE_LABELS,
   AVAILABLE_SOCIAL_NETWORKS,
+  CAMPAIGN_STATUS_LABEL,
   getSocialNetwork,
   getSocialAccountsByProfile,
   getCurrentClientProfile,
-  assignTeamToCampaign,
 } from '../../lib/mock-data';
-import type { ProfileType, MockCampaign, MockProfile, SocialAccount, SocialNetworkCode } from '../../interfaces/interface';
+import type { ProfileType, MockProfile, SocialAccount, SocialNetworkCode } from '../../interfaces/interface';
 
 // Estructura de la sección Cliente en ProfilePage (§3 del rediseño de dominio).
 // Placeholder: usa el primer MockProfile como "el Perfil del Cliente" porque hoy
@@ -53,10 +53,18 @@ export function ClientSection() {
   const user = useSelector(selectUser);
   const [profile, setProfile] = useState<MockProfile>(() => getCurrentClientProfile(user?.email));
 
-  const [campaigns, setCampaigns] = useState<MockCampaign[]>(() =>
-    MOCK_CAMPAIGNS.filter((c) => c.brandId === profile.id),
-  );
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
+  // CreateCampaignDialog ya crea contra /campaigns real y necesita un brandId
+  // real (UUID) — profile.id de arriba es mock (ids tipo "b1") y el backend
+  // lo rechaza con 400 "brandId must be a UUID". Se resuelve aparte, solo
+  // para esto, sin tocar el resto de la sección (fuera de alcance).
+  const { data: myBrands = [] } = useListMyBrandsQuery();
+  const realBrandId = myBrands[0]?.id;
+  // La lista de campañas SÍ es real ahora (antes mostraba MOCK_CAMPAIGNS y
+  // nunca reflejaba lo creado de verdad) — el resto de la sección (perfil,
+  // redes sociales) se queda mock, fuera de alcance de esta fase.
+  const { data: allCampaigns = [] } = useListCampaignsQuery();
+  const campaigns = realBrandId ? allCampaigns.filter((c) => c.brandId === realBrandId) : [];
 
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>(() =>
     getSocialAccountsByProfile(profile.id),
@@ -72,10 +80,12 @@ export function ClientSection() {
   const connectedNetworkIds = socialAccounts.map((a) => a.socialNetworkId);
   const availableNetworksToAdd = AVAILABLE_SOCIAL_NETWORKS.filter((n) => !connectedNetworkIds.includes(n.id));
 
-  // Una SocialAccount no se puede desconectar si alguna campaña activa la usa
-  // (MockCampaign.socialAccountIds) — evita romper una campaña en curso.
-  function isSocialAccountInActiveCampaign(socialAccountId: string): boolean {
-    return campaigns.some((c) => c.status === 'active' && c.socialAccountIds.includes(socialAccountId));
+  // El modelo real no vincula Campaign↔SocialAccount directamente (ver nota
+  // en CreateCampaignDialog.tsx) — sin ese dato ya no se puede saber si una
+  // cuenta social está en uso por una campaña activa, así que nunca bloquea
+  // (las cuentas sociales siguen siendo mock en esta sección de todas formas).
+  function isSocialAccountInActiveCampaign(_socialAccountId: string): boolean {
+    return false;
   }
 
   function handleDisconnect(accountId: string) {
@@ -210,6 +220,7 @@ export function ClientSection() {
             size="small"
             startIcon={<AddCircleOutlineIcon />}
             onClick={() => setCreateCampaignOpen(true)}
+            disabled={!realBrandId}
           >
             Crear nueva campaña
           </PrimaryButton>
@@ -219,32 +230,50 @@ export function ClientSection() {
             title="Aún no tienes campañas"
             description="Crea tu primera campaña para empezar a coordinar contenido con tu equipo."
             action={
-              <PrimaryButton onClick={() => setCreateCampaignOpen(true)}>
+              <PrimaryButton onClick={() => setCreateCampaignOpen(true)} disabled={!realBrandId}>
                 Crear primera campaña
               </PrimaryButton>
             }
           />
         ) : (
-          <Grid container spacing={2}>
-            {campaigns.map((c) => (
-              <Grid item xs={12} sm={6} md={4} key={c.id}>
-                <CampaignCard campaign={c} onClick={() => router.push(`/profile/campaigns/${c.id}`)} />
-              </Grid>
-            ))}
-          </Grid>
+          // Cards simples en vez de <CampaignCard> — ese componente asume
+          // datos que el modelo real de Campaign no trae (postsCount, redes
+          // sociales por campaña). Mismo estilo que profile/campaigns/page.tsx.
+          <Stack gap={1.5}>
+            {campaigns.map((c) => {
+              const s = CAMPAIGN_STATUS_LABEL[c.status];
+              return (
+                <Stack
+                  key={c.id}
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  onClick={() => router.push(`/profile/campaigns/${c.id}`)}
+                  sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
+                >
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                  </Box>
+                  <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
+                </Stack>
+              );
+            })}
+          </Stack>
         )}
       </Paper>
 
-      <CreateCampaignDialog
-        open={createCampaignOpen}
-        brandId={profile.id}
-        brandCategory={profile.categoryId}
-        onClose={() => setCreateCampaignOpen(false)}
-        onCreate={(campaign, team) => {
-          assignTeamToCampaign(campaign.id, team);
-          setCampaigns((prev) => [campaign, ...prev]);
-        }}
-      />
+      {/* CreateCampaignDialog y la lista de campañas de arriba ya son reales
+          (ver plan de integración) — el resto de esta sección (perfil, redes
+          sociales) se queda mock, fuera de alcance de esta fase. Al crear,
+          RTK Query invalida el cache de listCampaigns y la lista se actualiza sola. */}
+      {realBrandId && (
+        <CreateCampaignDialog
+          open={createCampaignOpen}
+          brandId={realBrandId}
+          onClose={() => setCreateCampaignOpen(false)}
+        />
+      )}
 
       <FormDialog
         open={addNetworkOpen}

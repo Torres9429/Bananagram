@@ -35,7 +35,11 @@ const STAFF_ROLE_LABELS: Record<string, string> = {
 // "perfil de habilidades" (CM/Diseñador).
 export default function ProfilePage() {
   const user = useSelector(selectUser);
-  const role = user?.role ?? '';
+  // Esta página asume un solo rol "de negocio" activo por sesión (mismo
+  // supuesto que ya tenía antes de multi-rol) — con varios roles reales toma
+  // el primero. No es parte del alcance de esta fase (login/catálogos/
+  // campañas), solo se ajusta el tipo para que siga compilando.
+  const role = user?.roles?.[0] ?? '';
   const isStaff = role === 'community_manager' || role === 'disenador';
   const mockStaffProfile = isStaff ? findMockStaffProfile(role) : null;
 
@@ -44,6 +48,13 @@ export default function ProfilePage() {
   // mismo comportamiento en vivo que tenía la pantalla antes de separar
   // Header/Sección.
   const [name, setName] = useState(mockStaffProfile?.name ?? user?.email ?? '');
+
+  // Mientras la sesión de Redux aún no hidrata (useSessionBootstrap corre en
+  // un useEffect, tras el primer render), `user` es null un instante — sin
+  // este guard, `role` caía a '' y el Header se alcanzaba a pintar con
+  // headerName vacío ("Sin nombre") antes de la re-render correcta. Va
+  // DESPUÉS de todos los hooks (Rules of Hooks) — solo bloquea el render.
+  if (!user) return null;
 
   const clientProfile = getCurrentClientProfile(user?.email);
   const headerName = role === 'cliente' ? clientProfile.name : name;

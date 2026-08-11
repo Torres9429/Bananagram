@@ -6,7 +6,7 @@ export function buildTokenFromUser(user: MockUser): string {
     sub: user.id,
     email: user.email,
     name: user.name,
-    role: user.role,
+    roles: [user.role],
     status: user.status,
     avatarUrl: user.avatarUrl ?? null,
     ownedBrandIds: user.ownedBrandIds ?? [],

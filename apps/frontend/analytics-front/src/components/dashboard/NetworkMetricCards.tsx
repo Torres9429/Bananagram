@@ -38,7 +38,7 @@ export function NetworkMetricCards() {
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Métricas de la red</Typography>
       <Grid container spacing={2}>
         {dashboard.metrics.map((metric) => (
-          <Grid item xs={6} sm={4} md={3} key={metric.key}>
+          <Grid item xs={12} sm={6} md={4} lg={3} key={metric.key}>
             <MetricCard icon={iconFor(metric.key)} label={metric.label} value={metric.value} unit={metric.unit ?? ''} />
           </Grid>
         ))}

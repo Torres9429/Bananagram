@@ -8,6 +8,7 @@ import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import { useDispatch, useSelector } from 'react-redux';
 import { EmptyState, usePermissions } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
 import { AnalyticsFilterBar } from '../../components/dashboard/AnalyticsFilterBar';
 import { AnalyticsBreadcrumb } from '../../components/dashboard/AnalyticsBreadcrumb';
 import { NetworkOverview } from '../../components/dashboard/NetworkOverview';
@@ -40,12 +41,18 @@ const TABS: { value: TabValue; label: string }[] = [
 
 export default function MetricsPage() {
   const { can } = usePermissions();
+  const user = useSelector(selectUser);
   const dispatch = useDispatch();
   const filters = useSelector(selectAnalyticsFilters);
   const selectedNetwork = useSelector(selectSelectedNetwork);
   const activeTab: TabValue = selectedNetwork ?? 'general';
 
-  if (!can('metrics', 'view')) {
+  // Mientras la sesión aún no hidrata desde la cookie, `can()` siempre da
+  // false (permissions arranca en {}) — sin este guard se veía un flash de
+  // "No tienes permisos" aunque sí los tuviera. Mismo patrón que profile/page.tsx.
+  if (!user) return null;
+
+  if (!can('metricas', 'ver')) {
     return (
       <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
         <EmptyState title="No tienes permisos para ver métricas" />

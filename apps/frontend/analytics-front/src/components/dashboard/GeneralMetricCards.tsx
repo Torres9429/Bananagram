@@ -25,10 +25,10 @@ export function GeneralMetricCards() {
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Métricas agregadas</Typography>
       <Grid container spacing={2}>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={12} sm={6}>
           <MetricCard icon={<GroupsOutlinedIcon />} label="Seguidores ganados" value={current.followersGained} />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={12} sm={6}>
           <MetricCard icon={<ArticleOutlinedIcon />} label="Publicaciones" value={current.postsCount} />
         </Grid>
       </Grid>

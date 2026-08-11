@@ -184,7 +184,7 @@ Convenciones (`.agents/backend.md`, `agents/conventions.md`):
 - Multi-tenancy por row-level: toda tabla de negocio tiene `brand_id UUID NOT NULL` FK → `brands` (ADR-0001); los guards validan pertenencia, no hay schema-per-tenant.
 - Soft delete universal (`deleted_at`), `created_at`/`updated_at` en todas las tablas.
 - UUID como PK excepto `audit_log` y `post_status_history` (BIGINT autoincrement, inmutables — solo INSERT).
-- Auth: JWT HS256 stateless, sin Redis/OIDC; access token 15 min, refresh token 7 días de un solo uso con rotación (tabla `refresh_tokens`) (ADR-0002). Payload del JWT: `userId, email, role, brandIds[], permissions{}` — `brandIds` hoy siempre `[]` (ver nota en "Modelo de datos vigente": ya no se puede resolver con join local, Brand vive en la BD de core-service).
+- Auth: JWT RS256/JWKS, multi-rol, denylist de access tokens en Redis (ADR-0004, supera al HS256/rol-único de ADR-0002); access token 15 min, refresh token 7 días de un solo uso con rotación (tabla `refresh_tokens`) (esto sigue vigente de ADR-0002). Payload del JWT: `userId, email, roles[], jti, brandIds[], permissions{}` — `brandIds` hoy siempre `[]` (ver nota en "Modelo de datos vigente": ya no se puede resolver con join local, Brand vive en la BD de core-service).
 - **Rotación con detección de reuso (2026-07-27)**: `refresh_tokens` tiene `familyId`/`revokedAt` (ver
   `docs/base/modelo2.txt`). Reusar un token ya consumido/revocado/expirado revoca **toda** la familia,
   incluido el token que ganó la rotación — no solo rechaza el intento inválido. Lógica en
@@ -221,8 +221,10 @@ Convenciones (`.agents/frontend.md`):
 
 ### ADRs (`agents/adrs/`)
 - ADR-0001: multi-tenancy por `brand_id` (row-level), no schema/DB-per-tenant.
-- ADR-0002: JWT HS256 stateless + refresh rotation, sin Redis/OIDC/JWKS.
+- ADR-0002: JWT HS256 stateless + refresh rotation, sin Redis/OIDC/JWKS — **superado por ADR-0004**.
 - ADR-0003: REST síncrono entre servicios (sin Kafka), circuit breaker `opossum` + `X-Request-ID` propagado.
+- ADR-0004: JWT RS256/JWKS + multi-rol + denylist de access tokens en Redis; gateway con rate-limit y
+  validación JWT en el edge.
 
 ### Documentación adicional
 - `docs/architecture.md` — tabla de servicios y ADRs

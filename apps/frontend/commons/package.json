@@ -9,6 +9,8 @@
     "./ui": "./src/ui/index.ts",
     "./theme": "./src/theme/index.ts",
     "./state": "./src/state/index.ts",
+    "./jwt": "./src/state/jwt.ts",
+    "./session-middleware": "./src/session/resolve-session-action.ts",
     "./types": "./src/types/index.ts",
     "./config": "./src/config/index.ts",
     "./utils": "./src/utils/index.ts",

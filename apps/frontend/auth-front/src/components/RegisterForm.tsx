@@ -161,10 +161,17 @@ export function RegisterForm() {
         altura del paso más alto y el tamaño nunca cambia al navegar entre
         pasos — el inactivo solo se oculta con visibility, sin salir del flujo.
       */}
-      <Box sx={{ display: 'grid' }}>
+      {/* gridTemplateColumns: '1fr' es lo que evita que la celda se ensanche
+          al contenido más ancho de cualquiera de los dos pasos superpuestos
+          (ej. el selector de tipo de perfil de Cliente vs. los selects de
+          categorías/especialidades de CM/Diseñador) — sin esto, el ancho de
+          la columna implícita se calcula por max-content y "salta" según cuál
+          paso tenga contenido más ancho en cada momento. */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr' }}>
         <Box
           sx={{
             gridArea: '1 / 1',
+            minWidth: 0,
             visibility: step === 0 ? 'visible' : 'hidden',
           }}
           aria-hidden={step !== 0}
@@ -229,6 +236,7 @@ export function RegisterForm() {
         <Box
           sx={{
             gridArea: '1 / 1',
+            minWidth: 0,
             visibility: step === 1 ? 'visible' : 'hidden',
           }}
           aria-hidden={step !== 1}

@@ -44,7 +44,7 @@ export default function BrandReportsPage() {
               <Typography variant="caption" color="text.secondary">Score, consistencia, engagement y frecuencia del periodo actual.</Typography>
             </Box>
           </Stack>
-          <ProtectedAction module="reports" action="export">
+          <ProtectedAction module="reportes" action="exportar">
             <ButtonGroup variant="outlined" size="small">
               <Button onClick={() => exportMock('csv')}>Exportar CSV</Button>
               <Button onClick={() => exportMock('pdf')}>Exportar PDF</Button>

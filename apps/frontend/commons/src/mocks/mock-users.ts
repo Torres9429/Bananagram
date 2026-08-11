@@ -14,11 +14,11 @@ export const MOCK_USERS: MockUser[] = [
     // Admin administra el catálogo global vía permisos, no es dueño de marcas
     // (Brand.ownerId siempre es un Cliente) — ver docs/frontend-db-alignment.md §1.2.
     permissions: {
-      [AppModule.USERS]:     [AppAction.MANAGE],
-      [AppModule.BRANDS]:    [AppAction.MANAGE],
-      [AppModule.CATALOGS]:  [AppAction.MANAGE],
-      [AppModule.POST]:      [AppAction.CREATE, AppAction.SCHEDULE, AppAction.APPROVE, AppAction.REJECT, AppAction.PUBLISH],
-      [AppModule.CAMPAIGNS]: [AppAction.MANAGE],
+      [AppModule.USERS]:     [AppAction.VIEW],
+      [AppModule.BRANDS]:    [AppAction.VIEW],
+      [AppModule.CATALOGS]:  [AppAction.VIEW],
+      [AppModule.POST]:      [AppAction.CREATE, AppAction.EDIT, AppAction.APPROVE, AppAction.REJECT, AppAction.EDIT],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
       [AppModule.METRICS]:   [AppAction.VIEW],
       [AppModule.SCORE]:     [AppAction.VIEW],
       [AppModule.REPORTS]:   [AppAction.EXPORT],
@@ -35,8 +35,8 @@ export const MOCK_USERS: MockUser[] = [
     // tiempo real de sus campañas asignadas (Campaign.cmId), nunca es un
     // campo de sesión — ver docs/frontend-db-alignment.md §1.2/§9.1.
     permissions: {
-      [AppModule.POST]:      [AppAction.CREATE, AppAction.SCHEDULE, AppAction.PUBLISH],
-      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
+      [AppModule.POST]:      [AppAction.CREATE, AppAction.EDIT, AppAction.EDIT],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
       [AppModule.METRICS]:   [AppAction.VIEW],
       [AppModule.SCORE]:     [AppAction.VIEW],
     },
@@ -51,7 +51,7 @@ export const MOCK_USERS: MockUser[] = [
     // Sin ownedBrandIds — mismo caso que CM: se deriva de CampaignDesigner.
     permissions: {
       [AppModule.POST]:      [AppAction.CREATE],
-      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
     },
   },
   {
@@ -105,8 +105,8 @@ export const MOCK_USERS: MockUser[] = [
     name: 'Diego Fernández',
     status: 'pending',
     permissions: {
-      [AppModule.POST]:      [AppAction.CREATE, AppAction.SCHEDULE, AppAction.PUBLISH],
-      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
+      [AppModule.POST]:      [AppAction.CREATE, AppAction.EDIT, AppAction.EDIT],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
       [AppModule.METRICS]:   [AppAction.VIEW],
       [AppModule.SCORE]:     [AppAction.VIEW],
     },

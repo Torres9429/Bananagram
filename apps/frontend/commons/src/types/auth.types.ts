@@ -8,8 +8,12 @@ export type UserStatus = 'pending' | 'active' | 'suspended';
 export interface AuthUser {
   id: string;
   email: string;
+  // El JWT real (RS256, multi-rol) no trae name/status — viven en
+  // UserProfile (core-service), no en auth-service. setCredentials cae a
+  // email como name y a 'active' como status cuando el payload no los trae
+  // (un login exitoso ya implica que el backend validó el status).
   name: string;
-  role: string;
+  roles: string[];
   status: UserStatus;
   avatarUrl?: string | null;
 }
@@ -30,12 +34,16 @@ export interface AuthState {
 export interface JwtPayload {
   sub: string;
   email: string;
-  name: string;
-  role: string;
-  status: UserStatus;
+  // name/status: solo presentes en el JWT mock (encodeMockJwt) — el JWT real
+  // de auth-service no los trae, ver AuthUser.
+  name?: string;
+  roles: string[];
+  status?: UserStatus;
   avatarUrl?: string | null;
-  ownedBrandIds?: string[]; // solo poblado para Cliente — ver AuthState
+  ownedBrandIds?: string[]; // nombre usado por el JWT mock (encodeMockJwt)
+  brandIds?: string[]; // nombre real del JWT de auth-service (siempre [] hoy, ver ADR-0004)
   permissions?: Record<string, string[]>;
+  exp?: number; // claim estándar JWT (segundos epoch) — usado por web-shell/middleware.ts
 }
 
 export interface MockUser {

@@ -13,7 +13,7 @@ import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import { SidebarNav, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
-import { AppRole } from '@repo/ui/types';
+import { AppRole, AppModule, AppAction } from '@repo/ui/types';
 import { ZONE_URLS } from '@repo/ui/config';
 import { useSelector } from 'react-redux';
 import type { NavItemWithPermission } from '../../interfaces/interface';
@@ -22,22 +22,24 @@ const { postsFront: POSTS_FRONT_URL, brandsFront: BRANDS_FRONT_URL, analyticsFro
 
 const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: <DashboardIcon /> },
-  // Mis Campañas / Mi perfil van primero (justo después de Dashboard): son
-  // mutuamente excluyentes por rol (view-own vs. create), así que cada rol ve
-  // arriba exactamente el ítem que corresponde a su landing post-login
-  // (Cliente → Mi perfil /profile; CM/Diseñador → Mis Campañas /my-campaigns).
-  { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
-  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <StorefrontIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }] },
-  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'post', action: 'approve' }] },
+  // Mis Campañas / Mi perfil van primero (justo después de Dashboard): mismo
+  // destino que "Mi perfil" de abajo NO existe más abajo — se quitó ese
+  // duplicado (apuntaba al mismo /profile). El backend real da campanas:ver
+  // a los 3 roles no-admin (cliente/CM/diseñador) por igual, así que ya no
+  // hay un permiso que separe "Cliente" de "CM/Diseñador" aquí — la
+  // exclusividad (Cliente ve Mi perfil, CM/Diseñador ve Mis Campañas) se
+  // resuelve por rol explícito más abajo (isCliente), no por permiso.
+  { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }] },
+  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.
-  { key: 'brands', label: 'Marcas', href: `${BRANDS_FRONT_URL}/brands`, icon: <StorefrontIcon />, requirePermission: [{ module: 'brands', action: 'manage' }] },
-  { key: 'calendar', label: 'Calendario', href: `${BRANDS_FRONT_URL}/profile/calendar`, icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: 'campaigns', action: 'create' }, { module: 'campaigns', action: 'view-own' }] },
-  { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: [{ module: 'metrics', action: 'view' }] },
-  { key: 'team', label: 'Team', href: `${BRANDS_FRONT_URL}/team`, icon: <GroupIcon />, requirePermission: [{ module: 'campaigns', action: 'view-own' }] },
-  { key: 'profile', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: 'post', action: 'create' }, { module: 'campaigns', action: 'view-own' }] },
-  { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: 'users', action: 'manage' }] },
+  { key: 'brands', label: 'Marcas', href: `${BRANDS_FRONT_URL}/brands`, icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
+  { key: 'calendar', label: 'Calendario', href: `${BRANDS_FRONT_URL}/profile/calendar`, icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
+  { key: 'team', label: 'Team', href: `${BRANDS_FRONT_URL}/team`, icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
 ];
 
 export function Sidebar() {
@@ -45,17 +47,34 @@ export function Sidebar() {
   const router = useRouter();
   const { can } = usePermissions();
   const user = useSelector(selectUser);
-  const isAdmin = user?.role === AppRole.ADMINISTRADOR;
+  const isAdmin = user?.roles?.includes(AppRole.ADMINISTRADOR) ?? false;
 
   const permissionVisible = NAV_ITEMS_WITH_PERMISSION.filter(
     (item) => !item.requirePermission || item.requirePermission.some((p) => can(p.module, p.action)),
   );
+  // Ajuste de UX (no de permisos): igual que isAdmin abajo. "Mis Campañas" y
+  // "Mi perfil" comparten permiso real (campanas:ver lo tienen los 3 roles
+  // no-admin) así que ya no se pueden separar por permiso — se decide por
+  // rol explícito cuál de los dos ve cada quien (eran, y siguen siendo,
+  // mutuamente excluyentes por diseño: apuntan a landings distintos).
+  const isCliente = user?.roles?.includes(AppRole.CLIENTE) ?? false;
+  const roleAdjusted = permissionVisible.filter((item) => {
+    if (item.key === 'my-campaigns') return !isCliente;
+    if (item.key === 'my-brand') return isCliente;
+    return true;
+  });
   // Ajuste de UX (no de permisos): Admin no debe operar como usuario de negocio
   // (Marcas/Posts/Métricas/Mis Campañas/Team/Mi perfil), solo Dashboard y Admin
   // (que ya contiene Usuarios/Roles/Catálogos/Auditoría vía AdminTabs).
-  const visibleItems = isAdmin
-    ? permissionVisible.filter((item) => item.key === 'dashboard' || item.key === 'admin')
-    : permissionVisible.filter((item) => item.key !== 'dashboard');
+  // Mientras la sesión no hidrata (!user), `can()` siempre da false y esta
+  // lista quedaría casi vacía por un instante — se manda [] explícito en vez
+  // de esa lista "casi vacía pero incorrecta", para no mostrar/ocultar ítems
+  // equivocados ni un salto de layout cuando los reales aparecen.
+  const visibleItems = !user
+    ? []
+    : isAdmin
+      ? roleAdjusted.filter((item) => item.key === 'dashboard' || item.key === 'admin')
+      : roleAdjusted.filter((item) => item.key !== 'dashboard');
 
   function handleNavigate(href: string) {
     if (href.startsWith('http')) {

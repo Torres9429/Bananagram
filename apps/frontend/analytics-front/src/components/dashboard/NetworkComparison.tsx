@@ -53,7 +53,10 @@ export function NetworkComparison() {
     <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparación entre redes</Typography>
 
-      <Table size="small" sx={{ mb: 3 }}>
+      {/* Tabla de 7 columnas — sin este contenedor se desborda o aplasta
+          ilegible en mobile, ver mismo patrón en DataTable.tsx. */}
+      <Box sx={{ overflowX: 'auto', mb: 3 }}>
+      <Table size="small">
         <TableHead>
           <TableRow>
             <TableCell sx={{ fontWeight: 700 }}>Red</TableCell>
@@ -89,6 +92,7 @@ export function NetworkComparison() {
           ))}
         </TableBody>
       </Table>
+      </Box>
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
         <Typography variant="body2" color="text.secondary">Comparar por métrica</Typography>
@@ -97,6 +101,7 @@ export function NetworkComparison() {
           exclusive
           value={metricKey}
           onChange={(_, value) => value && setMetricKey(value)}
+          sx={{ flexWrap: 'wrap', gap: 0.5 }}
         >
           {COMPARABLE_METRICS.map((m) => (
             <ToggleButton key={m.key} value={m.key} sx={{ textTransform: 'none', px: 1.5 }}>

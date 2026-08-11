@@ -9,14 +9,17 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Collapse from '@mui/material/Collapse';
 import MenuItem from '@mui/material/MenuItem';
 import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import UpcomingOutlinedIcon from '@mui/icons-material/UpcomingOutlined';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
-import { Calendar, dateFnsLocalizer, type EventProps, type Messages } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { Calendar, dateFnsLocalizer, type EventProps, type Messages, type View } from 'react-big-calendar';
+import { format, parse, startOfWeek, endOfWeek, getDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { LabeledField, LabeledSelect, PostPreviewDialog, WidgetCard, STATUS_LABELS, STATUS_COLORS, usePermissions } from '@repo/ui/ui';
@@ -99,6 +102,37 @@ export default function ProfileCalendarPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
+
+  // Toolbar propia en vez de la default de react-big-calendar: la default
+  // (.rbc-toolbar) vive DENTRO de .rbc-calendar, el mismo contenedor que
+  // necesita minWidth+scroll horizontal para la grilla — eso obligaba a la
+  // barra a estirarse al mismo ancho mínimo, dejando los botones de
+  // Mes/Semana/Día fuera de la pantalla en mobile sin scrollear primero.
+  // Con `toolbar={false}` + view/date controlados a mano, esta barra queda
+  // completamente afuera de esa zona de scroll — visible entera siempre.
+  const [calView, setCalView] = useState<View>('month');
+  const [calDate, setCalDate] = useState(new Date());
+
+  function handleCalendarNavigate(action: 'TODAY' | 'PREV' | 'NEXT') {
+    if (action === 'TODAY') { setCalDate(new Date()); return; }
+    const dir = action === 'NEXT' ? 1 : -1;
+    setCalDate((prev) => {
+      if (calView === 'week') return dir > 0 ? addWeeks(prev, 1) : subWeeks(prev, 1);
+      if (calView === 'day') return dir > 0 ? addDays(prev, 1) : subDays(prev, 1);
+      return dir > 0 ? addMonths(prev, 1) : subMonths(prev, 1);
+    });
+  }
+
+  const calendarLabel = useMemo(() => {
+    if (calView === 'week') {
+      const start = startOfWeek(calDate, { locale: es });
+      const end = endOfWeek(calDate, { locale: es });
+      return `${format(start, 'd MMM', { locale: es })} – ${format(end, 'd MMM yyyy', { locale: es })}`;
+    }
+    if (calView === 'day') return format(calDate, "EEEE d 'de' MMMM", { locale: es });
+    return format(calDate, 'MMMM yyyy', { locale: es });
+  }, [calView, calDate]);
 
   const hasActiveFilters = !!(campaignFilter || networkFilter || statusFilter || dateFrom || dateTo);
 
@@ -205,19 +239,45 @@ export default function ProfileCalendarPage() {
           </Grid>
         </Grid>
 
-        {/* Filtros — toolbar */}
+        {/* Filtros — toolbar, contraíble para liberar espacio vertical
+            (sobre todo en mobile, donde 5 campos ocupan bastante). */}
         <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} mb={2}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            gap={1}
+            mb={filtersOpen ? 2 : 0}
+            onClick={() => setFiltersOpen((v) => !v)}
+            sx={{ cursor: 'pointer' }}
+          >
             <Stack direction="row" alignItems="center" gap={1}>
               <FilterAltOutlinedIcon fontSize="small" sx={{ color: 'secondary.main' }} />
               <Typography variant="subtitle2" fontWeight={700}>Filtros</Typography>
+              {hasActiveFilters && !filtersOpen && (
+                <Chip size="small" label="Activos" sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600, height: 20, fontSize: 11 }} />
+              )}
             </Stack>
-            {hasActiveFilters && (
-              <Button size="small" onClick={handleClearFilters} sx={{ color: 'primary.contrastTextMuted' }}>
-                Limpiar filtros
-              </Button>
-            )}
+            <Stack direction="row" alignItems="center" gap={0.5}>
+              {hasActiveFilters && (
+                <Button
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); handleClearFilters(); }}
+                  sx={{ color: 'primary.contrastTextMuted' }}
+                >
+                  Limpiar filtros
+                </Button>
+              )}
+              <IconButton
+                size="small"
+                aria-label={filtersOpen ? 'Contraer filtros' : 'Expandir filtros'}
+                sx={{ transform: filtersOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}
+              >
+                <ExpandMoreIcon fontSize="small" />
+              </IconButton>
+            </Stack>
           </Stack>
+          <Collapse in={filtersOpen}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={3}>
               <LabeledSelect label="Campaña" displayEmpty value={campaignFilter} onChange={(e) => setCampaignFilter(e.target.value as string)}>
@@ -262,6 +322,7 @@ export default function ProfileCalendarPage() {
               />
             </Grid>
           </Grid>
+          </Collapse>
         </Paper>
 
         {/* Leyenda de redes */}
@@ -292,22 +353,11 @@ export default function ProfileCalendarPage() {
             borderRadius: 3,
             p: 2,
             height: 640,
-            overflowX: 'auto',
-            '& .rbc-calendar': { minWidth: 720, fontFamily: 'inherit' },
-            '& .rbc-toolbar': { flexWrap: 'wrap', gap: 1, mb: 2 },
-            '& .rbc-toolbar button': {
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              color: '#1A1A1A',
-              textTransform: 'none',
-              fontWeight: 600,
-            },
-            '& .rbc-toolbar button:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' },
-            '& .rbc-toolbar button.rbc-active': { bgcolor: 'primary.main', color: 'primary.contrastTextMuted', borderColor: 'primary.main' },
-            '& .rbc-toolbar-label': { fontWeight: 700, fontSize: 16 },
+            display: 'flex',
+            flexDirection: 'column',
+            '& .rbc-calendar': { fontFamily: 'inherit' },
             '& .rbc-header': { py: 1, fontWeight: 700, fontSize: 12, borderColor: 'divider' },
-            '& .rbc-month-view, & .rbc-time-view': { borderColor: 'divider', borderRadius: 2, overflow: 'hidden' },
+            '& .rbc-month-view, & .rbc-time-view, & .rbc-agenda-view': { borderColor: 'divider', borderRadius: 2 },
             '& .rbc-day-bg + .rbc-day-bg, & .rbc-header + .rbc-header': { borderColor: '#F0F0F0' },
             '& .rbc-off-range-bg': { bgcolor: '#FAFAFA' },
             '& .rbc-today': { bgcolor: 'primary.light' },
@@ -321,30 +371,88 @@ export default function ProfileCalendarPage() {
             '& .rbc-show-more': { color: 'primary.contrastTextMuted', fontWeight: 600 },
           }}
         >
+          {/* Toolbar propia — ver comentario en calView/handleCalendarNavigate
+              arriba. flexShrink: 0 para que nunca se comprima cuando el
+              calendario de abajo necesite su espacio. */}
+          <Stack direction="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap={1} sx={{ flexShrink: 0, mb: 2 }}>
+            <Stack direction="row" gap={1} flexWrap="wrap">
+              {([
+                { action: 'TODAY' as const, label: 'Hoy' },
+                { action: 'PREV' as const, label: 'Anterior' },
+                { action: 'NEXT' as const, label: 'Siguiente' },
+              ]).map((b) => (
+                <Button
+                  key={b.action}
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleCalendarNavigate(b.action)}
+                  sx={{ borderRadius: 2, borderColor: 'divider', color: '#1A1A1A', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' } }}
+                >
+                  {b.label}
+                </Button>
+              ))}
+            </Stack>
+
+            <Typography variant="subtitle1" fontWeight={700} sx={{ textTransform: 'capitalize' }}>{calendarLabel}</Typography>
+
+            <Stack direction="row" gap={1} flexWrap="wrap">
+              {([
+                { view: 'month' as View, label: 'Mes' },
+                { view: 'week' as View, label: 'Semana' },
+                { view: 'day' as View, label: 'Día' },
+                { view: 'agenda' as View, label: 'Agenda' },
+              ]).map((v) => (
+                <Button
+                  key={v.view}
+                  size="small"
+                  variant={calView === v.view ? 'contained' : 'outlined'}
+                  onClick={() => setCalView(v.view)}
+                  sx={calView === v.view
+                    ? { borderRadius: 2, textTransform: 'none', fontWeight: 600 }
+                    : { borderRadius: 2, borderColor: 'divider', color: '#1A1A1A', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' } }}
+                >
+                  {v.label}
+                </Button>
+              ))}
+            </Stack>
+          </Stack>
+
           {calendarEvents.length === 0 ? (
-            <Stack alignItems="center" justifyContent="center" sx={{ height: '100%' }} gap={1}>
+            <Stack alignItems="center" justifyContent="center" sx={{ flex: 1, minHeight: 0 }} gap={1}>
               <EventAvailableOutlinedIcon sx={{ fontSize: 40, color: '#D0D0D0' }} />
               <Typography variant="body2" color="text.secondary">Sin publicaciones para estos filtros.</Typography>
             </Stack>
           ) : (
-            <Calendar
-              localizer={localizer}
-              events={calendarEvents}
-              startAccessor="start"
-              endAccessor="end"
-              style={{ height: '100%' }}
-              culture="es"
-              messages={CALENDAR_MESSAGES}
-              components={{ event: EventRow }}
-              onSelectEvent={handleSelectEvent}
-              eventPropGetter={(event) => ({
-                style: {
-                  backgroundColor: `${event.networkColor}E6`,
-                  color: '#fff',
-                  cursor: 'pointer',
-                },
-              })}
-            />
+            // La grilla (mes/semana/agenda) sí necesita un ancho mínimo legible
+            // — a diferencia de la toolbar de arriba, esto SÍ scrollea
+            // horizontal en mobile, pero ya no arrastra a la navegación con ella.
+            <Box sx={{ flex: 1, minHeight: 0, overflowX: 'auto' }}>
+              <Box sx={{ minWidth: 720, height: '100%' }}>
+                <Calendar
+                  localizer={localizer}
+                  events={calendarEvents}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{ height: '100%' }}
+                  culture="es"
+                  messages={CALENDAR_MESSAGES}
+                  toolbar={false}
+                  view={calView}
+                  onView={setCalView}
+                  date={calDate}
+                  onNavigate={setCalDate}
+                  components={{ event: EventRow }}
+                  onSelectEvent={handleSelectEvent}
+                  eventPropGetter={(event) => ({
+                    style: {
+                      backgroundColor: `${event.networkColor}E6`,
+                      color: '#fff',
+                      cursor: 'pointer',
+                    },
+                  })}
+                />
+              </Box>
+            </Box>
           )}
         </Paper>
       </Box>
@@ -358,8 +466,8 @@ export default function ProfileCalendarPage() {
         campaignName={selectedCampaign?.name ?? null}
         scheduledAt={selectedScheduledAt}
         onViewFull={selectedEvent?.postId ? () => { window.location.href = `${ZONE_URLS.postsFront}/posts/${selectedEvent.postId}`; } : undefined}
-        onApprove={canReviewEvent && can('post', 'approve') ? handleApproveSelected : undefined}
-        onReject={canReviewEvent && can('post', 'reject') ? handleRejectSelected : undefined}
+        onApprove={canReviewEvent && can('publicaciones', 'aprobar') ? handleApproveSelected : undefined}
+        onReject={canReviewEvent && can('publicaciones', 'rechazar') ? handleRejectSelected : undefined}
       />
     </Box>
   );
