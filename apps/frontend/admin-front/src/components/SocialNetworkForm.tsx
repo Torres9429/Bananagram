@@ -10,24 +10,22 @@ import MenuItem from '@mui/material/MenuItem';
 import InputAdornment from '@mui/material/InputAdornment';
 import { DataTable, type DataTableColumn, FormDialog, LabeledField, LabeledSelect } from '@repo/ui/ui';
 import type { SocialNetwork, SocialNetworkCode } from '@repo/ui/types';
+import { useListSocialNetworksQuery, useCreateSocialNetworkMutation } from '@repo/ui/state';
 import { AdminTabs } from './AdminTabs';
-import { generateMockId } from '../lib/mock-data';
 
 // Redes soportadas por el catálogo — mismos 6 valores que SocialNetworkCode
 // en @repo/ui/types (nombres completos, minúsculas).
 const SOCIAL_NETWORK_CODES: SocialNetworkCode[] = ['instagram', 'tiktok', 'facebook', 'x', 'linkedin', 'youtube'];
-
-interface SocialNetworkFormProps {
-  items: SocialNetwork[];
-}
 
 // Formulario propio para el catálogo de Redes sociales — a diferencia de
 // Categorías/Especialidades (solo {id, name}, ver CatalogList.tsx), este
 // catálogo necesita capturar `code` (FK conceptual usada por el resto del
 // sistema para identificar la red) y `baseEngagementRate` (% base que
 // alimenta el cron job de métricas simuladas — ver modelo.txt).
-export function SocialNetworkForm({ items }: SocialNetworkFormProps) {
-  const [list, setList] = useState<SocialNetwork[]>(items);
+export function SocialNetworkForm() {
+  const { data: list = [], isFetching } = useListSocialNetworksQuery();
+  const [createSocialNetwork] = useCreateSocialNetworkMutation();
+
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [code, setCode] = useState<SocialNetworkCode>('instagram');
@@ -35,12 +33,12 @@ export function SocialNetworkForm({ items }: SocialNetworkFormProps) {
   // se guarda internamente como fracción (0-1), igual que en modelo.txt.
   const [ratePercent, setRatePercent] = useState('');
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!name.trim() || !ratePercent.trim()) return;
     const baseEngagementRate = Number(ratePercent) / 100;
     if (Number.isNaN(baseEngagementRate)) return;
 
-    setList((prev) => [{ id: generateMockId('sn'), name: name.trim(), code, baseEngagementRate }, ...prev]);
+    await createSocialNetwork({ name: name.trim(), code, baseEngagementRate });
     setName('');
     setCode('instagram');
     setRatePercent('');
@@ -82,7 +80,7 @@ export function SocialNetworkForm({ items }: SocialNetworkFormProps) {
             + Agregar
           </Button>
         </Stack>
-        <DataTable columns={columns} rows={list} getRowKey={(item) => item.id} emptyMessage="Sin redes sociales registradas." />
+        <DataTable columns={columns} rows={list} getRowKey={(item) => item.id} emptyMessage={isFetching ? 'Cargando…' : 'Sin redes sociales registradas.'} />
       </Box>
 
       <FormDialog
