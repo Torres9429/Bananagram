@@ -1,4 +1,4 @@
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthModule } from '../services/auth-service/src/auth/auth.module';
 import { AuthService } from '../services/auth-service/src/auth/auth.service';
@@ -10,6 +10,7 @@ import { cleanDatabase } from './helpers/db.helper';
 // BD real de auth-service.
 describe('Auth Integration', () => {
   let authService: AuthService;
+  let moduleRef: TestingModule;
 
   beforeAll(async () => {
     await cleanDatabase();
@@ -19,13 +20,19 @@ describe('Auth Integration', () => {
       create: { name: 'cliente' },
     });
 
-    const moduleRef = await Test.createTestingModule({ imports: [AuthModule] }).compile();
+    moduleRef = await Test.createTestingModule({ imports: [AuthModule] }).compile();
+    // init() dispara onModuleInit de TokenSignerService (carga las llaves RS256);
+    // sin esto privateKey queda undefined y signAccess falla con "Key ... Received undefined".
+    await moduleRef.init();
     authService = moduleRef.get(AuthService);
   });
 
   afterAll(async () => {
     await cleanDatabase();
     await authPrisma.$disconnect();
+    // close() dispara onModuleDestroy de TokenDenylistService (desconecta
+    // Redis); sin esto ioredis mantiene el event loop vivo y jest no termina.
+    await moduleRef.close();
   });
 
   it('should register and login returning a JWT', async () => {

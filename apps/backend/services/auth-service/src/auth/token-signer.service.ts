@@ -8,8 +8,8 @@
  */
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import {
   calculateJwkThumbprint,
   exportJWK,
@@ -41,8 +41,8 @@ export class TokenSignerService implements OnModuleInit {
   private readonly audience = process.env.JWT_AUDIENCE ?? 'bananagram-api';
 
   async onModuleInit() {
-    const privatePath = resolve(process.env.JWT_PRIVATE_KEY_PATH ?? './keys/jwt_private.pem');
-    const publicPath = resolve(process.env.JWT_PUBLIC_KEY_PATH ?? './keys/jwt_public.pem');
+    const privatePath = resolveKeyPath(process.env.JWT_PRIVATE_KEY_PATH, 'jwt_private.pem');
+    const publicPath = resolveKeyPath(process.env.JWT_PUBLIC_KEY_PATH, 'jwt_public.pem');
     const privatePem = readFileSync(privatePath, 'utf8');
     const publicPem = readFileSync(publicPath, 'utf8');
 
@@ -104,4 +104,28 @@ function parseExpiresIn(value: string): number {
   const unit = (match[2] ?? 's') as 's' | 'm' | 'h' | 'd';
   const multiplier = { s: 1, m: 60, h: 3600, d: 86400 }[unit];
   return amount * multiplier;
+}
+
+// Las llaves viven siempre en <repo-root>/keys, pero cada proceso corre con un
+// CWD distinto: turbo arranca auth-service con CWD=paquete, los tests corren
+// desde apps/backend/test y pnpm dev desde la raíz. Si la ruta configurada
+// (JWT_PRIVATE_KEY_PATH / JWT_PUBLIC_KEY_PATH) no existe desde el CWD actual,
+// se sube de directorio hasta encontrar keys/<defaultName>. En Docker la ruta
+// configurada sí existe (volumen montado en /repo/keys), así que no cambia nada.
+function resolveKeyPath(configuredPath: string | undefined, defaultName: string): string {
+  if (configuredPath) {
+    const resolved = resolve(configuredPath);
+    if (existsSync(resolved)) return resolved;
+  }
+  let dir = process.cwd();
+  for (;;) {
+    const candidate = join(dir, 'keys', defaultName);
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error(
+    `No se encontró la llave ${defaultName}. Ejecuta 'pnpm generate-keys' (las crea en <repo-root>/keys) o revisa JWT_PRIVATE_KEY_PATH/JWT_PUBLIC_KEY_PATH.`,
+  );
 }

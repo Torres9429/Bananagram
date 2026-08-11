@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { CampaignsModule } from '../services/core-service/src/campaigns/campaigns.module';
 import { CampaignsService } from '../services/core-service/src/campaigns/campaigns.service';
@@ -15,6 +15,7 @@ import { describe, beforeAll, afterAll, it, expect } from '@jest/globals';
 // diseñador requiere un perfil 'disenador', y el CM no se puede reasignar.
 describe('Campaigns Flow Integration', () => {
   let campaignsService: CampaignsService;
+  let moduleRef: TestingModule;
   const profilesController = new UserProfilesController();
 
   const clientUserId = randomUUID();
@@ -61,13 +62,16 @@ describe('Campaigns Flow Integration', () => {
       data: { userId: plainClientUserId, name: 'Cliente de prueba', roleNames: ['cliente'] },
     });
 
-    const moduleRef = await Test.createTestingModule({ imports: [CampaignsModule] }).compile();
+    moduleRef = await Test.createTestingModule({ imports: [CampaignsModule] }).compile();
     campaignsService = moduleRef.get(CampaignsService);
   });
 
   afterAll(async () => {
     await cleanDatabase();
     await corePrisma.$disconnect();
+    // close() dispara onModuleDestroy de TokenDenylistService (cierra Redis);
+    // sin esto ioredis mantiene el event loop vivo y jest no termina.
+    await moduleRef.close();
   });
 
   it('rechaza crear una campaña con un cmId sin perfil de Community Manager', async () => {

@@ -5,13 +5,13 @@
     "prebuild": "prisma generate",
     "build": "nest build",
     "predev": "prisma generate",
-    "dev": "nest start --watch",
+    "dev": "node --env-file-if-exists=../../../../.env ../../../../node_modules/@nestjs/cli/bin/nest.js start --watch",
     "start": "node dist/main",
     "pretest": "prisma generate",
     "test": "jest",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:migrate:prod": "prisma migrate deploy"
+    "db:migrate": "node --env-file-if-exists=../../../../.env ../../../../node_modules/prisma/build/index.js migrate dev",
+    "db:migrate:prod": "node --env-file-if-exists=../../../../.env ../../../../node_modules/prisma/build/index.js migrate deploy"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

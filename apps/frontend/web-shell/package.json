@@ -2,9 +2,9 @@
   "name": "@repo/web-shell",
   "version": "1.0.0",
   "scripts": {
-    "dev": "next dev --turbopack -p 3000",
+    "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start -p 3000"
+    "start": "next start"
   },
   "dependencies": {
     "next": "16.2.9",

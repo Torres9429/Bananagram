@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { CloudinaryService, UploadableFile } from '../services/core-service/src/cloudinary/cloudinary.service';
 import { PostsModule } from '../services/core-service/src/posts/posts.module';
@@ -12,6 +12,7 @@ import { cleanDatabase } from './helpers/db.helper';
 
 describe('Posts Flow Integration', () => {
   let postsService: PostsService;
+  let moduleRef: TestingModule;
 
   const ownerUserId = randomUUID();
   const cmUserId = randomUUID();
@@ -78,7 +79,7 @@ describe('Posts Flow Integration', () => {
     ]);
     socialNetworkIds = socialNetworks.map((socialNetwork) => socialNetwork.id);
 
-    const moduleRef = await Test.createTestingModule({ imports: [PostsModule] })
+    moduleRef = await Test.createTestingModule({ imports: [PostsModule] })
       .overrideProvider(CloudinaryService)
       .useValue(cloudinaryMock)
       .compile();
@@ -88,6 +89,9 @@ describe('Posts Flow Integration', () => {
   afterAll(async () => {
     await cleanDatabase();
     await corePrisma.$disconnect();
+    // close() dispara onModuleDestroy de TokenDenylistService (cierra Redis);
+    // sin esto ioredis mantiene el event loop vivo y jest no termina.
+    await moduleRef.close();
   });
 
   it('borrador → en_revision → aprobado → programado (transiciones válidas no lanzan)', () => {
@@ -274,8 +278,14 @@ describe('Posts Flow Integration', () => {
     expect(updatedPost.media[1].order).toBe(2);
     expect(updatedPost.media[0].media.brandId).toBe(brandId);
 
-    const storedMedia = await corePrisma.media.findMany({ where: { brandId }, orderBy: { createdAt: 'asc' } });
-    expect(storedMedia).toHaveLength(2);
-    expect(storedMedia[0].originalName).toBe('imagen-1.png');
+    // createdAt es TIMESTAMP(3): con createMany ambas filas reciben el mismo
+    // timestamp y orderBy createdAt es arbitrario. El orden real vive en el
+    // campo order de post_media, así que se verifica por esa relación.
+    const storedPost = await corePrisma.post.findUnique({
+      where: { id: post.id },
+      include: { media: { orderBy: { order: 'asc' }, include: { media: true } } },
+    });
+    expect(storedPost?.media).toHaveLength(2);
+    expect(storedPost?.media.map((pm) => pm.media.originalName)).toEqual(['imagen-1.png', 'video-1.mp4']);
   });
 });

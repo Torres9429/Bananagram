@@ -1,7 +1,7 @@
 {
   "name": "@repo/api-gateway",
   "version": "1.0.0",
-  "scripts": { "build": "nest build", "dev": "nest start --watch", "start": "node dist/main" },
+  "scripts": { "build": "nest build",     "dev": "node --env-file-if-exists=../../../.env ../../../node_modules/@nestjs/cli/bin/nest.js start --watch", "start": "node dist/main" },
   "dependencies": {
     "@nestjs/common": "^10.0.0", "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0", "http-proxy-middleware": "^3.0.0",
