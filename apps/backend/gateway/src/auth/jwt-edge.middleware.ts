@@ -28,6 +28,11 @@ const PUBLIC_EXACT = new Set([
   '/api/auth/refresh',
   '/api/auth/password-reset/request',
   '/api/auth/password-reset/confirm',
+  // Account-linking de la Alexa Skill (LinkCode, no OAuth2): el Lambda
+  // canjea el código sin tener todavía un JWT — es justo lo que este
+  // endpoint le entrega. /api/auth/link-code (generar el código) SÍ se
+  // queda protegido: lo llama el usuario ya logueado desde el frontend.
+  '/api/auth/link-code/redeem',
 ]);
 
 @Injectable()

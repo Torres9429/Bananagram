@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
 import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
+import { RedeemLinkCodeDto } from './dto/redeem-link-code.dto';
 import * as argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -177,5 +178,51 @@ export class AuthService {
     const passwordHash = await argon2.hash(dto.newPassword);
     await this.repo.consumePasswordResetToken(stored.id, stored.userId, passwordHash);
     return { reset: true };
+  }
+
+  // Account-linking de la Alexa Skill — LinkCode, no OAuth2 (contrato ya
+  // usado por el equipo externo del Lambda). El usuario logueado genera el
+  // código desde el frontend; el Lambda lo canjea una sola vez.
+  async createLinkCode(userId: string) {
+    const linkCode = await this.repo.createAccountLinkCode(userId);
+    return { code: linkCode.code, expiresAt: linkCode.expiresAt };
+  }
+
+  // Sin password: para cuando se llega aquí ya se validó identidad al
+  // generar el código (el usuario estaba logueado) — mismo criterio que
+  // refresh()/register() en issueTokens().
+  async redeemLinkCode(dto: RedeemLinkCodeDto) {
+    const stored = await this.repo.findValidAccountLinkCode(dto.code);
+    if (!stored) throw new UnauthorizedException('Código inválido o expirado');
+
+    await this.repo.consumeAccountLinkCode(stored.id);
+
+    const user = await this.repo.findById(stored.userId);
+    if (!user) throw new UnauthorizedException('El usuario asociado a este código ya no existe');
+
+    const tokens = await this.issueTokens(user);
+    const name = await this.fetchDisplayName(user.id, user.email);
+
+    // userId/name además de los tokens (no en vez de): la skill los necesita
+    // para saludar por nombre, pero sigue necesitando accessToken/
+    // refreshToken reales para llamar al resto de endpoints de alexa-service
+    // (todos exigen JWT, igual que cualquier otro cliente).
+    return { ...tokens, userId: user.id, name };
+  }
+
+  // El nombre para mostrar vive en UserProfile (core-service), no en User
+  // (auth-service) — ver "Modelo de datos vigente" en CLAUDE.md. Best-effort,
+  // mismo criterio que createProfileBestEffort: si core-service está caído o
+  // el perfil no existe todavía, no se rompe el canje, solo se usa el email.
+  private async fetchDisplayName(userId: string, fallbackEmail: string): Promise<string> {
+    const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
+    try {
+      const response = await fetch(`${coreServiceUrl}/api/internal/user-profiles/${userId}`);
+      if (!response.ok) return fallbackEmail;
+      const profile = (await response.json()) as { name?: string } | null;
+      return profile?.name ?? fallbackEmail;
+    } catch {
+      return fallbackEmail;
+    }
   }
 }

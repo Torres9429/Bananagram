@@ -6,6 +6,7 @@ import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
 import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
+import { RedeemLinkCodeDto } from './dto/redeem-link-code.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 
@@ -51,5 +52,20 @@ export class AuthController {
   @Post('password-reset/confirm')
   confirmPasswordReset(@Body() dto: PasswordResetConfirmDto) {
     return this.authService.confirmPasswordReset(dto);
+  }
+
+  // Genera el código: lo llama el frontend con el usuario ya logueado.
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('link-code')
+  createLinkCode(@CurrentUser() user: any) {
+    return this.authService.createLinkCode(user.sub);
+  }
+
+  // Canjea el código: lo llama el Lambda de Alexa, sin JWT todavía (es
+  // justamente lo que este endpoint entrega) — público a propósito.
+  @Post('link-code/redeem')
+  redeemLinkCode(@Body() dto: RedeemLinkCodeDto) {
+    return this.authService.redeemLinkCode(dto);
   }
 }

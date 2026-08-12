@@ -3,6 +3,27 @@ import { prisma } from '../prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const LINK_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutos
+// Solo dígitos, 4 caracteres — un PIN se dicta por voz mucho más fácil que
+// texto alfanumérico. Espacio de 9,000 códigos (nunca empieza en 0, ver
+// abajo): de sobra para el volumen de este proyecto (códigos expiran a los
+// 10 min y se invalida el anterior al pedir uno nuevo, nunca hay muchos
+// "vivos" a la vez).
+const LINK_CODE_LENGTH = 4;
+
+// El slot de Alexa que captura esto es AMAZON.FOUR_DIGIT_NUMBER — no hay
+// certeza de que preserve ceros a la izquierda ("0234" podría llegar como
+// "234"). En vez de depender de probarlo en el simulador, se evita el caso
+// por completo: el primer dígito nunca es 0, así el código siempre se lee
+// como un número de 4 dígitos real sin ambigüedad de padding.
+function generateLinkCode(): string {
+  const firstDigit = String(1 + Math.floor(Math.random() * 9)); // 1-9
+  let code = firstDigit;
+  for (let i = 1; i < LINK_CODE_LENGTH; i++) {
+    code += String(Math.floor(Math.random() * 10)); // 0-9
+  }
+  return code;
+}
 
 type UserWithRoles = {
   id: string;
@@ -150,6 +171,49 @@ export class AuthRepository {
         data: { revokedAt: new Date() },
       }),
     ]);
+  }
+
+  findById(userId: string) {
+    return prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      include: { roles: { include: { role: true } } },
+    });
+  }
+
+  // --- Account-linking de la Alexa Skill (LinkCode, no OAuth2) ---
+
+  async createAccountLinkCode(userId: string) {
+    // Invalida cualquier código previo no usado del mismo usuario —
+    // "expirarlo ya" en vez de un campo revokedAt aparte, mismo efecto para
+    // el filtro que ya usa findValidAccountLinkCode.
+    await prisma.accountLinkCode.updateMany({
+      where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { expiresAt: new Date() },
+    });
+
+    const code = await this.generateUniqueLinkCode();
+    return prisma.accountLinkCode.create({
+      data: { userId, code, expiresAt: new Date(Date.now() + LINK_CODE_TTL_MS) },
+    });
+  }
+
+  findValidAccountLinkCode(code: string) {
+    return prisma.accountLinkCode.findFirst({
+      where: { code, usedAt: null, expiresAt: { gt: new Date() } },
+    });
+  }
+
+  async consumeAccountLinkCode(id: string): Promise<void> {
+    await prisma.accountLinkCode.update({ where: { id }, data: { usedAt: new Date() } });
+  }
+
+  private async generateUniqueLinkCode(): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = generateLinkCode();
+      const existing = await prisma.accountLinkCode.findUnique({ where: { code } });
+      if (!existing) return code;
+    }
+    throw new Error('No se pudo generar un código de vinculación único');
   }
 
   // --- Multirol: asignación puntual de roles a un usuario ya existente ---

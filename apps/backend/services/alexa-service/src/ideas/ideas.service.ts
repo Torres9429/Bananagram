@@ -1,4 +1,90 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ContentIdeaSource } from '../../node_modules/.prisma-client';
+import { prisma } from '../prisma/client';
+import { CreateIdeaDto } from './dto/create-idea.dto';
+import { UpdateIdeaDto } from './dto/update-idea.dto';
 
+type CurrentUser = { sub: string; roles: string[] };
+
+// Único servicio del sistema con lectura/escritura directa de ContentIdea
+// (Fase 6 del plan): las ideas solo se generan desde la skill, así que
+// core-service dejó de tener cualquier lógica de este dominio — este
+// service es ahora el único dueño, para cualquier cliente (web o skill).
 @Injectable()
-export class IdeasService {}
+export class IdeasService {
+  private readonly coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
+
+  async listByCampaign(campaignId: string, authHeader: string): Promise<any> {
+    await this.assertCampaignAccess(campaignId, authHeader);
+    return prisma.contentIdea.findMany({
+      where: { campaignId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getIdea(id: string, authHeader: string): Promise<any> {
+    const idea = await prisma.contentIdea.findFirst({ where: { id, deletedAt: null } });
+    if (!idea) throw new NotFoundException(`ContentIdea ${id} no existe`);
+    await this.assertCampaignAccess(idea.campaignId, authHeader);
+    return idea;
+  }
+
+  async createIdea(dto: CreateIdeaDto, user: CurrentUser, authHeader: string): Promise<any> {
+    await this.assertCampaignAccess(dto.campaignId, authHeader);
+    return prisma.contentIdea.create({
+      data: {
+        campaignId: dto.campaignId,
+        text: dto.text,
+        title: dto.title,
+        source: (dto.source as ContentIdeaSource) ?? ContentIdeaSource.sugerida,
+        createdBy: user.sub,
+      },
+    });
+  }
+
+  async updateIdea(id: string, dto: UpdateIdeaDto, authHeader: string): Promise<any> {
+    await this.getIdea(id, authHeader);
+    this.assertAtLeastOneProvided(dto);
+
+    return prisma.contentIdea.update({
+      where: { id },
+      data: { text: dto.text, title: dto.title },
+    });
+  }
+
+  async removeIdea(id: string, authHeader: string): Promise<any> {
+    await this.getIdea(id, authHeader);
+    return prisma.contentIdea.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  // alexa-service ya no tiene Campaign en su propio Prisma Client — reutiliza
+  // la regla de pertenencia que ya vive (correcta) en core-service vía HTTP,
+  // en vez de reimplementarla: GET /campaigns ya filtra server-side por
+  // ownership (dueño, CM, diseñador o Administrador — CampaignsService.
+  // listCampaigns). Reenvía el mismo Bearer del caller para que el
+  // ownership se valide como el usuario real, no como un usuario de
+  // servicio genérico.
+  private async assertCampaignAccess(campaignId: string, authHeader: string): Promise<void> {
+    const response = await fetch(`${this.coreServiceUrl}/api/campaigns`, {
+      headers: { Authorization: authHeader },
+    });
+    if (!response.ok) {
+      throw new BadRequestException('No se pudo verificar el acceso a la campaña');
+    }
+
+    const campaigns = (await response.json()) as Array<{ id: string }>;
+    const hasAccess = campaigns.some((campaign) => campaign.id === campaignId);
+    if (!hasAccess) {
+      // No se distingue "no existe" de "no es tuya" a propósito — mismo
+      // criterio que no filtrar existencia de recursos a quien no tiene acceso.
+      throw new ForbiddenException('No tienes acceso a esta campaña');
+    }
+  }
+
+  private assertAtLeastOneProvided(dto: object): void {
+    const hasAnyValue = Object.values(dto).some((value) => value !== undefined && value !== null);
+    if (!hasAnyValue) {
+      throw new BadRequestException('Debes enviar al menos un campo para actualizar');
+    }
+  }
+}

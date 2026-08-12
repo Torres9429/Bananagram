@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../node_modules/.prisma-client';
 import { prisma } from '../prisma/client';
+
+type LatestEngagement = { postSocialAccountId: string; engagement: number | null };
 
 @Injectable()
 export class ScoreService {
@@ -12,7 +15,7 @@ export class ScoreService {
     // docs/base/modelo2.txt). Un post puede publicarse en varias redes.
     const posts = await prisma.post.findMany({
       where: { brandId, status: 'publicado', publishedAt: { gte: thirtyDaysAgo }, deletedAt: null },
-      include: { socialAccounts: { include: { metrics: true } } },
+      include: { socialAccounts: true },
     });
 
     // Consistencia (30%): posts en horarios pico / total posts
@@ -20,12 +23,16 @@ export class ScoreService {
     const peakPosts = posts.filter(p => p.publishedAt && peakHours.includes(new Date(p.publishedAt).getHours()));
     const consistency = posts.length > 0 ? (peakPosts.length / posts.length) * 100 : 0;
 
-    // Engagement (40%): promedio de las métricas de todas las redes en las
-    // que se publicó cada post (antes había una sola red por post; ahora
-    // puede haber varias vía PostSocialAccount).
-    const allMetrics = posts.flatMap(p => p.socialAccounts.flatMap(sa => sa.metrics));
-    const avgEngagement = allMetrics.length > 0
-      ? allMetrics.reduce((sum, m) => sum + (m.engagement ?? 0), 0) / allMetrics.length
+    // Engagement (40%): promedio de la ÚLTIMA captura por PostSocialAccount,
+    // no de todo el histórico (auditoría §8/§22.9) — el cron crea una fila
+    // nueva cada 6h sin borrar las viejas, así que promediar todas sobre-
+    // pesaba los posts más viejos (más capturas acumuladas). `null` se
+    // excluye del promedio, nunca se trata como 0 (auditoría §22.16).
+    const postSocialAccountIds = posts.flatMap(p => p.socialAccounts.map(sa => sa.id));
+    const latestMetrics = await this.getLatestEngagement(postSocialAccountIds);
+    const withEngagement = latestMetrics.filter((m): m is LatestEngagement & { engagement: number } => m.engagement !== null);
+    const avgEngagement = withEngagement.length > 0
+      ? withEngagement.reduce((sum, m) => sum + m.engagement, 0) / withEngagement.length
       : 0;
     const engagement = avgEngagement <= 2 ? (avgEngagement / 2) * 50
       : avgEngagement <= 5 ? 50 + ((avgEngagement - 2) / 3) * 30
@@ -55,5 +62,23 @@ export class ScoreService {
     });
 
     return { score: rounded, consistency, engagement, coverage, frequency, classification };
+  }
+
+  // $queryRaw es el único lugar del proyecto donde se justifica SQL nativo
+  // (auditoría §22.9) — Prisma no tiene DISTINCT ON nativo en su query builder.
+  // Columnas camelCase entre comillas: este schema NO mapea cada campo a
+  // snake_case (@@map solo renombra la tabla) — el nombre real de columna
+  // es literal "postSocialAccountId"/"capturedAt", no post_social_account_id.
+  private async getLatestEngagement(postSocialAccountIds: string[]): Promise<LatestEngagement[]> {
+    if (postSocialAccountIds.length === 0) return [];
+    return prisma.$queryRaw<LatestEngagement[]>(
+      Prisma.sql`
+        SELECT DISTINCT ON ("postSocialAccountId")
+          "postSocialAccountId", engagement
+        FROM post_metrics
+        WHERE "postSocialAccountId" IN (${Prisma.join(postSocialAccountIds)})
+        ORDER BY "postSocialAccountId", "capturedAt" DESC
+      `,
+    );
   }
 }

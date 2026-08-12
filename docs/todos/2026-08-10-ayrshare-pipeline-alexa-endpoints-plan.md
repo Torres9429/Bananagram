@@ -227,8 +227,9 @@ Prisma Client al mismo folder por compartir versión de `@prisma/client`):
 `gestor_redes_auth`, no tocada por esta decisión; mismo patrón que `PasswordResetToken`,
 `auth-service/prisma/schema.prisma:158-168`):
 - `schema.prisma` — nuevo modelo `AccountLinkCode { id, userId, code String @unique, expiresAt DateTime,
-  usedAt DateTime?, createdAt }`, relación `User.accountLinkCodes`. Código corto (6-8 caracteres
-  alfanuméricos, generado en el service, no UUID completo), expira en pocos minutos (p. ej. 10).
+  usedAt DateTime?, createdAt }`, relación `User.accountLinkCodes`. Código de 4 dígitos (solo números,
+  no UUID completo — un PIN se dicta por voz mucho más fácil que texto alfanumérico), expira en pocos
+  minutos (10).
 - `auth.controller.ts`/`auth.service.ts`/`auth.repository.ts` — dos endpoints nuevos siguiendo el mismo
   patrón que `password-reset`:
   - `POST /auth/link-code` (autenticado, `JwtAuthGuard`) — genera un código nuevo para el usuario actual,

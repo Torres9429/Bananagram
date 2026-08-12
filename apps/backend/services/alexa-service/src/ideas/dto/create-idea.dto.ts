@@ -6,8 +6,10 @@ export class CreateIdeaDto {
   @ApiProperty() @IsString() @MinLength(1) text: string;
   @ApiPropertyOptional() @IsOptional() @IsString() title?: string;
 
-  // Default 'propia': una idea creada por HTTP viene del panel web, a
-  // diferencia de 'sugerida' (generada por la Alexa Skill vía alexa-service).
+  // 'sugerida' = generada por GenerateContentIdeasIntent y guardada tal cual
+  // (SaveIdeaIntent); 'propia' = dictada libremente por el usuario
+  // (SaveCustomIdeaIntent). Ambas vienen siempre de la skill — este endpoint
+  // ya no lo llama la plataforma web (ver Fase 6 del plan).
   @ApiPropertyOptional({ enum: ['sugerida', 'propia'] })
   @IsOptional()
   @IsIn(['sugerida', 'propia'])

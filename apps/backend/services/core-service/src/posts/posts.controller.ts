@@ -5,6 +5,8 @@ import { RequirePermission } from '../decorators/require-permission.decorator';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionGuard } from '../guards/permission.guard';
 import { CreatePostDto } from './dto/create-post.dto';
+import { RejectPostDto } from './dto/reject-post.dto';
+import { SchedulePostDto } from './dto/schedule-post.dto';
 import { PostsService } from './posts.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -29,6 +31,30 @@ export class PostsController {
   @RequirePermission('publicaciones', 'editar')
   submitForReview(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
     return this.posts.submitPostForReview(id, user);
+  }
+
+  @Post(':id/approve')
+  @RequirePermission('publicaciones', 'aprobar')
+  approve(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
+    return this.posts.approvePost(id, user);
+  }
+
+  @Post(':id/reject')
+  @RequirePermission('publicaciones', 'rechazar')
+  reject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectPostDto, @CurrentUser() user: Claims) {
+    return this.posts.rejectPost(id, dto, user);
+  }
+
+  @Post(':id/schedule')
+  @RequirePermission('publicaciones', 'editar')
+  schedule(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SchedulePostDto, @CurrentUser() user: Claims) {
+    return this.posts.schedulePost(id, dto, user);
+  }
+
+  @Post(':id/cancel')
+  @RequirePermission('publicaciones', 'editar')
+  cancel(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
+    return this.posts.cancelPost(id, user);
   }
 
   @Post(':id/media')

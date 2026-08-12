@@ -1,0 +1,46 @@
+// Schema propio de alexa-service — NO es dueño de esta base de datos, solo
+// tiene acceso directo de lectura/escritura a la misma físicamente
+// (gestor_redes_core, la de core-service). Contiene ÚNICAMENTE el modelo
+// ContentIdea, porque es el único dominio que se mudó por completo a
+// alexa-service (las ideas solo se generan desde la skill — ver
+// docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md Fase 6).
+// campaigns/brands/etc. NO se declaran aquí a propósito: ese dominio sigue
+// viviendo en core-service, alexa-service lo consume por HTTP.
+//
+// REGLA DURA: este schema NUNCA se migra (`prisma migrate`) — solo se
+// genera cliente (`prisma generate`). La única dueña del schema real y de
+// las migraciones sobre esta base es core-service, en exclusiva. Si
+// core-service migra un campo de ContentIdea, esta copia hay que
+// sincronizarla a mano.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_CORE")
+}
+
+enum ContentIdeaSource {
+  sugerida
+  propia
+}
+
+model ContentIdea {
+  id         String @id @default(uuid())
+  campaignId String // FK → core-service.Campaign.id (sin @relation: ese modelo no vive en este schema)
+
+  createdBy String // FK → auth-service.User.id (sin constraint de BD; viene del JWT al escribir)
+
+  title  String?
+  text   String @db.Text
+  source ContentIdeaSource @default(sugerida)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("content_ideas")
+}
