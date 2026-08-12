@@ -78,6 +78,14 @@ describe('Posts Flow Integration', () => {
     ]);
     socialNetworkIds = socialNetworks.map((socialNetwork) => socialNetwork.id);
 
+    // Cuentas sociales conectadas de la marca — necesarias para schedulePost
+    // (valida que la marca tenga cada red del post ya conectada).
+    await Promise.all(
+      socialNetworkIds.map((socialNetworkId) =>
+        corePrisma.socialAccount.create({ data: { brandId, socialNetworkId, active: true } }),
+      ),
+    );
+
     const moduleRef = await Test.createTestingModule({ imports: [PostsModule] })
       .overrideProvider(CloudinaryService)
       .useValue(cloudinaryMock)
@@ -274,8 +282,125 @@ describe('Posts Flow Integration', () => {
     expect(updatedPost.media[1].order).toBe(2);
     expect(updatedPost.media[0].media.brandId).toBe(brandId);
 
-    const storedMedia = await corePrisma.media.findMany({ where: { brandId }, orderBy: { createdAt: 'asc' } });
-    expect(storedMedia).toHaveLength(2);
-    expect(storedMedia[0].originalName).toBe('imagen-1.png');
+    // El orden real vive en PostMedia.order, no en Media.createdAt — ambas
+    // filas de Media se crean dentro de la misma prisma.$transaction(), y
+    // Postgres congela now() al valor de inicio de la transacción para
+    // TODOS sus statements, así que las dos quedan con el mismo createdAt
+    // (orderBy: createdAt no puede desempatar, por eso este assert fallaba
+    // de forma no determinística según el orden físico de Postgres, no por
+    // un bug real de la app).
+    const storedPostMedia = await corePrisma.postMedia.findMany({
+      where: { postId: post.id },
+      include: { media: true },
+      orderBy: { order: 'asc' },
+    });
+    expect(storedPostMedia).toHaveLength(2);
+    expect(storedPostMedia[0].media.originalName).toBe('imagen-1.png');
+    expect(storedPostMedia[1].media.originalName).toBe('video-1.mp4');
+  });
+
+  it('aprueba una publicación en revisión (Cliente dueño de la marca)', async () => {
+    const post = await postsService.createPost(
+      { brandId, campaignId, socialNetworkIds, content: 'Para aprobar' } as any,
+      cmClaims,
+    );
+    await postsService.submitPostForReview(post.id, cmClaims);
+
+    const approved = await postsService.approvePost(post.id, ownerClaims);
+    expect(approved.status).toBe(PostStatus.APROBADO);
+
+    const history = await corePrisma.postStatusHistory.findMany({
+      where: { postId: post.id },
+      orderBy: { id: 'asc' },
+    });
+    expect(history[history.length - 1].toStatus).toBe(PostStatus.APROBADO);
+  });
+
+  it('rechaza aprobar si el usuario no es dueño de la marca ni admin', async () => {
+    const post = await postsService.createPost(
+      { brandId, campaignId, socialNetworkIds, content: 'Aprobación ajena' } as any,
+      cmClaims,
+    );
+    await postsService.submitPostForReview(post.id, cmClaims);
+
+    await expect(postsService.approvePost(post.id, outsiderClaims)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rechaza aprobar sin pasar antes por revisión (transición inválida)', async () => {
+    const post = await postsService.createPost(
+      { brandId, campaignId, socialNetworkIds, content: 'Aprobación prematura' } as any,
+      cmClaims,
+    );
+
+    await expect(postsService.approvePost(post.id, ownerClaims)).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+  });
+
+  it('rechaza un post en revisión sin motivo y lo marca rechazado con motivo válido', async () => {
+    const post = await postsService.createPost(
+      { brandId, campaignId, socialNetworkIds, content: 'Para rechazar' } as any,
+      cmClaims,
+    );
+    await postsService.submitPostForReview(post.id, cmClaims);
+
+    await expect(
+      postsService.rejectPost(post.id, { comment: '' } as any, ownerClaims),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const rejected = await postsService.rejectPost(post.id, { comment: 'Faltan hashtags' } as any, ownerClaims);
+    expect(rejected.status).toBe(PostStatus.RECHAZADO);
+  });
+
+  it('programa una publicación aprobada cuando la marca tiene las redes conectadas', async () => {
+    const post = await postsService.createPost(
+      { brandId, campaignId, socialNetworkIds, content: 'Para programar' } as any,
+      cmClaims,
+    );
+    await postsService.submitPostForReview(post.id, cmClaims);
+    await postsService.approvePost(post.id, ownerClaims);
+
+    const scheduled = await postsService.schedulePost(
+      post.id,
+      { scheduledAt: '2026-09-01T10:00:00.000Z' } as any,
+      cmClaims,
+    );
+    expect(scheduled.status).toBe(PostStatus.PROGRAMADO);
+    expect(scheduled.scheduledAt).toEqual(new Date('2026-09-01T10:00:00.000Z'));
+  });
+
+  it('rechaza programar si falta conectar alguna red social de la marca', async () => {
+    const disconnectedNetwork = await corePrisma.socialNetwork.create({
+      data: { name: 'Red sin conectar', code: `red-sin-conectar-${randomUUID()}`, baseEngagementRate: 0.1 },
+    });
+
+    const post = await postsService.createPost(
+      {
+        brandId,
+        campaignId,
+        socialNetworkIds: [...socialNetworkIds, disconnectedNetwork.id],
+        content: 'Red faltante',
+      } as any,
+      cmClaims,
+    );
+    await postsService.submitPostForReview(post.id, cmClaims);
+    await postsService.approvePost(post.id, ownerClaims);
+
+    await expect(
+      postsService.schedulePost(post.id, { scheduledAt: '2026-09-01T10:00:00.000Z' } as any, cmClaims),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('cancela una publicación programada', async () => {
+    const post = await postsService.createPost(
+      { brandId, campaignId, socialNetworkIds, content: 'Para cancelar' } as any,
+      cmClaims,
+    );
+    await postsService.submitPostForReview(post.id, cmClaims);
+    await postsService.approvePost(post.id, ownerClaims);
+    await postsService.schedulePost(post.id, { scheduledAt: '2026-09-01T10:00:00.000Z' } as any, cmClaims);
+
+    const cancelled = await postsService.cancelPost(post.id, cmClaims);
+    expect(cancelled.status).toBe(PostStatus.CANCELADO);
   });
 });

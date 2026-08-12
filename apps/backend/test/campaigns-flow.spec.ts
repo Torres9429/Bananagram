@@ -55,6 +55,9 @@ describe('Campaigns Flow Integration', () => {
       data: { userId: cmUserId, name: 'CM de prueba', roleNames: ['cm'] },
     });
     await corePrisma.userProfile.create({
+      data: { userId: otherCmUserId, name: 'Otro CM de prueba', roleNames: ['cm'] },
+    });
+    await corePrisma.userProfile.create({
       data: { userId: designerUserId, name: 'Diseñador de prueba', roleNames: ['disenador'] },
     });
     await corePrisma.userProfile.create({
@@ -87,33 +90,56 @@ describe('Campaigns Flow Integration', () => {
     expect(campaign.cmId).toBe(cmUserId);
   });
 
-  it('no permite reasignar el cmId de una campaña ya creada (RF-2.3)', async () => {
+  it('permite reasignar el cmId mientras el CM no haya aceptado, y lo bloquea después de aceptar (RF-2.3, relajada en la Fase J)', async () => {
     const campaign = await campaignsService.createCampaign(
       { brandId, name: 'Campaña para reasignar', cmId: cmUserId } as any,
       clientClaims,
     );
 
+    // Pendiente todavía: reasignar SÍ funciona — el Cliente necesita poder
+    // elegir otro CM si el primero rechaza (o antes de que responda), sin
+    // esperar a que "acepte" primero.
+    const reassigned = await campaignsService.updateCampaign(
+      campaign.id,
+      { cmId: otherCmUserId } as any,
+      clientClaims,
+    );
+    expect(reassigned.cmId).toBe(otherCmUserId);
+    expect(reassigned.cmStatus).toBe('pendiente');
+
+    const otherCmClaims = { sub: otherCmUserId, roles: ['community_manager'] };
+    await campaignsService.acceptCampaign(campaign.id, otherCmClaims);
+
+    // Ya aceptada: ahora sí queda bloqueado por completo, incluso reenviando
+    // el mismo cmId ya asignado — no es un no-op silencioso.
     await expect(
       campaignsService.updateCampaign(campaign.id, { cmId: otherCmUserId } as any, clientClaims),
     ).rejects.toBeInstanceOf(BadRequestException);
-
-    // Incluso reenviando el mismo cmId ya asignado se rechaza — no es un
-    // no-op silencioso, es un campo bloqueado por completo tras la creación.
-    await expect(
-      campaignsService.updateCampaign(campaign.id, { cmId: cmUserId } as any, clientClaims),
-    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('rechaza asignar un diseñador cuyo perfil no tiene rol de Diseñador', async () => {
+  it('assignDesigner exige que la campaña esté aceptada y que el diseñador ya esté en el equipo general del CM', async () => {
     const campaign = await campaignsService.createCampaign(
       { brandId, name: 'Campaña para asignar diseñador', cmId: cmUserId } as any,
       clientClaims,
     );
     const cmClaims = { sub: cmUserId, roles: ['community_manager'] };
 
-    await expect(campaignsService.assignDesigner(campaign.id, cmUserId, cmClaims)).rejects.toBeInstanceOf(
+    // Bloqueado mientras el CM no aceptó (regla nueva de la Fase J2): no se
+    // arma equipo de una campaña todavía no confirmada.
+    await expect(campaignsService.assignDesigner(campaign.id, designerUserId, cmClaims)).rejects.toBeInstanceOf(
       BadRequestException,
     );
+
+    await campaignsService.acceptCampaign(campaign.id, cmClaims);
+
+    // Ya aceptada, pero el diseñador todavía no está en el equipo GENERAL
+    // del CM (CmTeamMember) — la validación de rol 'disenador' vive ahí
+    // (POST /me/team, Fase J5), no en assignDesigner.
+    await expect(campaignsService.assignDesigner(campaign.id, designerUserId, cmClaims)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    await corePrisma.cmTeamMember.create({ data: { cmUserId, designerUserId } });
 
     const assigned = await campaignsService.assignDesigner(campaign.id, designerUserId, cmClaims);
     expect(assigned.userId).toBe(designerUserId);
