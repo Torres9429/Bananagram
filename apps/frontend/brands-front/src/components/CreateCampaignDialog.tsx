@@ -5,63 +5,78 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import Avatar from '@mui/material/Avatar';
-import Checkbox from '@mui/material/Checkbox';
 import Divider from '@mui/material/Divider';
 import Alert from '@mui/material/Alert';
-import { FormDialog, LabeledField } from '@repo/ui/ui';
-import { getInitials } from '@repo/ui/utils';
-import {
-  useListEligibleCMsQuery,
-  useListEligibleDesignersQuery,
-  useCreateCampaignMutation,
-  useAssignDesignerMutation,
-} from '../store/api/campaigns.api';
+import { FormDialog, LabeledField, useToast } from '@repo/ui/ui';
+import { useListCategoriesQuery } from '@repo/ui/state';
+import { useListEligibleCMsQuery, useCreateCampaignMutation } from '../store/api/campaigns.api';
+import { CmPicker } from './CmPicker';
 
 interface CreateCampaignDialogProps {
   open: boolean;
   brandId: string;
+  // Respaldo para las recomendaciones de CM cuando el Cliente todavía no
+  // eligió categorías de campaña (ver Contexto de la Fase J en el plan).
+  brandCategoryId?: string | null;
   onClose: () => void;
   // RTK Query ya invalida el cache de listCampaigns al crear — el padre solo
   // necesita saber que terminó (para, por ejemplo, cerrar su propio estado).
   onCreated?: () => void;
 }
 
-// Reescrito para consumir /campaigns real (ver plan de integración):
-// - "status" al crear ya no es elegible en UI: CreateCampaignDto no lo acepta,
-//   toda campaña nace 'active' en el backend — cambiar el estado es un PATCH
-//   posterior (edición), fuera de alcance de este diálogo de creación.
-// - El picker de "cuentas sociales de la campaña" del mock se quita: el
-//   modelo real no vincula Campaign↔SocialAccount directamente (el fan-out
-//   multi-red vive en PostSocialAccount, a nivel de Post, no de Campaign).
-// - "Coincide con tu categoría" también se quita: GET /campaigns/eligible-*
-//   devuelve solo {userId, name, avatarUrl}, sin categorías por CM.
-export function CreateCampaignDialog({ open, brandId, onClose, onCreated }: CreateCampaignDialogProps) {
+// Fase J: el CM ahora debe ACEPTAR la campaña antes de que nada más pase —
+// ya no se le asignan Diseñadores aquí (ese paso era en realidad un bug:
+// CampaignsService.assignDesigner exige ser el CM asignado, el Cliente no
+// lo es, así que esa llamada nunca funcionó de verdad). El CM arma su
+// equipo después de aceptar, desde su equipo general.
+export function CreateCampaignDialog({ open, brandId, brandCategoryId, onClose, onCreated }: CreateCampaignDialogProps) {
   const [name, setName] = useState('');
   const [objective, setObjective] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [cmId, setCmId] = useState<string | null>(null);
-  const [designerIds, setDesignerIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: eligibleCMs = [] } = useListEligibleCMsQuery(undefined, { skip: !open });
-  const { data: eligibleDesigners = [] } = useListEligibleDesignersQuery(undefined, { skip: !open });
+  const { data: categories = [] } = useListCategoriesQuery();
+  // Sin categorías elegidas todavía, se usa la de la marca como respaldo
+  // para no dejar las recomendaciones vacías desde el primer render.
+  const effectiveCategoryIds = categoryIds.length ? categoryIds : brandCategoryId ? [brandCategoryId] : [];
+  // Misma query que usa <CmPicker /> internamente (RTK Query la comparte,
+  // no hay doble fetch) — se necesita aquí también para resolver el nombre
+  // del CM elegido al armar el mensaje de éxito.
+  const { data: eligibleCMs = [] } = useListEligibleCMsQuery(effectiveCategoryIds, { skip: !open });
   const [createCampaign, { isLoading: isCreating }] = useCreateCampaignMutation();
-  const [assignDesigner] = useAssignDesignerMutation();
+  const { showSuccess, showError } = useToast();
 
   const selectedCm = eligibleCMs.find((cm) => cm.userId === cmId) ?? null;
 
-  function toggleDesigner(id: string) {
-    setDesignerIds((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
+  function toggleCategory(id: string) {
+    setCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+  }
+
+  function reset() {
+    setName('');
+    setObjective('');
+    setDescription('');
+    setStartDate('');
+    setEndDate('');
+    setCategoryIds([]);
+    setCmId(null);
+    setError(null);
+  }
+
+  function handleClose() {
+    reset();
+    onClose();
   }
 
   async function handleCreate() {
     if (!name.trim() || !selectedCm) return;
     setError(null);
     try {
-      const campaign = await createCampaign({
+      await createCampaign({
         brandId,
         name: name.trim(),
         objective: objective.trim() || undefined,
@@ -69,21 +84,16 @@ export function CreateCampaignDialog({ open, brandId, onClose, onCreated }: Crea
         cmId: selectedCm.userId,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        categoryIds: categoryIds.length ? categoryIds : undefined,
       }).unwrap();
 
-      await Promise.all(designerIds.map((userId) => assignDesigner({ campaignId: campaign.id, userId }).unwrap()));
-
-      setName('');
-      setObjective('');
-      setDescription('');
-      setStartDate('');
-      setEndDate('');
-      setCmId(null);
-      setDesignerIds([]);
+      reset();
       onCreated?.();
       onClose();
+      showSuccess(`Campaña creada — se notificó a ${selectedCm.name} para que la confirme.`);
     } catch {
       setError('No se pudo crear la campaña. Verifica los datos e intenta de nuevo.');
+      showError('No se pudo crear la campaña.');
     }
   }
 
@@ -94,7 +104,7 @@ export function CreateCampaignDialog({ open, brandId, onClose, onCreated }: Crea
       maxWidth="sm"
       confirmLabel={isCreating ? 'Creando…' : 'Crear'}
       confirmDisabled={!name.trim() || !selectedCm || isCreating}
-      onClose={onClose}
+      onClose={handleClose}
       onConfirm={handleCreate}
     >
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -111,77 +121,36 @@ export function CreateCampaignDialog({ open, brandId, onClose, onCreated }: Crea
         </Box>
       </Stack>
 
+      {categories.length > 0 && (
+        <Box mb={2}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Categorías de la campaña (opcional)</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+            Ayudan a recomendarte un Community Manager afín al tipo de campaña.
+          </Typography>
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            {categories.map((cat) => (
+              <Chip
+                key={cat.id}
+                label={cat.name}
+                onClick={() => toggleCategory(cat.id)}
+                color={categoryIds.includes(cat.id) ? 'primary' : 'default'}
+                variant={categoryIds.includes(cat.id) ? 'filled' : 'outlined'}
+              />
+            ))}
+          </Stack>
+        </Box>
+      )}
+
       <Divider sx={{ mb: 2.5 }} />
 
       <Box>
         <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Elige un Community Manager</Typography>
         <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-          Solo puedes seleccionar un CM por campaña — no se puede cambiar después de creada.
+          Solo puedes seleccionar uno por campaña — se le notificará para que confirme antes de que
+          empiece a trabajar en ella. Cuando confirme, armará su propio equipo de Diseñadores.
         </Typography>
-        {eligibleCMs.length === 0 ? (
-          <Alert severity="info" sx={{ borderRadius: 2 }}>No hay Community Managers disponibles.</Alert>
-        ) : (
-          <Stack gap={1}>
-            {eligibleCMs.map((cm) => {
-              const active = cmId === cm.userId;
-              return (
-                <Stack
-                  key={cm.userId}
-                  direction="row"
-                  gap={1.5}
-                  alignItems="center"
-                  onClick={() => setCmId(cm.userId)}
-                  sx={{
-                    p: 1.5,
-                    border: active ? '1.5px solid #E0A800' : '1px solid #E8E8E8',
-                    bgcolor: active ? '#FFFDE7' : '#fff',
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    '&:hover': { borderColor: '#E0A800' },
-                  }}
-                >
-                  <Avatar src={cm.avatarUrl ?? undefined} sx={{ width: 32, height: 32, fontSize: 12, fontWeight: 600 }}>
-                    {getInitials(cm.name)}
-                  </Avatar>
-                  <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>{cm.name}</Typography>
-                  {active && <Chip size="small" label="Seleccionado" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600, fontSize: 11 }} />}
-                </Stack>
-              );
-            })}
-          </Stack>
-        )}
+        <CmPicker categoryIds={effectiveCategoryIds} value={cmId} onChange={setCmId} skip={!open} />
       </Box>
-
-      {selectedCm && (
-        <Box sx={{ mt: 2.5 }}>
-          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>Diseñadores (opcional)</Typography>
-          <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-            Puedes asignar diseñadores ahora o después desde el detalle de la campaña.
-          </Typography>
-          {eligibleDesigners.length === 0 ? (
-            <Alert severity="info" sx={{ borderRadius: 2 }}>No hay Diseñadores disponibles.</Alert>
-          ) : (
-            <Stack gap={0.5}>
-              {eligibleDesigners.map((d) => (
-                <Stack
-                  key={d.userId}
-                  direction="row"
-                  gap={1}
-                  alignItems="center"
-                  onClick={() => toggleDesigner(d.userId)}
-                  sx={{ p: 1, border: '1px solid #E8E8E8', borderRadius: 2, cursor: 'pointer' }}
-                >
-                  <Checkbox size="small" checked={designerIds.includes(d.userId)} sx={{ p: 0.5 }} />
-                  <Avatar src={d.avatarUrl ?? undefined} sx={{ width: 28, height: 28, fontSize: 11, fontWeight: 600 }}>
-                    {getInitials(d.name)}
-                  </Avatar>
-                  <Typography variant="body2">{d.name}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-          )}
-        </Box>
-      )}
     </FormDialog>
   );
 }
