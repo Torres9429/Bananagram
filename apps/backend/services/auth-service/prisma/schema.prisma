@@ -147,6 +147,7 @@ model User {
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   notifications       Notification[]
+  accountLinkCodes    AccountLinkCode[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -165,6 +166,24 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   @@map("password_reset_tokens")
+}
+
+// Account-linking de la Alexa Skill: código corto de un solo uso, generado
+// desde el frontend logueado y canjeado una vez por el Lambda (nunca OAuth2
+// — contrato ya usado por el equipo externo de la skill). Mismo patrón que
+// PasswordResetToken (token/expiresAt/usedAt), salvo que `code` es corto
+// (6-8 caracteres alfanuméricos) en vez de un UUID — pensado para copiar/
+// pegar o dictar por voz, no para verse en una URL.
+model AccountLinkCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  code      String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("account_link_codes")
 }
 
 // Inmutable — instancia LOCAL de auditoría de auth-service. performedBy se
