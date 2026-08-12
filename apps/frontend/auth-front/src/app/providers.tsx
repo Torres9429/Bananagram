@@ -4,7 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Provider as ReduxProvider } from 'react-redux';
 import { theme, EmotionCacheProvider } from '@repo/ui/theme';
-import { useSessionBootstrap } from '@repo/ui/ui';
+import { useSessionBootstrap, ToastProvider } from '@repo/ui/ui';
 import { store } from '../store';
 
 function SessionBootstrap() {
@@ -19,7 +19,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <SessionBootstrap />
-          {children}
+          <ToastProvider>{children}</ToastProvider>
         </ThemeProvider>
       </ReduxProvider>
     </EmotionCacheProvider>

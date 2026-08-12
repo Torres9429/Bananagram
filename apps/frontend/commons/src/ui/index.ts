@@ -26,9 +26,11 @@ export * from './organisms/SidebarNav/SidebarNav';
 export * from './organisms/DataTable/DataTable';
 export * from './organisms/RoleSwitcher/RoleSwitcher';
 export * from './organisms/TopBar/TopBar';
+export * from './organisms/ToastProvider/ToastProvider';
 
 // Hooks (viven junto a la UI porque son hooks de componente, no de estado global)
 export * from '../hooks/usePermissions';
 export * from '../hooks/useSession';
 export * from '../hooks/useNotifications';
 export * from '../hooks/useSessionBootstrap';
+export * from '../hooks/useNotificationStream';

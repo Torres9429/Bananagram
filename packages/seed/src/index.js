@@ -45,7 +45,7 @@ const ROLE_PERMISSIONS = {
     marcas: ['ver'],
     publicaciones: ['ver', 'crear', 'editar'],
     calendario: ['ver', 'crear', 'editar'],
-    campanas: ['ver', 'crear', 'editar', 'asignar'],
+    campanas: ['ver', 'crear', 'editar', 'asignar', 'aprobar', 'rechazar'],
     metricas: ['ver'],
     score: ['ver'],
     reportes: ['ver'],
@@ -62,7 +62,11 @@ const ROLE_PERMISSIONS = {
     marcas: ['ver', 'crear', 'editar'],
     publicaciones: ['ver', 'aprobar', 'rechazar'],
     calendario: ['ver'],
-    campanas: ['ver', 'crear'],
+    // 'editar' agregado en la Fase L — reasignar CM tras un rechazo usa
+    // PATCH /campaigns/:id (updateCampaign), gateado por campanas:editar;
+    // sin esto el Cliente daba 403 al intentarlo. assertCanManage/
+    // BrandAccessGuard ya limitan esto a sus propias marcas.
+    campanas: ['ver', 'crear', 'editar'],
     metricas: ['ver'],
     score: ['ver'],
     reportes: ['ver', 'exportar'],
