@@ -12,17 +12,16 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { PrimaryButton } from '@repo/ui/ui';
 import { CreateCampaignDialog } from '../../../components/CreateCampaignDialog';
 import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
-import { useListMyBrandsQuery } from '../../../store/api/brands.api';
+import { useSelectedBrand } from '../../../hooks/useSelectedBrand';
 import { CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
 
 // Listado de campañas del Cliente en /profile — mismo contenido que
-// brands-front/app/brands/[id]/campaigns, pero SIN BrandTabs. GET /brands ya
-// viene filtrado por el backend a lo que el usuario logueado posee — se toma
-// la primera (mismo supuesto de "un solo perfil activo" que ya tenía el mock).
+// brands-front/app/brands/[id]/campaigns, pero SIN BrandTabs. Usa la marca
+// activa (useSelectedBrand, compartida con ClientSection) en vez de tomar
+// myBrands[0] a ciegas — un Cliente puede tener varias marcas.
 export default function ProfileCampaignsPage() {
   const router = useRouter();
-  const { data: myBrands = [] } = useListMyBrandsQuery();
-  const profile = myBrands[0];
+  const { selectedBrand: profile } = useSelectedBrand();
   const { data: allCampaigns = [] } = useListCampaignsQuery();
   const campaigns = profile ? allCampaigns.filter((c) => c.brandId === profile.id) : [];
   const [createOpen, setCreateOpen] = useState(false);
@@ -56,7 +55,7 @@ export default function ProfileCampaignsPage() {
                 direction="row"
                 justifyContent="space-between"
                 alignItems="center"
-                onClick={() => router.push(`/profile/campaigns/${c.id}`)}
+                onClick={() => router.push(`/brands/${c.brandId}/campaigns/${c.id}`)}
                 sx={{ p: 2, bgcolor: '#fff', border: '1px solid', borderColor: 'divider', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
               >
                 <Box>

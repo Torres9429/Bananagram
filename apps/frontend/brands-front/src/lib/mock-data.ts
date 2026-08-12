@@ -61,6 +61,16 @@ export const PROFILE_TYPE_LABELS: Record<ProfileType, string> = {
   personal: 'Perfil personal',
 };
 
+// El backend solo acepta 'brand'|'profile' en Brand.profileType
+// (CreateBrandDto/UpdateBrandDto: @IsIn(['brand','profile']), regla de
+// negocio #9) — PROFILE_TYPE_LABELS tiene más valores porque también los usa
+// el mock de perfiles de CM/Diseñador, pero un formulario de Brand real solo
+// puede enviar estos dos.
+export const BRAND_TYPE_OPTIONS: { value: 'brand' | 'profile'; label: string }[] = [
+  { value: 'brand', label: 'Marca' },
+  { value: 'profile', label: 'Perfil' },
+];
+
 export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, { label: string; bg: string; color: string }> = {
   active: { label: 'Activa', bg: '#E8F5E9', color: '#2E7D32' },
   paused: { label: 'Pausada', bg: '#FFF3E0', color: '#E65100' },
@@ -232,12 +242,7 @@ export function getCampaignCM(campaignId: string): MockTeamMember | null {
 
 // Solo Diseñadores (CampaignDesigner: join N sin campo de rol) — el CM ya no
 // se mezcla aquí (ver getCampaignCM) y el Cliente nunca fue un team member
-// (es Campaign.createdBy). El flujo "Agregar/Quitar Diseñador" sigue
-// mutando esta estructura exactamente igual que antes.
-export function assignTeamToCampaign(campaignId: string, designers: MockTeamMember[]) {
-  MOCK_CAMPAIGN_DESIGNERS[campaignId] = designers;
-}
-
+// (es Campaign.createdBy).
 export const MOCK_CAMPAIGN_DESIGNERS: Record<string, MockTeamMember[]> = {
   c1: [
     { id: 'u3', name: 'Elías Bailón', role: 'Diseñador', avatarBg: '#E3F2FD', avatarColor: '#1565C0' },
@@ -247,22 +252,6 @@ export const MOCK_CAMPAIGN_DESIGNERS: Record<string, MockTeamMember[]> = {
   ],
   c5: [
     { id: 'u2', name: 'Alexa Delgado', role: 'Diseñador', avatarBg: '#E3F2FD', avatarColor: '#1565C0' },
-  ],
-};
-
-export const MOCK_POSTS_BY_CAMPAIGN: Record<string, MockCampaignPost[]> = {
-  c1: [
-    { id: 'p1', title: 'Post lanzamiento verano', socialAccountId: 'bp1', status: 'borrador', scheduledAt: '—' },
-    { id: 'p3', title: 'Carrusel colores SS25', socialAccountId: 'bp2', status: 'en_revision', scheduledAt: '—' },
-    { id: 'p4', title: 'Story promo weekend', socialAccountId: 'bp3', status: 'programado', scheduledAt: 'Hoy 18:00' },
-  ],
-  c2: [
-    { id: 'p2', title: 'Reel Nike 30 seg', socialAccountId: 'bp4', status: 'rechazado', scheduledAt: '—' },
-    { id: 'p5', title: 'Reels sustentabilidad', socialAccountId: 'bp5', status: 'publicado', scheduledAt: 'Ayer 12:00' },
-  ],
-  c5: [
-    { id: 'p6', title: 'Rutina de la mañana', socialAccountId: 'bp7', status: 'en_revision', scheduledAt: '—' },
-    { id: 'p7', title: 'Trend challenge TikTok', socialAccountId: 'bp8', status: 'programado', scheduledAt: 'Mañana 20:00' },
   ],
 };
 
