@@ -56,13 +56,27 @@ pnpm seed                 # carga roles, permisos y usuarios de prueba
 > `pnpm seed` imprime al final las cuentas de prueba (mismo email/password que usa el modo mock del
 > frontend), incluida `multi@bananagram.mx` (community_manager + disenador, para probar multi-rol). No
 > siembra catálogos (categorías/especialidades/redes sociales) a propósito — se crean vía API una vez
-> logueado.
+> logueado (ver [Flujo esperado de punta a punta](#flujo-esperado-de-punta-a-punta) abajo).
 
 > [!IMPORTANT]
 > `auth-service` (y solo él) necesita las llaves RSA de `pnpm generate-keys` para firmar tokens —
 > `core-service`, `alexa-service` y el gateway verifican contra `GET /.well-known/jwks.json`, nunca leen
 > un `.pem` directo. Si `auth-service` no arranca por no encontrar las llaves, corre `pnpm generate-keys`
 > desde la raíz del repo.
+
+> [!IMPORTANT]
+> **Ayrshare es obligatorio, no opcional**, para avanzar más allá de crear una marca: `POST /brands`
+> llama a Ayrshare para crear el perfil + link de conexión, y falla con 500 sin `AYRSHARE_API_KEY`/
+> `AYRSHARE_DOMAIN`/`AYRSHARE_PRIVATE_KEY` configurados (cuenta de prueba gratuita de
+> [ayrshare.com](https://www.ayrshare.com) alcanza). Sin esto, todo el flujo se corta en el paso 3 de
+> abajo.
+>
+> **Cada servicio de backend lee su propio `.env` local** (`apps/backend/{gateway,services/*}/.env`), no
+> solo el de la raíz — `ConfigModule.forRoot()` de NestJS carga desde el directorio de trabajo del
+> proceso. Si cambias una variable (ej. `SOCIAL_PROVIDER` para probar publicación real, ver el paso 9),
+> edítala en el `.env` del servicio puntual, no solo en el de la raíz, y reinicia ese servicio. Estos
+> `.env` por servicio no están versionados (mismo patrón que el de la raíz) — cópialos de
+> `.env.example` la primera vez si no existen todavía.
 
 ## Correr el proyecto
 
@@ -96,6 +110,77 @@ producción de cada servicio):
 ```bash
 docker compose --profile full up -d --build
 ```
+
+## Flujo esperado de punta a punta
+
+Con `pnpm dev` corriendo (backend + frontend) y `pnpm seed` ya aplicado, así se recorre el sistema
+completo por primera vez, en el orden que espera el modelo de negocio (nada de esto está sembrado de
+antemano salvo los usuarios — cada paso depende del anterior).
+
+> [!NOTE]
+> Las URLs de abajo son directas a cada zona (`brands-front:3013`, `posts-front:3014`, etc.), no vía
+> `web-shell:3000` — `web-shell` es el host pensado como único punto de entrada, pero sus rewrites
+> (`apps/frontend/web-shell/next.config.ts`) todavía no cubren `/profile` ni `/my-team`, así que por ahora
+> hay que entrar directo a esas dos. El resto de rutas (`/login`, `/brands/*`, `/my-campaigns`,
+> `/posts/*`, `/catalogs/*`) sí funcionan igual entrando por `localhost:3000`.
+
+Cuentas de prueba (las mismas que imprime `pnpm seed` al final):
+
+| Rol | Email | Password |
+|---|---|---|
+| Administrador | `20233tn102@utez.edu.mx` | `admin123` |
+| Community Manager | `cm@bananagram.mx` | `cm123456` |
+| Diseñador | `disenador@bananagram.mx` | `diseno123` |
+| Cliente | `cliente@bananagram.mx` | `cliente123` |
+| CM + Diseñador (multi-rol) | `multi@bananagram.mx` | `multi12345` |
+
+**1. Administrador — catálogos** (`http://localhost:3010/catalogs`, o `localhost:3000/catalogs/...`)
+Sin esto no hay con qué crear una marca ni una campaña:
+- `/catalogs/social-networks` → agregar al menos **Instagram** (nombre, código, engagement base) —
+  sin ninguna red en el catálogo, Ayrshare no tiene con qué ofrecer conexión.
+- `/catalogs/categories` y `/catalogs/specialties` → al menos una de cada una, las usan marcas/campañas
+  y los perfiles de CM/Diseñador para las recomendaciones de asignación.
+
+**2. Cliente — crear la marca y conectar Instagram real** (`http://localhost:3013`)
+- Login como `cliente@bananagram.mx`, `/brands` → "Nueva marca" (nombre + slug obligatorios, el resto
+  opcional). Esto ya llama a Ayrshare de verdad para crear el perfil — ver el `[!IMPORTANT]` de Ayrshare
+  arriba si falla con 500.
+- Entrar a la marca creada → "Conectar otra red" abre el link real de Ayrshare — conectar una cuenta de
+  Instagram de verdad ahí.
+- Volver a la app y darle "Sincronizar" para traer la cuenta conectada (seguidores, handle, etc.).
+
+**3. Cliente — crear la campaña** (`/brands/[id]/campaigns` o `/profile`)
+Elegir categorías (para las recomendaciones) y un Community Manager — `cm@bananagram.mx` ya existe.
+Queda en estado `pendiente`, notificando al CM.
+
+**4. Community Manager — aceptar la campaña** (`/my-campaigns`, login `cm@bananagram.mx`)
+Sección "Pendientes de tu aprobación" → Aceptar (o Rechazar con motivo, lo que la regresa al Cliente para
+elegir otro CM).
+
+**5. Community Manager — armar equipo** (`/my-team`, y luego dentro de la campaña → "Ver equipo")
+- `/my-team`: agregar a `disenador@bananagram.mx` al equipo general (roster) — un Diseñador tiene que
+  estar aquí antes de poder asignarlo a una campaña puntual.
+- Dentro de la campaña ya aceptada → equipo de la campaña → agregar a ese mismo Diseñador desde el roster.
+
+**6. Diseñador — crear una publicación** (`http://localhost:3014/posts/new`, login `disenador@bananagram.mx`)
+Elegir la campaña (ya debe tener al Diseñador asignado, paso 5), redes, contenido, adjuntar media si se
+quiere. "Guardar borrador" o "Crear y enviar a revisión →" directo.
+
+**7. Community Manager — revisar** (`/posts/approvals` o el detalle del post, login `cm@bananagram.mx`)
+Aprobar (pasa al Cliente) o Rechazar con motivo obligatorio (regresa al Diseñador, que ve el motivo y
+puede corregir y reenviar).
+
+**8. Cliente — aprobación final** (detalle del post, login `cliente@bananagram.mx`)
+Programar una fecha, o "Publicar ahora" (sin fecha — el cron de `PostSchedulerService` corre cada minuto
+y la recoge sola). También puede rechazar con motivo, lo que regresa al CM (quien la edita él mismo y
+reenvía, o la reenvía al Diseñador con una nota opcional propia).
+
+**9. (Opcional) Publicación real contra Ayrshare, no simulada**
+Por defecto `SOCIAL_PROVIDER=mock` (el cron simula la publicación y las métricas, ver
+`decay-simulator.ts`). Para publicar de verdad: parar `core-service`, cambiar `SOCIAL_PROVIDER=ayrshare`
+en **su `.env` local** (`apps/backend/services/core-service/.env`, no el de la raíz — ver nota de arriba),
+reiniciar. Confirmar en el dashboard de Ayrshare que el post llegó, y que `PostMetric.source` queda en
+`'ayrshare'` (no `'simulated'`) en la siguiente corrida del cron de métricas.
 
 ## Estructura
 
