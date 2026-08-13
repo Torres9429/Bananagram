@@ -45,6 +45,12 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'calendar', label: 'Calendario', href: '/profile/calendar', icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
   { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
   { key: 'team', label: 'Team', href: '/team', icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  // Equipo GENERAL del CM (Fase J) — distinto de "Team" de arriba (esa es
+  // de solo lectura, agregado de colaboradores en campañas activas, mock
+  // todavía). campanas:asignar solo lo tiene community_manager en el seed,
+  // así que este ítem ya queda oculto para Cliente/Diseñador sin necesitar
+  // un ajuste de rol explícito como "my-campaigns"/"my-brand" abajo.
+  { key: 'my-team', label: 'Mi equipo', href: '/my-team', icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.ASSIGN }] },
   { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
 ];
 

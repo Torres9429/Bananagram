@@ -78,12 +78,15 @@ export interface MockCampaignRecord extends Campaign {
 // cmId referencia el directorio de CMs local de brands-front
 // (MOCK_AVAILABLE_CMS/getCampaignCM) — posts-front no necesita resolver la
 // identidad del CM, solo brandId/socialAccountIds para su selector multi-red.
+// cmStatus fijo en 'aceptada': estas campañas mock representan un estado ya
+// establecido/en marcha (Fase J agregó el flujo de aceptación al modelo
+// real, pero el mundo mock no necesita representar el estado "pendiente").
 export const MOCK_CAMPAIGNS: MockCampaignRecord[] = [
-  { id: 'c1', brandId: 'b1', name: 'Campaña Verano', status: 'active', startDate: '1 jun', endDate: '31 jul', socialAccountIds: ['bp1', 'bp2', 'bp3'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Aumentar el alcance de la colección de verano', description: 'Contenido semanal en Instagram, LinkedIn y Facebook para la temporada de verano.' },
-  { id: 'c4', brandId: 'b1', name: 'Black Friday', status: 'paused', startDate: '1 nov', endDate: '30 nov', socialAccountIds: ['bp1', 'bp3'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Impulsar ventas durante Black Friday', description: 'Promociones y contenido de cuenta regresiva para la campaña de descuentos.' },
-  { id: 'c2', brandId: 'b2', name: 'Nike Run Launch', status: 'active', startDate: '15 jun', endDate: '15 ago', socialAccountIds: ['bp4', 'bp5'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Lanzar la nueva línea de running', description: 'Reels y posts destacando la nueva colección de calzado deportivo.' },
-  { id: 'c3', brandId: 'b3', name: 'Spotify Weekly', status: 'finished', startDate: '1 ene', endDate: '31 may', socialAccountIds: ['bp6'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Mantener presencia semanal constante', description: 'Publicación semanal de playlists destacadas.' },
-  { id: 'c5', brandId: 'b4', name: 'Serie Reels diarios', status: 'active', startDate: '10 jun', endDate: '10 ago', socialAccountIds: ['bp7', 'bp8'], cmId: 'u1', createdBy: 'user-cliente-002', objective: 'Crecer la audiencia con contenido diario', description: 'Serie de reels cortos publicados a diario en Instagram y TikTok.' },
+  { id: 'c1', brandId: 'b1', name: 'Campaña Verano', status: 'active', cmStatus: 'aceptada', startDate: '1 jun', endDate: '31 jul', socialAccountIds: ['bp1', 'bp2', 'bp3'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Aumentar el alcance de la colección de verano', description: 'Contenido semanal en Instagram, LinkedIn y Facebook para la temporada de verano.' },
+  { id: 'c4', brandId: 'b1', name: 'Black Friday', status: 'paused', cmStatus: 'aceptada', startDate: '1 nov', endDate: '30 nov', socialAccountIds: ['bp1', 'bp3'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Impulsar ventas durante Black Friday', description: 'Promociones y contenido de cuenta regresiva para la campaña de descuentos.' },
+  { id: 'c2', brandId: 'b2', name: 'Nike Run Launch', status: 'active', cmStatus: 'aceptada', startDate: '15 jun', endDate: '15 ago', socialAccountIds: ['bp4', 'bp5'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Lanzar la nueva línea de running', description: 'Reels y posts destacando la nueva colección de calzado deportivo.' },
+  { id: 'c3', brandId: 'b3', name: 'Spotify Weekly', status: 'finished', cmStatus: 'aceptada', startDate: '1 ene', endDate: '31 may', socialAccountIds: ['bp6'], cmId: 'u1', createdBy: 'user-cliente-001', objective: 'Mantener presencia semanal constante', description: 'Publicación semanal de playlists destacadas.' },
+  { id: 'c5', brandId: 'b4', name: 'Serie Reels diarios', status: 'active', cmStatus: 'aceptada', startDate: '10 jun', endDate: '10 ago', socialAccountIds: ['bp7', 'bp8'], cmId: 'u1', createdBy: 'user-cliente-002', objective: 'Crecer la audiencia con contenido diario', description: 'Serie de reels cortos publicados a diario en Instagram y TikTok.' },
 ];
 
 export function getCampaign(id: string): MockCampaignRecord | undefined {
