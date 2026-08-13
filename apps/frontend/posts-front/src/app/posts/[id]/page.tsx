@@ -14,20 +14,28 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
+import TextField from '@mui/material/TextField';
+import Alert from '@mui/material/Alert';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import { StatusChip, ProtectedAction, PrimaryButton } from '@repo/ui/ui';
+import { StatusChip, PrimaryButton, useToast } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
-import { findUserByEmail } from '@repo/ui';
-import { MOCK_POSTS, MOCK_STATUS_HISTORY, addStatusHistoryEntry, getPostNetworkInfo, getMedia } from '../../../lib/mock-data';
-import type { PostSocialAccountStatus, StatusHistoryItem } from '../../../interfaces/interface';
+import { ZONE_URLS } from '@repo/ui/config';
+import type { PostSocialAccountStatus } from '@repo/ui/types';
+import {
+  useGetPostQuery,
+  useSubmitForReviewMutation,
+  useApprovePostMutation,
+  useRejectPostMutation,
+  useClientRejectPostMutation,
+  useForwardToDesignerMutation,
+  useUpdatePostMutation,
+  useSchedulePostMutation,
+  useCancelPostMutation,
+} from '../../../store/api/posts.api';
+import { NETWORK_DISPLAY_COLORS, NETWORK_LABELS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
 import { RejectPostDialog } from '../../../components/RejectPostDialog';
 
-// Estado POR RED (PostSocialAccountStatus) — distinto de PostStatus (el
-// estado agregado del post, cubierto por StatusChip de @repo/ui). Este mapa
-// es local a esta vista porque solo /posts/[id] expone el detalle por red
-// (ver docs/frontend-db-alignment.md decisión §3): la lista y el kanban solo
-// muestran el PostStatus agregado.
 const PSA_STATUS_STYLES: Record<PostSocialAccountStatus, { bg: string; color: string; label: string }> = {
   pendiente: { bg: '#F5F5F5', color: '#616161', label: 'Pendiente' },
   publicando: { bg: '#E1F5FE', color: '#0277BD', label: 'Publicando' },
@@ -36,52 +44,179 @@ const PSA_STATUS_STYLES: Record<PostSocialAccountStatus, { bg: string; color: st
   cancelado: { bg: '#EEEEEE', color: '#757575', label: 'Cancelado' },
 };
 
+const STATUS_HISTORY_STYLES: Record<string, string> = {
+  borrador: '#757575',
+  en_revision: '#0277BD',
+  aprobado: '#2E7D32',
+  rechazado: '#C62828',
+  rechazado_cliente: '#C62828',
+  programado: '#E65100',
+  publicando: '#0277BD',
+  publicado: '#2E7D32',
+  parcial: '#E65100',
+  error: '#B71C1C',
+  cancelado: '#757575',
+};
+
+const HISTORY_PREVIEW_COUNT = 3;
+
+const FILTER_LABELS: Record<string, string> = {
+  borrador: 'Borrador',
+  en_revision: 'Enviado a revisión',
+  aprobado: 'Aprobado por el CM',
+  rechazado: 'Rechazado por el CM',
+  rechazado_cliente: 'Rechazado por el Cliente',
+  programado: 'Programado',
+  publicando: 'Publicando',
+  publicado: 'Publicado',
+  parcial: 'Parcial',
+  error: 'Error',
+  cancelado: 'Cancelado',
+};
+
+// Reescrita a datos reales (Fase N), acciones reales de 2 tramos (Fase O):
+// Diseñador crea/edita → CM aprueba/rechaza → Cliente programa/rechaza → CM
+// edita-y-reenvía o regresa al Diseñador. Se quitó el panel de "análisis IA"
+// (era enteramente inventado, sin integración real detrás).
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  // Mock: estado local, sin persistencia — mismo patrón ya usado en
-  // /posts/approvals y en ClientSection.tsx (brands-front).
-  const [post, setPost] = useState(() => MOCK_POSTS.find((p) => p.id === params.id) ?? MOCK_POSTS.find((p) => p.id === 'p2')!);
-  const [history, setHistory] = useState<StatusHistoryItem[]>(() => MOCK_STATUS_HISTORY[post.id] ?? []);
-  const [rejectOpen, setRejectOpen] = useState(false);
   const user = useSelector(selectUser);
+  const { showSuccess, showError } = useToast();
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [editInstructions, setEditInstructions] = useState('');
+  const [cmComment, setCmComment] = useState('');
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
-  // Vista previa (columna derecha) y resumen: representan la primera red del
-  // post — el detalle completo de TODAS las redes vive en la sección de
-  // abajo ("Estado por red"), que es la que permite ver el caso `parcial`.
-  const primaryAccountId = post.socialAccounts[0]?.socialAccountId;
-  const { networkLabel, networkShort, networkBg, networkColor, brand } = getPostNetworkInfo(primaryAccountId);
-  const primaryAccount = post.socialAccounts[0];
+  const { data: post, isFetching } = useGetPostQuery(params.id);
+  const [submitForReview, { isLoading: isSubmitting }] = useSubmitForReviewMutation();
+  const [approvePost, { isLoading: isApproving }] = useApprovePostMutation();
+  const [rejectPost] = useRejectPostMutation();
+  const [clientRejectPost] = useClientRejectPostMutation();
+  const [forwardToDesigner, { isLoading: isForwarding }] = useForwardToDesignerMutation();
+  const [updatePost, { isLoading: isSaving }] = useUpdatePostMutation();
+  const [schedulePost, { isLoading: isScheduling }] = useSchedulePostMutation();
+  const [cancelPost, { isLoading: isCancelling }] = useCancelPostMutation();
 
-  // Media adjunta (PostMedia) — ordenada por MockPost.media[].order, resuelta
-  // contra MOCK_MEDIA_LIBRARY. Puede no haber ninguna (la mayoría de los
-  // MOCK_POSTS no tienen media todavía).
-  const postMedia = [...(post.media ?? [])]
-    .sort((a, b) => a.order - b.order)
-    .map((pm) => getMedia(pm.mediaId))
-    .filter((m): m is NonNullable<typeof m> => !!m);
-
-  function handleApprove() {
-    setPost((prev) => ({ ...prev, status: 'aprobado' }));
+  if (isFetching) return null;
+  if (!post) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="body2" color="text.secondary">Esta publicación no existe o no tienes acceso a ella.</Typography>
+      </Box>
+    );
   }
 
-  // Rechazar pide motivo en un modal (§3) — el estado y el historial solo se
-  // actualizan al confirmar, nunca al abrir el modal.
-  function handleConfirmReject(reason: string) {
-    const actor = findUserByEmail(user?.email ?? '')?.name ?? user?.email ?? 'Cliente';
-    const entry: StatusHistoryItem = {
-      status: 'rechazado',
-      label: 'Rechazado',
-      color: '#C62828',
-      actor,
-      role: 'Cliente',
-      date: new Date().toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-      comment: reason,
-    };
-    addStatusHistoryEntry(post.id, entry);
-    setHistory((prev) => [entry, ...prev]);
-    setPost((prev) => ({ ...prev, status: 'rechazado', rejectionReason: reason }));
-    setRejectOpen(false);
+  const isCm = !!user && post.campaign.cmId === user.id;
+  const isClient = !!user && post.brand.ownerId === user.id;
+  const isDesignerOrCreator =
+    !!user && (post.createdBy === user.id || post.campaign.designers.some((d) => d.userId === user.id));
+  const canEditNow =
+    (post.status === 'borrador' || post.status === 'rechazado') && (isCm || isClient || isDesignerOrCreator);
+  const canEditRechazadoCliente = post.status === 'rechazado_cliente' && isCm;
+
+  // Historial más reciente primero, colapsado por defecto (ver más/ver menos).
+  const historyDesc = [...post.statusHistory].reverse();
+  const visibleHistory = historyExpanded ? historyDesc : historyDesc.slice(0, HISTORY_PREVIEW_COUNT);
+
+  // El motivo del Cliente SIEMPRE se muestra cuando el post llegó por la vía
+  // "el CM lo regresó al Diseñador" — se busca en el historial, no depende
+  // de que exista un comentario adicional del CM.
+  const forwardedHistoryEntry = post.status === 'borrador'
+    ? [...post.statusHistory].reverse().find((h) => h.fromStatus === 'rechazado_cliente' && h.toStatus === 'borrador')
+    : undefined;
+  const clientRejectionEntry = forwardedHistoryEntry
+    ? [...post.statusHistory].reverse().find((h) => h.toStatus === 'rechazado_cliente')
+    : undefined;
+
+  const hasDelivery = post.socialAccounts.length > 0;
+  const primaryNetworkCode = post.socialNetworks[0]?.socialNetwork.code;
+  const primaryColors = primaryNetworkCode ? NETWORK_DISPLAY_COLORS[primaryNetworkCode] : undefined;
+
+  function startEditing() {
+    setEditContent(post!.content);
+    setEditInstructions(post!.instructions ?? '');
+    setEditing(true);
+  }
+
+  async function handleSaveEdit(resendAfter: boolean) {
+    try {
+      await updatePost({ id: post!.id, content: editContent.trim(), instructions: editInstructions.trim() || undefined }).unwrap();
+      if (resendAfter) {
+        await approvePost(post!.id).unwrap();
+        showSuccess('Publicación editada y reenviada al cliente.');
+      } else {
+        showSuccess('Publicación actualizada.');
+      }
+      setEditing(false);
+    } catch {
+      showError('No se pudo guardar la edición.');
+    }
+  }
+
+  async function handleSubmitForReview() {
+    try {
+      await submitForReview(post!.id).unwrap();
+      showSuccess('Publicación enviada a revisión.');
+    } catch {
+      showError('No se pudo enviar a revisión.');
+    }
+  }
+
+  async function handleApprove() {
+    try {
+      await approvePost(post!.id).unwrap();
+      showSuccess('Publicación aprobada — pasó al Cliente.');
+    } catch {
+      showError('No se pudo aprobar la publicación.');
+    }
+  }
+
+  async function handleConfirmReject(reason: string) {
+    try {
+      if (isCm) {
+        await rejectPost({ id: post!.id, comment: reason }).unwrap();
+        showSuccess('Publicación rechazada — regresó al Diseñador.');
+      } else {
+        await clientRejectPost({ id: post!.id, comment: reason }).unwrap();
+        showSuccess('Publicación rechazada — regresó al CM.');
+      }
+    } catch {
+      showError('No se pudo rechazar la publicación.');
+    } finally {
+      setRejectOpen(false);
+    }
+  }
+
+  async function handleForwardToDesigner() {
+    try {
+      await forwardToDesigner({ id: post!.id, comment: cmComment.trim() || undefined }).unwrap();
+      showSuccess('Publicación regresada al Diseñador.');
+      setCmComment('');
+    } catch {
+      showError('No se pudo regresar la publicación al Diseñador.');
+    }
+  }
+
+  async function handleSchedule() {
+    try {
+      await schedulePost({ id: post!.id, scheduledAt: scheduledAt || undefined }).unwrap();
+      showSuccess('Publicación programada.');
+    } catch {
+      showError('No se pudo programar — confirma que todas las redes elegidas estén conectadas.');
+    }
+  }
+
+  async function handleCancel() {
+    try {
+      await cancelPost(post!.id).unwrap();
+      showSuccess('Publicación cancelada.');
+    } catch {
+      showError('No se pudo cancelar la publicación.');
+    }
   }
 
   return (
@@ -99,89 +234,131 @@ export default function PostDetailPage() {
           <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, mb: 3 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
               <Typography variant="h6" fontWeight={600}>
-                {post.title}
+                {post.content.split('\n')[0].slice(0, 60) || 'Sin contenido'}
               </Typography>
               <StatusChip status={post.status} />
             </Stack>
             <Divider sx={{ mb: 2 }} />
+
+            {/* El motivo del Cliente siempre se muestra cuando el post llegó
+                por "el CM lo regresó" — no depende de que el CM haya agregado
+                un comentario propio. */}
+            {forwardedHistoryEntry && (
+              <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                <Typography variant="body2" fontWeight={600}>El cliente rechazó esta publicación:</Typography>
+                <Typography variant="body2">"{clientRejectionEntry?.comment ?? 'sin detalle'}"</Typography>
+                {forwardedHistoryEntry.comment && (
+                  <>
+                    <Typography variant="body2" fontWeight={600} mt={1}>Nota del CM:</Typography>
+                    <Typography variant="body2">"{forwardedHistoryEntry.comment}"</Typography>
+                  </>
+                )}
+              </Alert>
+            )}
+
             <Stack gap={1}>
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" color="text.secondary">
-                  Redes
-                </Typography>
+                <Typography variant="body2" color="text.secondary">Redes</Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {post.socialAccounts.length === 0
+                  {post.socialNetworks.length === 0
                     ? 'Sin redes asignadas'
-                    : post.socialAccounts.length === 1
-                      ? networkLabel
-                      : `${post.socialAccounts.length} redes (ver detalle abajo)`}
+                    : post.socialNetworks.length === 1
+                      ? NETWORK_LABELS[post.socialNetworks[0].socialNetwork.code]
+                      : `${post.socialNetworks.length} redes (ver detalle abajo)`}
                 </Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" color="text.secondary">
-                  Campaña
+                <Typography variant="body2" color="text.secondary">Campaña</Typography>
+                <Typography
+                  component="span"
+                  variant="body2"
+                  sx={{ color: '#1565C0', cursor: 'pointer', textDecoration: 'underline', fontWeight: 500 }}
+                  onClick={() => { window.location.href = `${ZONE_URLS.brandsFront}/brands/${post.brandId}/campaigns/${post.campaignId}`; }}
+                >
+                  {post.campaign.name}
                 </Typography>
-                {post.campaign ? (
-                  <Typography
-                    component="span"
-                    variant="body2"
-                    sx={{ color: '#1565C0', cursor: 'pointer', textDecoration: 'underline', fontWeight: 500 }}
-                    onClick={() => router.push(`/brands/campaigns/${post.campaign!.id}`)}
-                  >
-                    {post.campaign.name}
-                  </Typography>
-                ) : (
+              </Stack>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="body2" color="text.secondary">Creado el</Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {new Date(post.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </Typography>
+              </Stack>
+              {post.scheduledAt && (
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="body2" color="text.secondary">Programado para</Typography>
                   <Typography variant="body2" fontWeight={500}>
-                    Sin campaña
+                    {new Date(post.scheduledAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </Typography>
-                )}
-              </Stack>
-              <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" color="text.secondary">
-                  Diseñador
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {post.designer}
-                </Typography>
-              </Stack>
-              <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" color="text.secondary">
-                  Enviado el
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  25 jun, 14:30
-                </Typography>
-              </Stack>
+                </Stack>
+              )}
             </Stack>
 
             <Divider sx={{ my: 2 }} />
 
-            <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
-              <Typography variant="body2" sx={{ lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
-                {post.content}
-              </Typography>
-            </Box>
+            {editing ? (
+              <Stack gap={1.5}>
+                <TextField
+                  multiline
+                  minRows={5}
+                  fullWidth
+                  label="Contenido"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                />
+                <TextField
+                  multiline
+                  minRows={2}
+                  fullWidth
+                  label="Instrucciones internas (opcional)"
+                  value={editInstructions}
+                  onChange={(e) => setEditInstructions(e.target.value)}
+                />
+                <Stack direction="row" gap={1.5}>
+                  <Button variant="outlined" onClick={() => setEditing(false)} sx={{ color: '#6B6B6B', borderColor: '#E8E8E8' }}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    disabled={isSaving || !editContent.trim()}
+                    onClick={() => handleSaveEdit(false)}
+                    sx={{ borderColor: '#E0A800', color: 'secondary.main' }}
+                  >
+                    Guardar
+                  </Button>
+                  {canEditRechazadoCliente && (
+                    <PrimaryButton disabled={isSaving || isApproving || !editContent.trim()} onClick={() => handleSaveEdit(true)}>
+                      Guardar y reenviar al Cliente →
+                    </PrimaryButton>
+                  )}
+                </Stack>
+              </Stack>
+            ) : (
+              <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
+                <Typography variant="body2" sx={{ lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                  {post.content}
+                </Typography>
+              </Box>
+            )}
 
-            {/* Media adjunta (Media/PostMedia) — thumbnails simples, sin más
-                interacción que un link a la URL del archivo. */}
-            {postMedia.length > 0 && (
+            {post.media.length > 0 && !editing && (
               <Stack direction="row" gap={1} flexWrap="wrap" mt={1.5}>
-                {postMedia.map((m) => (
+                {post.media.map((pm) => (
                   <Box
-                    key={m.id}
+                    key={pm.mediaId}
                     component="a"
-                    href={m.url}
+                    href={pm.media.url}
                     target="_blank"
                     rel="noreferrer"
                     sx={{ position: 'relative', width: 72, height: 72, display: 'block' }}
                   >
                     <Box
                       component="img"
-                      src={m.url}
-                      alt={m.originalName}
+                      src={pm.media.url}
+                      alt={pm.media.originalName}
                       sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1.5, border: '1px solid #E8E8E8' }}
                     />
-                    {m.mimeType.startsWith('video') && (
+                    {pm.media.mimeType.startsWith('video') && (
                       <Chip
                         label="Video"
                         size="small"
@@ -193,104 +370,137 @@ export default function PostDetailPage() {
               </Stack>
             )}
 
-            <Stack direction="row" gap={1.5} mt={3} flexWrap="wrap">
-              <ProtectedAction module="publicaciones" action="crear">
+            {post.status === 'aprobado' && isClient && (
+              <TextField
+                type="datetime-local"
+                size="small"
+                label="Programar para (opcional, vacío = ahora)"
+                InputLabelProps={{ shrink: true }}
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
+                sx={{ mt: 2, mb: 1, minWidth: 260 }}
+              />
+            )}
+
+            {canEditRechazadoCliente && !editing && (
+              <TextField
+                multiline
+                minRows={2}
+                fullWidth
+                size="small"
+                label="Nota para el Diseñador (opcional)"
+                value={cmComment}
+                onChange={(e) => setCmComment(e.target.value)}
+                sx={{ mt: 2 }}
+              />
+            )}
+
+            {!editing && (
+              <Stack direction="row" gap={1.5} mt={2} flexWrap="wrap">
+                {canEditNow && (
+                  <Button variant="outlined" onClick={startEditing} sx={{ borderColor: '#E0A800', color: 'secondary.main' }}>
+                    Editar
+                  </Button>
+                )}
+                {(post.status === 'borrador' || post.status === 'rechazado') && (isCm || isClient || isDesignerOrCreator) && (
+                  <PrimaryButton disabled={isSubmitting} onClick={handleSubmitForReview}>
+                    {isSubmitting ? 'Enviando…' : 'Enviar a revisión →'}
+                  </PrimaryButton>
+                )}
+                {post.status === 'en_revision' && isCm && (
+                  <>
+                    <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                      Rechazar
+                    </Button>
+                    <Button variant="contained" disabled={isApproving} onClick={handleApprove} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
+                      {isApproving ? 'Aprobando…' : 'Aprobar'}
+                    </Button>
+                  </>
+                )}
+                {post.status === 'aprobado' && isClient && (
+                  <>
+                    <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                      Rechazar
+                    </Button>
+                    <Button variant="contained" disabled={isScheduling} onClick={handleSchedule} sx={{ bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}>
+                      {isScheduling ? 'Programando…' : 'Programar / Publicar ahora'}
+                    </Button>
+                  </>
+                )}
+                {canEditRechazadoCliente && (
+                  <Button variant="outlined" disabled={isForwarding} onClick={handleForwardToDesigner} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                    {isForwarding ? 'Regresando…' : 'Regresar a Diseñador'}
+                  </Button>
+                )}
+                {post.status === 'programado' && (isCm || isClient) && (
+                  <Button variant="outlined" disabled={isCancelling} onClick={handleCancel} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                    {isCancelling ? 'Cancelando…' : 'Cancelar programación'}
+                  </Button>
+                )}
                 <Button
                   variant="outlined"
                   sx={{ borderColor: '#E8E8E8', color: '#6B6B6B' }}
-                  onClick={() => router.push('/posts/new')}
+                  onClick={() => { window.location.href = `${ZONE_URLS.brandsFront}/brands/${post.brandId}/campaigns/${post.campaignId}`; }}
                 >
-                  Editar
+                  Ver campaña →
                 </Button>
-              </ProtectedAction>
-              <ProtectedAction module="publicaciones" action="crear">
-                <PrimaryButton onClick={() => router.push('/posts/new')}>
-                  Enviar a revisión →
-                </PrimaryButton>
-              </ProtectedAction>
-              <ProtectedAction module="publicaciones" action="editar">
-                <Button variant="contained" sx={{ bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}>
-                  Programar
-                </Button>
-              </ProtectedAction>
-              <ProtectedAction module="publicaciones" action="rechazar">
-                <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
-                  Rechazar
-                </Button>
-              </ProtectedAction>
-              <ProtectedAction module="publicaciones" action="aprobar">
-                <Button variant="contained" onClick={handleApprove} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
-                  Aprobar
-                </Button>
-              </ProtectedAction>
-              <Button
-                variant="outlined"
-                sx={{ borderColor: '#E8E8E8', color: '#6B6B6B' }}
-                onClick={() => router.push('/brands/campaigns/c2')}
-              >
-                Ver campaña →
-              </Button>
-            </Stack>
+              </Stack>
+            )}
           </Paper>
 
-          {/* Estado por red — PostSocialAccount, una fila por red (ver
-              docs/frontend-db-alignment.md §1.1). Es lo único que hace visible
-              el caso `parcial` (una red publicada, otra con error). */}
           <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, mb: 3 }}>
             <Typography variant="subtitle2" color="text.secondary" mb={2}>
               Estado por red
             </Typography>
-            {post.socialAccounts.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                Este post no tiene redes asignadas.
-              </Typography>
+            {!hasDelivery ? (
+              <Stack gap={1}>
+                <Typography variant="body2" color="text.secondary" mb={1}>
+                  Todavía no se envió a publicar — redes solicitadas:
+                </Typography>
+                <Stack direction="row" gap={1} flexWrap="wrap">
+                  {post.socialNetworks.map((sn) => {
+                    const colors = NETWORK_DISPLAY_COLORS[sn.socialNetwork.code];
+                    return (
+                      <Chip
+                        key={sn.socialNetworkId}
+                        label={NETWORK_LABELS[sn.socialNetwork.code]}
+                        sx={{ bgcolor: colors.bg, color: colors.color, fontWeight: 600 }}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Stack>
             ) : (
               <Stack gap={1.5}>
                 {post.socialAccounts.map((sa) => {
-                  const info = getPostNetworkInfo(sa.socialAccountId);
+                  const code = sa.socialAccount.socialNetwork.code;
+                  const colors = NETWORK_DISPLAY_COLORS[code];
                   const style = PSA_STATUS_STYLES[sa.status];
                   return (
                     <Box key={sa.id} sx={{ border: '1px solid #E8E8E8', borderRadius: 2, p: 1.5 }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
                         <Stack direction="row" gap={1.5} alignItems="center">
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: info.networkBg, color: info.networkColor, fontSize: 11, fontWeight: 600 }}>
-                            {info.networkShort}
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: colors.bg, color: colors.color, fontSize: 11, fontWeight: 600 }}>
+                            {NETWORK_SHORT_LABELS[code]}
                           </Avatar>
                           <Box>
-                            <Typography variant="body2" fontWeight={600}>
-                              {info.networkLabel}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {info.brand}
-                            </Typography>
+                            <Typography variant="body2" fontWeight={600}>{NETWORK_LABELS[code]}</Typography>
+                            <Typography variant="caption" color="text.secondary">{sa.socialAccount.handle}</Typography>
                           </Box>
                         </Stack>
-                        <Chip
-                          size="small"
-                          label={style.label}
-                          sx={{ bgcolor: style.bg, color: style.color, fontWeight: 600, fontSize: 10 }}
-                        />
+                        <Chip size="small" label={style.label} sx={{ bgcolor: style.bg, color: style.color, fontWeight: 600, fontSize: 10 }} />
                       </Stack>
                       {sa.postUrl && (
                         <Stack direction="row" gap={0.5} alignItems="center" mt={1}>
                           <OpenInNewIcon sx={{ fontSize: 14, color: '#1565C0' }} />
-                          <Typography
-                            component="a"
-                            href={sa.postUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            variant="caption"
-                            sx={{ color: '#1565C0', textDecoration: 'underline' }}
-                          >
+                          <Typography component="a" href={sa.postUrl} target="_blank" rel="noreferrer" variant="caption" sx={{ color: '#1565C0', textDecoration: 'underline' }}>
                             {sa.postUrl}
                           </Typography>
                         </Stack>
                       )}
                       {sa.errorMessage && (
                         <Box mt={1} sx={{ bgcolor: '#FDE2E2', border: '1px solid #F5C2C2', borderRadius: 1.5, p: 1 }}>
-                          <Typography variant="caption" sx={{ color: '#B71C1C' }}>
-                            {sa.errorMessage}
-                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#B71C1C' }}>{sa.errorMessage}</Typography>
                         </Box>
                       )}
                     </Box>
@@ -304,40 +514,39 @@ export default function PostDetailPage() {
             <Typography variant="subtitle2" color="text.secondary" mb={2}>
               Historial de estados
             </Typography>
-            <Box sx={{ position: 'relative', pl: 2.5 }}>
-              <Box sx={{ position: 'absolute', left: 7, top: 0, bottom: 0, width: 1, borderLeft: '1px solid #E8E8E8' }} />
-              {history.map((item, i) => (
-                <Box key={i} sx={{ position: 'relative', mb: 2.5 }}>
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      left: -18,
-                      top: 4,
-                      width: 10,
-                      height: 10,
-                      borderRadius: '50%',
-                      bgcolor: item.color,
-                    }}
-                  />
-                  <Typography variant="body2" fontWeight={600} sx={{ color: item.color }}>
-                    {item.label}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {item.date} · {item.actor} ({item.role})
-                  </Typography>
-                  {item.comment && (
-                    <Box
-                      mt={0.75}
-                      sx={{ bgcolor: `${item.color}1A`, border: `1px solid ${item.color}30`, borderRadius: 1.5, p: 1.5 }}
-                    >
-                      <Typography variant="caption" sx={{ color: item.color }}>
-                        {item.comment}
-                      </Typography>
-                    </Box>
-                  )}
+            {post.statusHistory.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">Sin cambios de estado todavía.</Typography>
+            ) : (
+              <>
+                <Box sx={{ position: 'relative', pl: 2.5 }}>
+                  <Box sx={{ position: 'absolute', left: 7, top: 0, bottom: 0, width: 1, borderLeft: '1px solid #E8E8E8' }} />
+                  {visibleHistory.map((item) => {
+                    const color = STATUS_HISTORY_STYLES[item.toStatus] ?? '#757575';
+                    return (
+                      <Box key={item.id} sx={{ position: 'relative', mb: 2.5 }}>
+                        <Box sx={{ position: 'absolute', left: -18, top: 4, width: 10, height: 10, borderRadius: '50%', bgcolor: color }} />
+                        <Typography variant="body2" fontWeight={600} sx={{ color }}>
+                          {FILTER_LABELS[item.toStatus] ?? item.toStatus}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(item.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                        {item.comment && (
+                          <Box mt={0.75} sx={{ bgcolor: `${color}1A`, border: `1px solid ${color}30`, borderRadius: 1.5, p: 1.5 }}>
+                            <Typography variant="caption" sx={{ color }}>{item.comment}</Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
                 </Box>
-              ))}
-            </Box>
+                {historyDesc.length > HISTORY_PREVIEW_COUNT && (
+                  <Button size="small" onClick={() => setHistoryExpanded((v) => !v)} sx={{ color: 'secondary.main' }}>
+                    {historyExpanded ? 'Ver menos' : `Ver más (${historyDesc.length - HISTORY_PREVIEW_COUNT})`}
+                  </Button>
+                )}
+              </>
+            )}
           </Paper>
         </Grid>
 
@@ -346,37 +555,22 @@ export default function PostDetailPage() {
             <Typography variant="subtitle2" color="text.secondary" mb={2}>
               Vista previa
             </Typography>
-            <Box
-              sx={{
-                bgcolor: '#1A1A1A',
-                borderRadius: 2,
-                height: 200,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <Box sx={{ bgcolor: '#1A1A1A', borderRadius: 2, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Typography variant="caption" sx={{ color: '#666' }}>
-                {networkLabel !== '—' ? `Vista previa · ${networkLabel}` : 'Sin red asignada'}
+                {primaryNetworkCode ? `Vista previa · ${NETWORK_LABELS[primaryNetworkCode]}` : 'Sin red asignada'}
               </Typography>
             </Box>
             <Divider sx={{ my: 2 }} />
-            <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+            <Typography variant="body2" sx={{ lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
               {post.content}
             </Typography>
-            <Stack direction="row" gap={0.5} mt={1} alignItems="center">
-              <Typography variant="caption" color="text.secondary">
-                {brand}
-              </Typography>
-              <Typography variant="caption" fontWeight={500}>
-                {primaryAccount ? primaryAccount.socialAccountId : ''}
-              </Typography>
-            </Stack>
-            <Chip
-              size="small"
-              label={networkShort}
-              sx={{ bgcolor: networkBg, color: networkColor, fontWeight: 600, mt: 1 }}
-            />
+            {primaryNetworkCode && (
+              <Chip
+                size="small"
+                label={NETWORK_SHORT_LABELS[primaryNetworkCode]}
+                sx={{ bgcolor: primaryColors?.bg, color: primaryColors?.color, fontWeight: 600, mt: 1 }}
+              />
+            )}
           </Paper>
         </Grid>
       </Grid>

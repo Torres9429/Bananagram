@@ -20,6 +20,9 @@ function getMessage(n: Notification): string {
   const p = n.payload as Record<string, unknown>;
   const campaignName = typeof p.campaignName === 'string' ? p.campaignName : 'tu campaña';
   const reason = typeof p.reason === 'string' && p.reason.trim() ? p.reason : undefined;
+  const postSnippet = typeof p.postSnippet === 'string' ? p.postSnippet : undefined;
+  const clientReason = typeof p.clientReason === 'string' && p.clientReason.trim() ? p.clientReason : undefined;
+  const cmComment = typeof p.cmComment === 'string' && p.cmComment.trim() ? p.cmComment : undefined;
 
   switch (n.type) {
     case 'campaign_pending_cm_approval':
@@ -28,6 +31,16 @@ function getMessage(n: Notification): string {
       return `Tu campaña "${campaignName}" fue aceptada por el Community Manager.`;
     case 'campaign_rejected':
       return `Tu campaña "${campaignName}" fue rechazada${reason ? `: "${reason}"` : ''}.`;
+    case 'post_submitted_for_review':
+      return `Nueva publicación para revisar en "${campaignName}"${postSnippet ? `: "${postSnippet}"` : ''}`;
+    case 'post_rejected_by_cm':
+      return `El CM rechazó tu publicación en "${campaignName}"${reason ? `: "${reason}"` : ''}`;
+    case 'post_pending_client_approval':
+      return `Publicación lista para tu aprobación en "${campaignName}"${postSnippet ? `: "${postSnippet}"` : ''}`;
+    case 'post_rejected_by_client':
+      return `El cliente rechazó una publicación en "${campaignName}"${reason ? `: "${reason}"` : ''}`;
+    case 'post_forwarded_to_designer':
+      return `Te regresaron una publicación de "${campaignName}" — motivo del cliente: "${clientReason ?? 'sin detalle'}"${cmComment ? ` · Nota del CM: "${cmComment}"` : ''}`;
     default:
       return n.type;
   }
@@ -42,6 +55,7 @@ function getTargetUrl(n: Notification): string | null {
   const p = n.payload as Record<string, unknown>;
   const campaignId = typeof p.campaignId === 'string' ? p.campaignId : undefined;
   const brandId = typeof p.brandId === 'string' ? p.brandId : undefined;
+  const postId = typeof p.postId === 'string' ? p.postId : undefined;
 
   switch (n.type) {
     case 'campaign_pending_cm_approval':
@@ -49,6 +63,12 @@ function getTargetUrl(n: Notification): string | null {
     case 'campaign_accepted':
     case 'campaign_rejected':
       return brandId && campaignId ? `${ZONE_URLS.brandsFront}/brands/${brandId}/campaigns/${campaignId}` : null;
+    case 'post_submitted_for_review':
+    case 'post_rejected_by_cm':
+    case 'post_pending_client_approval':
+    case 'post_rejected_by_client':
+    case 'post_forwarded_to_designer':
+      return postId ? `${ZONE_URLS.postsFront}/posts/${postId}` : null;
     default:
       return null;
   }

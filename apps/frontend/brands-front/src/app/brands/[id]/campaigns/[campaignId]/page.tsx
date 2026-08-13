@@ -20,7 +20,7 @@ import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
-import { usePermissions, PrimaryButton } from '@repo/ui/ui';
+import { usePermissions, PrimaryButton, StatusChip } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
@@ -31,6 +31,7 @@ import {
   useListEligibleDesignersQuery,
 } from '../../../../../store/api/campaigns.api';
 import { useGetBrandQuery } from '../../../../../store/api/brands.api';
+import { useListPostsByCampaignQuery } from '../../../../../store/api/posts.api';
 import { ReassignCmDialog } from '../../../../../components/ReassignCmDialog';
 import { CAMPAIGN_STATUS_LABEL } from '../../../../../lib/mock-data';
 
@@ -63,6 +64,7 @@ export default function CampaignDetailPage() {
 
   const { data: metrics, isFetching: isLoadingMetrics } = useGetCampaignMetricsQuery(params.campaignId);
   const [refreshMetrics, { isLoading: isRefreshingMetrics }] = useRefreshCampaignMetricsMutation();
+  const { data: recentPosts = [] } = useListPostsByCampaignQuery(params.campaignId);
   const [reassignOpen, setReassignOpen] = useState(false);
 
   if (isLoadingCampaign) return null;
@@ -197,14 +199,36 @@ export default function CampaignDetailPage() {
           </Paper>
         )}
 
-        {/* Publicaciones recientes — sin fuente real todavía (posts-front
-            sigue mock, sin ninguna UI conectada a POST /posts real) —
-            estado vacío honesto en vez de datos inventados. */}
+        {/* Publicaciones recientes — real desde la Fase N (GET /posts?
+            campaignId=, posts-front ya tiene su propia UI completa). Cross-
+            zona: llamada directa al mismo backend, no se importa el store
+            de posts-front (Multi-Zones, cada zona es standalone). */}
         <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
           <Typography variant="subtitle2" color="text.secondary" mb={2}>Publicaciones recientes</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Sin publicaciones todavía — la gestión de publicaciones de esta campaña no está conectada aquí.
-          </Typography>
+          {recentPosts.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Sin publicaciones todavía para esta campaña.
+            </Typography>
+          ) : (
+            <Stack gap={1.5}>
+              {recentPosts.slice(0, 5).map((post) => (
+                <Stack
+                  key={post.id}
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  gap={1.5}
+                  onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/${post.id}`; }}
+                  sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
+                >
+                  <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {post.content.split('\n')[0] || 'Sin contenido'}
+                  </Typography>
+                  <StatusChip status={post.status} />
+                </Stack>
+              ))}
+            </Stack>
+          )}
         </Paper>
 
         {/* Métricas — reales (GET /campaigns/:id/metrics), ver Fase I. */}
