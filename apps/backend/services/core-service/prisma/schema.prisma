@@ -305,6 +305,7 @@ enum PostStatus {
   en_revision
   aprobado
   rechazado
+  rechazado_cliente
   programado
   publicando
   publicado

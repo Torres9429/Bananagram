@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { RequirePermission } from '../decorators/require-permission.decorator';
@@ -7,10 +7,13 @@ import { PermissionGuard } from '../guards/permission.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { RejectPostDto } from './dto/reject-post.dto';
 import { SchedulePostDto } from './dto/schedule-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { ForwardToDesignerDto } from './dto/forward-to-designer.dto';
 import { PostsService } from './posts.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { UploadableFile } from '../cloudinary/cloudinary.service';
+import { PostStatus } from '../types/post-status.enum';
 
 type Claims = { sub: string; roles: string[] };
 
@@ -20,6 +23,23 @@ type Claims = { sub: string; roles: string[] };
 @Controller('posts')
 export class PostsController {
   constructor(private readonly posts: PostsService) {}
+
+  @Get()
+  @RequirePermission('publicaciones', 'ver')
+  list(
+    @CurrentUser() user: Claims,
+    @Query('campaignId') campaignId?: string,
+    @Query('brandId') brandId?: string,
+    @Query('status') status?: PostStatus,
+  ) {
+    return this.posts.listPosts({ campaignId, brandId, status }, user);
+  }
+
+  @Get(':id')
+  @RequirePermission('publicaciones', 'ver')
+  get(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
+    return this.posts.getPost(id, user);
+  }
 
   @Post()
   @RequirePermission('publicaciones', 'crear')
@@ -43,6 +63,24 @@ export class PostsController {
   @RequirePermission('publicaciones', 'rechazar')
   reject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectPostDto, @CurrentUser() user: Claims) {
     return this.posts.rejectPost(id, dto, user);
+  }
+
+  @Post(':id/client-reject')
+  @RequirePermission('publicaciones', 'rechazar')
+  clientReject(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RejectPostDto, @CurrentUser() user: Claims) {
+    return this.posts.clientRejectPost(id, dto, user);
+  }
+
+  @Post(':id/forward-to-designer')
+  @RequirePermission('publicaciones', 'editar')
+  forwardToDesigner(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ForwardToDesignerDto, @CurrentUser() user: Claims) {
+    return this.posts.forwardToDesigner(id, dto, user);
+  }
+
+  @Patch(':id')
+  @RequirePermission('publicaciones', 'editar')
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePostDto, @CurrentUser() user: Claims) {
+    return this.posts.updatePost(id, dto, user);
   }
 
   @Post(':id/schedule')

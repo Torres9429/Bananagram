@@ -1,18 +1,44 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CampaignStatus } from '../../node_modules/.prisma-client';
 import { CloudinaryService, UploadableFile } from '../cloudinary/cloudinary.service';
+import { NotificationsClient } from '../notifications/notifications-client.service';
 import { prisma } from '../prisma/client';
 import { PostStatus } from '../types/post-status.enum';
 import { CreatePostDto } from './dto/create-post.dto';
 import { RejectPostDto } from './dto/reject-post.dto';
 import { SchedulePostDto } from './dto/schedule-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { ForwardToDesignerDto } from './dto/forward-to-designer.dto';
 import { validateTransition } from './state-machine/post-state-machine';
 
 type CurrentUser = { sub: string; roles: string[] };
 
+function snippet(content: string): string {
+  return content.length > 60 ? `${content.slice(0, 60)}…` : content;
+}
+
+// El Cliente (dueño de marca) no debe ver el trabajo interno de Diseñador/CM
+// (borrador/en_revision/rechazado) — recién le corresponde desde que el CM
+// aprueba y se lo reenvía (aprobado en adelante, incluida la vuelta de
+// rechazado_cliente). CM/Diseñador/administrador siguen viendo todo, sin
+// esta restricción — la necesitan para trabajar el post completo.
+const CLIENT_VISIBLE_STATUSES: PostStatus[] = [
+  PostStatus.APROBADO,
+  PostStatus.RECHAZADO_CLIENTE,
+  PostStatus.PROGRAMADO,
+  PostStatus.PUBLICANDO,
+  PostStatus.PUBLICADO,
+  PostStatus.PARCIAL,
+  PostStatus.ERROR,
+  PostStatus.CANCELADO,
+];
+
 @Injectable()
 export class PostsService {
-  constructor(private readonly cloudinary: CloudinaryService) {}
+  constructor(
+    private readonly cloudinary: CloudinaryService,
+    private readonly notifications: NotificationsClient,
+  ) {}
 
   async createPost(dto: CreatePostDto, user: CurrentUser): Promise<any> {
     const brand = await prisma.brand.findFirst({ where: { id: dto.brandId, deletedAt: null } });
@@ -22,12 +48,22 @@ export class PostsService {
 
     const campaign = await prisma.campaign.findFirst({
       where: { id: dto.campaignId, brandId: dto.brandId, deletedAt: null, status: CampaignStatus.active },
+      include: { designers: true },
     });
     if (!campaign) {
       throw new BadRequestException('La campaña indicada no es válida para esta marca');
     }
 
-    if (!user.roles.includes('administrador') && brand.ownerId !== user.sub && campaign.cmId !== user.sub) {
+    // Bug real (pre-existente, no de esta sesión): este chequeo nunca
+    // incluía a los Diseñadores asignados a la campaña, aunque el seed les
+    // da publicaciones:crear y attachMediaToPost (abajo) ya sí los incluye
+    // — nadie lo había ejercitado como Diseñador real hasta la Fase N.
+    if (
+      !user.roles.includes('administrador') &&
+      brand.ownerId !== user.sub &&
+      campaign.cmId !== user.sub &&
+      !campaign.designers.some((designer) => designer.userId === user.sub)
+    ) {
       throw new ForbiddenException('No tienes permiso para crear esta publicación');
     }
 
@@ -66,24 +102,36 @@ export class PostsService {
     });
   }
 
+  // Fase O: lo puede enviar el Diseñador que lo creó, el CM asignado, el
+  // dueño de marca, o un administrador — mismo criterio amplio que
+  // createPost/attachMediaToPost. Antes solo lo permitía el CM (el bug real
+  // que encontró el usuario probando como Diseñador). Válido desde borrador
+  // o rechazado (el Diseñador corrige un rechazo del CM y reenvía directo,
+  // sin pasar por borrador como parada intermedia — ver decisión técnica en
+  // el plan de esta fase).
   async submitPostForReview(postId: string, user: CurrentUser): Promise<any> {
     const post = await prisma.post.findFirst({
       where: { id: postId, deletedAt: null },
-      include: { campaign: true },
+      include: { brand: true, campaign: { include: { designers: true } } },
     });
 
     if (!post) {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
 
-    if (!user.roles.includes('community_manager') || post.campaign.cmId !== user.sub) {
+    if (
+      !user.roles.includes('administrador') &&
+      post.brand.ownerId !== user.sub &&
+      post.campaign.cmId !== user.sub &&
+      !post.campaign.designers.some((designer) => designer.userId === user.sub)
+    ) {
       throw new ForbiddenException('No tienes permiso para enviar esta publicación a revisión');
     }
 
     validateTransition(post.status as PostStatus, PostStatus.EN_REVISION, undefined, post.createdBy, user.sub);
 
-    return prisma.$transaction(async (tx) => {
-      const updatedPost = await tx.post.update({
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({
         where: { id: postId },
         data: { status: PostStatus.EN_REVISION },
       });
@@ -97,48 +145,76 @@ export class PostsService {
         },
       });
 
-      return updatedPost;
+      return updated;
     });
+
+    void this.notifications.notify(post.campaign.cmId, 'post_submitted_for_review', {
+      postId,
+      campaignId: post.campaignId,
+      campaignName: post.campaign.name,
+      postSnippet: snippet(post.content),
+    });
+
+    return updatedPost;
   }
 
-  // Aprobar/rechazar es acción del Cliente (dueño de la marca) — mismo
-  // criterio de pertenencia que createPost/attachMediaToPost (bypass para
-  // administrador, comparación directa contra brand.ownerId).
+  // Fase O — primer tramo de aprobación: el CM revisa el trabajo del
+  // Diseñador (antes esto lo hacía el Cliente directo, sin pasar por el CM
+  // — corregido según el flujo real de negocio). También cubre el segundo
+  // tramo: el CM edita y reenvía tras un rechazo del Cliente (mismo destino,
+  // aprobado, sin duplicar lógica — ver rechazado_cliente → aprobado).
   async approvePost(postId: string, user: CurrentUser): Promise<any> {
-    const post = await prisma.post.findFirst({ where: { id: postId, deletedAt: null }, include: { brand: true } });
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { brand: true, campaign: true },
+    });
     if (!post) {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
-    if (!user.roles.includes('administrador') && post.brand.ownerId !== user.sub) {
+    if (!user.roles.includes('administrador') && post.campaign.cmId !== user.sub) {
       throw new ForbiddenException('No tienes permiso para aprobar esta publicación');
     }
 
     // validateTransition también bloquea la auto-aprobación (createdBy === userId).
     validateTransition(post.status as PostStatus, PostStatus.APROBADO, undefined, post.createdBy, user.sub);
 
-    return prisma.$transaction(async (tx) => {
-      const updatedPost = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.APROBADO } });
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.APROBADO } });
       await tx.postStatusHistory.create({
         data: { postId, fromStatus: post.status, toStatus: PostStatus.APROBADO, changedBy: user.sub },
       });
-      return updatedPost;
+      return updated;
     });
+
+    void this.notifications.notify(post.brand.ownerId, 'post_pending_client_approval', {
+      postId,
+      campaignId: post.campaignId,
+      campaignName: post.campaign.name,
+      postSnippet: snippet(post.content),
+    });
+
+    return updatedPost;
   }
 
+  // Fase O — rechazo del CM hacia el Diseñador (primer tramo). Antes esto lo
+  // hacía el Cliente directo — corregido según el flujo real de negocio.
   async rejectPost(postId: string, dto: RejectPostDto, user: CurrentUser): Promise<any> {
-    const post = await prisma.post.findFirst({ where: { id: postId, deletedAt: null }, include: { brand: true } });
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { brand: true, campaign: true },
+    });
     if (!post) {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
-    if (!user.roles.includes('administrador') && post.brand.ownerId !== user.sub) {
+    if (!user.roles.includes('administrador') && post.campaign.cmId !== user.sub) {
       throw new ForbiddenException('No tienes permiso para rechazar esta publicación');
     }
 
     // El comentario obligatorio ya lo exige validateTransition (regla de negocio #4).
     validateTransition(post.status as PostStatus, PostStatus.RECHAZADO, dto.comment, post.createdBy, user.sub);
 
-    return prisma.$transaction(async (tx) => {
-      const updatedPost = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.RECHAZADO } });
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.RECHAZADO } });
       await tx.postStatusHistory.create({
         data: {
           postId,
@@ -148,29 +224,178 @@ export class PostsService {
           comment: dto.comment,
         },
       });
-      return updatedPost;
+      return updated;
     });
+
+    void this.notifications.notify(post.createdBy, 'post_rejected_by_cm', {
+      postId,
+      campaignId: post.campaignId,
+      campaignName: post.campaign.name,
+      reason: dto.comment,
+    });
+
+    return updatedPost;
   }
 
-  // Programar es acción del CM de la campaña — mismo criterio de pertenencia
-  // que submitPostForReview, pero con bypass de administrador (consistente
-  // con el resto del service, no con la variante más estricta de ese método).
-  async schedulePost(postId: string, dto: SchedulePostDto, user: CurrentUser): Promise<any> {
+  // Fase O — segundo tramo: el Cliente rechaza una publicación ya aprobada
+  // por el CM. Va a rechazado_cliente (no a rechazado — ese es el destino
+  // del rechazo del CM, un tramo distinto) porque el CM todavía tiene que
+  // decidir: editarla él mismo y reenviarla, o reenviarla al Diseñador.
+  async clientRejectPost(postId: string, dto: RejectPostDto, user: CurrentUser): Promise<any> {
     const post = await prisma.post.findFirst({
       where: { id: postId, deletedAt: null },
-      include: { campaign: true, socialNetworks: { include: { socialNetwork: true } } },
+      include: { brand: true, campaign: true },
+    });
+    if (!post) {
+      throw new NotFoundException('La publicación indicada no existe o fue eliminada');
+    }
+    if (!user.roles.includes('administrador') && post.brand.ownerId !== user.sub) {
+      throw new ForbiddenException('No tienes permiso para rechazar esta publicación');
+    }
+
+    validateTransition(post.status as PostStatus, PostStatus.RECHAZADO_CLIENTE, dto.comment, post.createdBy, user.sub);
+
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.RECHAZADO_CLIENTE } });
+      await tx.postStatusHistory.create({
+        data: {
+          postId,
+          fromStatus: post.status,
+          toStatus: PostStatus.RECHAZADO_CLIENTE,
+          changedBy: user.sub,
+          comment: dto.comment,
+        },
+      });
+      return updated;
+    });
+
+    void this.notifications.notify(post.campaign.cmId, 'post_rejected_by_client', {
+      postId,
+      campaignId: post.campaignId,
+      campaignName: post.campaign.name,
+      reason: dto.comment,
+    });
+
+    return updatedPost;
+  }
+
+  // Fase O — el CM decide no editarla él mismo y la reenvía al Diseñador
+  // (rechazado_cliente → borrador). El comentario del CM es opcional: el
+  // motivo del Cliente SIEMPRE llega al Diseñador (vía el payload de la
+  // notificación y el historial, no depende de que el CM agregue algo) —
+  // ver clientReason abajo, tomado de la fila de historial del rechazo del
+  // Cliente, no del comentario (opcional) de esta transición.
+  async forwardToDesigner(postId: string, dto: ForwardToDesignerDto, user: CurrentUser): Promise<any> {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { campaign: true },
     });
     if (!post) {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
     if (!user.roles.includes('administrador') && post.campaign.cmId !== user.sub) {
+      throw new ForbiddenException('No tienes permiso para reenviar esta publicación al Diseñador');
+    }
+
+    validateTransition(post.status as PostStatus, PostStatus.BORRADOR, undefined, post.createdBy, user.sub);
+
+    const lastClientRejection = await prisma.postStatusHistory.findFirst({
+      where: { postId, toStatus: PostStatus.RECHAZADO_CLIENTE },
+      orderBy: { id: 'desc' },
+    });
+
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.BORRADOR } });
+      await tx.postStatusHistory.create({
+        data: {
+          postId,
+          fromStatus: post.status,
+          toStatus: PostStatus.BORRADOR,
+          changedBy: user.sub,
+          comment: dto.comment?.trim() || undefined,
+        },
+      });
+      return updated;
+    });
+
+    void this.notifications.notify(post.createdBy, 'post_forwarded_to_designer', {
+      postId,
+      campaignId: post.campaignId,
+      campaignName: post.campaign.name,
+      clientReason: lastClientRejection?.comment ?? null,
+      cmComment: dto.comment?.trim() || null,
+    });
+
+    return updatedPost;
+  }
+
+  // Fase O — edición de contenido, sin cambiar status. Diseñador/CM/dueño de
+  // marca/admin pueden editar mientras está en borrador o rechazado (mismo
+  // criterio amplio de createPost); en rechazado_cliente solo el CM (es el
+  // paso "editarla él mismo" antes de reenviarla al Cliente).
+  async updatePost(postId: string, dto: UpdatePostDto, user: CurrentUser): Promise<any> {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { brand: true, campaign: { include: { designers: true } } },
+    });
+    if (!post) {
+      throw new NotFoundException('La publicación indicada no existe o fue eliminada');
+    }
+
+    const status = post.status as PostStatus;
+    if (status !== PostStatus.BORRADOR && status !== PostStatus.RECHAZADO && status !== PostStatus.RECHAZADO_CLIENTE) {
+      throw new BadRequestException('Solo se puede editar una publicación en borrador, rechazada, o rechazada por el cliente');
+    }
+
+    const isCm = post.campaign.cmId === user.sub;
+    const canEdit =
+      user.roles.includes('administrador') ||
+      (status === PostStatus.RECHAZADO_CLIENTE
+        ? isCm
+        : post.brand.ownerId === user.sub || isCm || post.campaign.designers.some((designer) => designer.userId === user.sub));
+
+    if (!canEdit) {
+      throw new ForbiddenException('No tienes permiso para editar esta publicación');
+    }
+
+    return prisma.post.update({
+      where: { id: postId },
+      data: {
+        content: dto.content?.trim(),
+        instructions: dto.instructions?.trim() || undefined,
+      },
+      include: {
+        socialNetworks: { include: { socialNetwork: true } },
+        media: { include: { media: true }, orderBy: { order: 'asc' } },
+      },
+    });
+  }
+
+  // Fase O — programar/publicar es acción del Cliente en el segundo tramo
+  // (antes de esta fase solo el CM podía; se mantiene el bypass de CM/admin
+  // por si necesitan intervenir).
+  async schedulePost(postId: string, dto: SchedulePostDto, user: CurrentUser): Promise<any> {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { brand: true, campaign: true, socialNetworks: { include: { socialNetwork: true } } },
+    });
+    if (!post) {
+      throw new NotFoundException('La publicación indicada no existe o fue eliminada');
+    }
+    if (
+      !user.roles.includes('administrador') &&
+      post.campaign.cmId !== user.sub &&
+      post.brand.ownerId !== user.sub
+    ) {
       throw new ForbiddenException('No tienes permiso para programar esta publicación');
     }
 
-    const scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : post.scheduledAt;
-    if (!scheduledAt) {
-      throw new BadRequestException('Debes indicar una fecha de programación');
-    }
+    // Bug real encontrado en vivo: "Publicar ahora" (sin fecha) mandaba 400
+    // porque no había fallback a "ahora" — solo se aceptaba dto.scheduledAt o
+    // un post.scheduledAt ya existente desde la creación (que el formulario
+    // de creación nunca manda). "Publicar directo" siempre debió ser "sin
+    // fecha = ahora mismo", el cron de PostSchedulerService la recoge sola.
+    const scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : post.scheduledAt ?? new Date();
 
     // No se puede programar un post para una red que la marca no tiene
     // conectada — el scheduler (Fase 4) asume que toda PostSocialNetwork
@@ -222,6 +447,76 @@ export class PostsService {
       });
       return updatedPost;
     });
+  }
+
+  // Lectura (Fase N) — mismo criterio de pertenencia que el resto del
+  // service: dueño de marca, CM asignado a la campaña, o Diseñador asignado
+  // a esa campaña (no solo quien creó el post), bypass para administrador.
+  async listPosts(
+    filters: { campaignId?: string; brandId?: string; status?: PostStatus },
+    user: CurrentUser,
+  ): Promise<any> {
+    const where: Record<string, unknown> = { deletedAt: null };
+    if (filters.campaignId) where.campaignId = filters.campaignId;
+    if (filters.brandId) where.brandId = filters.brandId;
+    if (filters.status) where.status = filters.status;
+
+    if (!user.roles.includes('administrador')) {
+      where.OR = [
+        { brand: { ownerId: user.sub }, status: { in: CLIENT_VISIBLE_STATUSES } },
+        { campaign: { cmId: user.sub } },
+        { campaign: { designers: { some: { userId: user.sub } } } },
+      ];
+    }
+
+    return prisma.post.findMany({
+      where,
+      include: {
+        socialNetworks: { include: { socialNetwork: true } },
+        media: { include: { media: true }, orderBy: { order: 'asc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getPost(postId: string, user: CurrentUser): Promise<any> {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: {
+        brand: true,
+        campaign: { include: { designers: true } },
+        socialNetworks: { include: { socialNetwork: true } },
+        socialAccounts: { include: { socialAccount: { include: { socialNetwork: true } } } },
+        media: { include: { media: true }, orderBy: { order: 'asc' } },
+        statusHistory: { orderBy: { id: 'asc' } },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('La publicación indicada no existe o fue eliminada');
+    }
+
+    const isClientAllowedNow =
+      post.brand.ownerId === user.sub && CLIENT_VISIBLE_STATUSES.includes(post.status as PostStatus);
+
+    if (
+      !user.roles.includes('administrador') &&
+      !isClientAllowedNow &&
+      post.campaign.cmId !== user.sub &&
+      !post.campaign.designers.some((designer) => designer.userId === user.sub)
+    ) {
+      throw new ForbiddenException('No tienes permiso para ver esta publicación');
+    }
+
+    // PostStatusHistory.id es BigInt (única tabla de posts con ese tipo de
+    // PK, ver docs/base — id es BIGINT autoincrement, inmutable) — JSON.
+    // stringify no sabe serializar BigInt y el endpoint tiraba 500 al armar
+    // la respuesta HTTP (nunca se detectó en los tests porque llaman al
+    // service directo, sin pasar por la serialización HTTP real).
+    return {
+      ...post,
+      statusHistory: post.statusHistory.map((h) => ({ ...h, id: h.id.toString() })),
+    };
   }
 
   async attachMediaToPost(postId: string, files: UploadableFile[] | undefined, user: CurrentUser): Promise<any> {
