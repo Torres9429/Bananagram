@@ -8,6 +8,7 @@ import { CurrentUser } from '../decorators/current-user.decorator';
 import { BrandsService } from './brands.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
+import { CreateConnectUrlDto } from './dto/create-connect-url.dto';
 
 @ApiTags('brands')
 @ApiBearerAuth()
@@ -47,5 +48,12 @@ export class BrandsController {
   @UseGuards(BrandAccessGuard)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.brands.removeBrand(id);
+  }
+
+  @Post(':id/connect-url')
+  @RequirePermission('marcas', 'editar')
+  @UseGuards(BrandAccessGuard)
+  createConnectUrl(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateConnectUrlDto) {
+    return this.brands.createConnectUrl(id, dto.allowedSocial);
   }
 }

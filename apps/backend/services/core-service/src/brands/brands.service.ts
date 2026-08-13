@@ -68,6 +68,7 @@ export class BrandsService {
           name: dto.name,
           slug: dto.slug,
           profileType: dto.profileType,
+          categoryId: dto.categoryId,
           logoUrl: dto.logoUrl,
           primaryColor: dto.primaryColor,
           ownerId: user.sub,
@@ -111,12 +112,36 @@ export class BrandsService {
           name: dto.name,
           slug: dto.slug,
           profileType: dto.profileType,
+          categoryId: dto.categoryId,
           logoUrl: dto.logoUrl,
           primaryColor: dto.primaryColor,
         },
       }),
     );
     return this.toBrandResponse(updated);
+  }
+
+  // Regenera el connectUrl de Ayrshare para una marca YA existente — a
+  // diferencia de createBrand, que solo lo genera una vez al crear. Sin
+  // allowedSocial explícito, ofrece todo el catálogo activo de redes (así
+  // crece solo cuando el Admin agregue más redes al catálogo).
+  async createConnectUrl(id: string, allowedSocial?: string[]): Promise<{ connectUrl: string }> {
+    const brand = await prisma.brand.findFirst({ where: { id, deletedAt: null } });
+    if (!brand) throw new NotFoundException(`Brand ${id} no existe`);
+    if (!brand.profileKey) {
+      throw new BadRequestException('Esta marca no tiene un perfil de Ayrshare — no se puede generar un enlace de conexión');
+    }
+
+    const networks = allowedSocial?.length
+      ? allowedSocial
+      : (await prisma.socialNetwork.findMany({ where: { deletedAt: null }, select: { code: true } })).map((n) => n.code);
+
+    if (!networks.length) {
+      throw new BadRequestException('No hay redes sociales en el catálogo para conectar');
+    }
+
+    const connectUrl = await this.createAyrshareConnectUrl(brand.profileKey, networks);
+    return { connectUrl };
   }
 
   async removeBrand(id: string): Promise<BrandResponse> {
