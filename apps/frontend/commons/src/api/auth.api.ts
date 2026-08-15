@@ -60,7 +60,19 @@ export const authApi = createApi({
         body: { token, newPassword: password },
       }),
     }),
+    // Vinculación con la Alexa Skill — restringido en el backend a
+    // Cliente/Diseñador/Administrador (auth.service.ts.createLinkCode).
+    // El código dura 10 minutos (expiresAt lo confirma el backend).
+    createLinkCode: builder.mutation<{ code: string; expiresAt: string }, void>({
+      query: () => ({ url: 'auth/link-code', method: 'POST' }),
+    }),
   }),
 });
 
-export const { useLoginMutation, useRegisterMutation, useForgotPasswordMutation, useResetPasswordMutation } = authApi;
+export const {
+  useLoginMutation,
+  useRegisterMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useCreateLinkCodeMutation,
+} = authApi;

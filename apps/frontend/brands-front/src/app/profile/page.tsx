@@ -1,9 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import MicOutlinedIcon from '@mui/icons-material/MicOutlined';
 import { selectUser } from '@repo/ui/state';
 import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { ClientSection } from '../../components/profile/ClientSection';
@@ -34,7 +38,9 @@ const STAFF_ROLE_LABELS: Record<string, string> = {
 // ruta, que es lo único que distingue "perfil de negocio" (Cliente) de
 // "perfil de habilidades" (CM/Diseñador).
 export default function ProfilePage() {
+  const router = useRouter();
   const user = useSelector(selectUser);
+  const canUseAlexaSkill = (user?.roles ?? []).some((r) => r === 'cliente' || r === 'disenador');
   // Esta página asume un solo rol "de negocio" activo por sesión (mismo
   // supuesto que ya tenía antes de multi-rol) — con varios roles reales toma
   // el primero. No es parte del alcance de esta fase (login/catálogos/
@@ -84,6 +90,19 @@ export default function ProfilePage() {
           </Typography>
           <ProfileHeader name={headerName} subtitle={headerSubtitle} />
         </>
+      )}
+
+      {canUseAlexaSkill && (
+        <Stack direction="row" justifyContent="flex-end" mb={2}>
+          <Button
+            variant="outlined"
+            startIcon={<MicOutlinedIcon />}
+            onClick={() => router.push('/profile/alexa')}
+            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
+          >
+            Alexa Skill
+          </Button>
+        </Stack>
       )}
 
       {/* Cliente: ClientSection renderiza su propio hero (avatar, tipo, categoría,
