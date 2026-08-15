@@ -1,12 +1,88 @@
 # Pipeline real de Ayrshare (publish + métricas) + endpoints backend para la Alexa Skill
 
-> Plan guardado para implementación posterior. No ejecutado todavía.
+> **Actualización 2026-08-13 (Fase P1)**: la Fase 0-6 de este plan ya está implementada (`alexa-service`
+> tiene `ideas`/`campaigns`/link-code reales, `core-service` tiene el pipeline de Ayrshare completo). Lo
+> que faltaba era verificarlo **en vivo** contra la API real de Ayrshare (nunca se había probado, solo
+> `SOCIAL_PROVIDER=mock`) — ya se hizo, publicando de verdad en Instagram. Se encontraron y arreglaron 5
+> bugs reales que ninguna lectura de código había detectado (ver detalle en el bloque "Fase P1 — hallazgos
+> en vivo" más abajo). El contrato real del Lambda también resultó tener 2 funciones más de las que este
+> documento listaba originalmente — tabla corregida abajo.
 
 ## Contexto
 
 La skill de Alexa se construye por fuera (equipo externo, Lambda ya en desarrollo contra un contrato
-propio: `fetchUserByLinkCode`, `fetchCampaigns`, `fetchCampaignByName`, `fetchContentIdeas`). La skill
-**solo consume cosas de nuestro backend** — no tiene persistencia propia relevante para esto: las ideas de
+propio — **6 funciones, no 4** (corrección 2026-08-13, extraídas directo del código real del Lambda):
+
+| # | Función | Envía | Espera de vuelta |
+|---|---|---|---|
+| 1 | `fetchUserByLinkCode(code)` | código de 4 dígitos | `{ bananagramUserId, name }` |
+| 2 | `fetchCampaigns(userId)` | — (vía Bearer) | `[{ name, totalPosts, score, reach, engagement, followersGained, topNetwork, topPost.* }]` |
+| 3 | `fetchContentIdeas(userId, campaign, {networkName, quantity})` | campaña completa, red opcional, cantidad | array de strings (ideas ya generadas) |
+| 4 | `fetchSavedIdeas(userId, campaignKey)` | — | `[{ title, text, createdAt }]` |
+| 5 | `saveIdeaToBackend(userId, campaignKey, idea)` | `{ title, text }` | confirmación |
+| 6 | `deleteIdeaFromBackend(userId, campaignKey, title)` | título (no id — `fetchSavedIdeas` no expone uno) | confirmación |
+
+**Corrección importante sobre la función 3**: `fetchContentIdeas` espera ideas **ya generadas** de vuelta,
+no un texto libre que el Lambda arme llamando a Claude por su cuenta — la IA de generación de ideas vive
+del lado del **backend de Bananagram**, no del Lambda. Esto contradice el diseño de
+`docs/skill/lambda-codigo-por-pasos.md` (ya marcado como descartado) y sigue **sin implementarse**: hace
+falta un endpoint nuevo (`POST /ideas/generate` en `alexa-service`, modelo Sonnet 5 por latencia de voz)
+que llame a la API de Claude — pendiente de que el proyecto tenga una `ANTHROPIC_API_KEY` con facturación
+activa (la cuenta de Anthropic es de pago, sin tier gratuito).
+
+## Mapeo exacto función → endpoint (estado real, 2026-08-14)
+
+Las 6 funciones ya están implementadas de punta a punta en `alexa-service` (puerto **3004**, prefijo
+`/api`, **no proxeado por el gateway** — el Lambda debe pegarle directo, `http://<host>:3004/api/...`, no a
+través de `localhost:4000`). Tabla exacta, función por función:
+
+| # | Función del Lambda | Método/URL real | Request | Response real (hoy) |
+|---|---|---|---|---|
+| 1 | `fetchUserByLinkCode` | `POST {auth-service}/auth/link-code/redeem` (público, sin JWT) | `{ code }` | `{ accessToken, refreshToken, userId, name }` — el Lambda guarda `accessToken`/`refreshToken` y los manda como `Authorization: Bearer` en cada llamada siguiente a `alexa-service` |
+| 2 | `fetchCampaigns` | `GET /api/campaigns` (`alexa-service`) | — (Bearer) | `[{ id, name, totalPosts, score, reach, engagement, followers, topNetwork, topPost }]` — ver notas abajo sobre `score`/`followers` |
+| 2b | (resolver por nombre, usado por `SelectCampaignIntent`/`ChangeCampaignIntent`) | `GET /api/campaigns?name=<texto>` | — | un solo objeto `EnrichedCampaign` (match exacto, o parcial si no hay exacto) o `null` |
+| 3 | `fetchContentIdeas` | **No implementado** — ver nota de IA más abajo | — | — |
+| 4 | `fetchSavedIdeas` | `GET /api/ideas?campaignId=<uuid>` | — (Bearer) | `ContentIdea[]` completo (incluye `id`, aunque el contrato del Lambda solo documente `title`/`text`/`createdAt`) |
+| 5 | `saveIdeaToBackend` | `POST /api/ideas` | `{ campaignId, title?, text, source? }` | `ContentIdea` creado |
+| 6 | `deleteIdeaFromBackend` | `DELETE /api/ideas?campaignId=<uuid>&title=<texto>` | — (query params) | `ContentIdea` borrado (soft delete). Coincide por título, insensible a mayúsculas; si hay varias con el mismo título, borra la más reciente. Convive con `DELETE /api/ideas/:id` (borrado por id, usado por la web) |
+
+**Notas importantes sobre `fetchCampaigns` (función 2), no documentadas en ninguna versión anterior de este
+plan:**
+
+- **`score` puede venir `null`.** Score es información exclusiva de Cliente/Administrador desde esta misma
+  sesión (Fase P2, `ScoreController.assertIsBrandOwnerOrAdmin`) — si el usuario que canjeó el LinkCode es
+  un CM o Diseñador (no el dueño de la marca), `core-service` responde 403 al pedir el score, y
+  `alexa-service` lo captura y devuelve `score: null` en vez de tumbar toda la respuesta (bug real
+  encontrado y arreglado hoy mismo — antes de este fix, `fetchCampaigns` fallaba con 400 completo para
+  cualquier CM/Diseñador que usara la Skill, verificado en vivo). **El Lambda debe manejar `score: null`
+  como "no disponible para este usuario", no como error.**
+- **`followers` es el total actual, no "ganados".** `SocialAccount.followers` no tiene historial (aunque
+  esta sesión sí se construyó un historial nuevo para la plataforma web —
+  `SocialAccountMetricSnapshot`, ver más abajo — no está conectado a este endpoint todavía, sería trabajo
+  aparte si el Lambda llega a necesitar "cuántos seguidores ganaste").
+- **`topPost`/`topNetwork` pueden venir `null`** si la campaña no tiene ninguna publicación con métricas
+  capturadas todavía.
+
+## IA (`fetchContentIdeas`, función 3) — sigue sin implementarse
+
+Como ya se documentó: la generación de ideas debe vivir en el backend de Bananagram (`POST
+/ideas/generate` en `alexa-service`, propuesto, no construido), no en el Lambda. Sigue bloqueado por no
+tener una `ANTHROPIC_API_KEY` de pago. Mientras tanto, el Lambda no tiene ningún endpoint real que llamar
+para esta función — si se prueba la Skill de punta a punta hoy, este intent específico
+(`GenerateContentIdeasIntent`) no puede completarse contra el backend real.
+
+## Historial/crecimiento nuevo (esta sesión) — no forma parte del contrato del Lambda todavía
+
+Se construyó infraestructura de historial real para la plataforma web (`analytics-front`):
+`SocialAccountMetricSnapshot` (crecimiento de seguidores), `BrandScore` como snapshot periódico en vez de
+por-request, y series diarias/heatmap de campaña (`GET /brands/:id/metrics-history`, `GET
+/brands/:id/score-history`, `GET /campaigns/:id/metrics-history`, todos en `core-service`, no en
+`alexa-service`). Ninguno de los 3 está expuesto a través de `alexa-service` ni forma parte de las 6
+funciones del Lambda — quedan aquí anotados por si en algún momento se quiere agregar un intent nuevo tipo
+"cómo ha crecido mi cuenta" a la Skill, que si se pidiera sería trivial de construir (el dato ya existe,
+solo faltaría el BFF).
+
+La skill **solo consume cosas de nuestro backend** — no tiene persistencia propia relevante para esto: las ideas de
 contenido únicamente se generan por voz (no hay forma de generarlas desde la plataforma web), así que
 deben guardarse en nuestro Postgres (`ContentIdea`) para que la app web pueda mostrarlas y borrarlas
 después — pero la lógica de esa persistencia vive enteramente en `alexa-service`, no en `core-service`
@@ -264,6 +340,35 @@ golpear el gateway en vez de `alexa-service` directo (puerto 3004 hoy no proxead
   la parte de persistencia de ideas en `ContentIdea` sí se adopta, coincide con la corrección del usuario.
 - Un formulario/UI de creación manual de ideas en la plataforma web: no existe hoy y no se construye —
   las ideas solo se crean desde la skill, la web únicamente lista y elimina.
+
+## Fase P1 (2026-08-13) — hallazgos en vivo verificando Ayrshare real
+
+El código de las Fases 0-6 ya estaba escrito y parecía completo, pero nunca se había probado contra la API
+real de Ayrshare (solo `SOCIAL_PROVIDER=mock`). Al hacerlo (publicar un post real en Instagram con una
+marca ya conectada), aparecieron 5 bugs reales que ninguna lectura de código detectó — todos ya arreglados:
+
+1. **Instagram exige media real** — un post de solo texto es rechazado por Ayrshare (error 139, "Media
+   Error"). La decisión 2 de este plan ("posts de solo texto por ahora") no es viable para Instagram en la
+   práctica. Se conectó Cloudinary (`cloudinary.service.ts`, ya existía pero no estaba cableado al publish
+   real) — `PostSchedulerService` ahora manda `mediaUrls` reales a Ayrshare.
+2. **Post trabado en `publicando` para siempre** cuando `provider.publish()` fallaba — el `catch` del cron
+   (`post-scheduler.service.ts`) solo loggeaba el error, nunca cerraba la transición a `error`.
+3. **Timeout del circuit breaker insuficiente** (5s default de `opossum.factory.ts`) — Ayrshare tarda más
+   que eso en procesar/subir media a Instagram. Subido a 60s específicamente para `publish` (no para el
+   default global).
+4. **Parsing de la respuesta de publish, dos capas equivocadas**: (a) los resultados por red no vienen en
+   `payload.postIds` (raíz) sino en `payload.posts[0].postIds` — con la lectura vieja, `resultsByPlatform`
+   quedaba siempre vacío y todo se marcaba `error` aunque Ayrshare hubiera publicado de verdad; (b) el
+   `socialPostId` que hay que guardar es el ID propio de Ayrshare (`payload.posts[0].id`, alfanumérico),
+   no el ID nativo de la red (`postIds[i].id`, numérico) — Ayrshare rechaza `/analytics/post` con 404 si le
+   mandas el segundo.
+5. **Mapper de métricas leyendo el nivel equivocado** — los campos (`likeCount`, `reachCount`, etc.) vienen
+   en `rawForNetwork.analytics`, no en `rawForNetwork` directo. Con el bug, `raw` en `PostMetric` sí
+   guardaba el payload completo real (parecía que funcionaba), pero `likes`/`reach`/etc. normalizados
+   quedaban siempre `null`.
+
+Verificado de punta a punta: post real publicado en Instagram (URL real devuelta por Ayrshare),
+`PostMetric.source = 'ayrshare'` con valores reales (`0` porque el post es nuevo, no simulados).
 
 ## Verificación
 

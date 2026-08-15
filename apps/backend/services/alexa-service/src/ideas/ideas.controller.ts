@@ -60,4 +60,19 @@ export class IdeasController {
   remove(@Param('id', ParseUUIDPipe) id: string, @Headers('authorization') authHeader: string) {
     return this.ideas.removeIdea(id, authHeader);
   }
+
+  // deleteIdeaFromBackend del Lambda real (contrato de 6 funciones, ver
+  // docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md) borra
+  // por título, no por id — convive con DELETE /ideas/:id, no lo reemplaza.
+  @Delete()
+  @ApiQuery({ name: 'campaignId', required: true })
+  @ApiQuery({ name: 'title', required: true })
+  @RequirePermission('campanas', 'crear')
+  removeByTitle(
+    @Query('campaignId', ParseUUIDPipe) campaignId: string,
+    @Query('title') title: string,
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.ideas.removeIdeaByTitle(campaignId, title, authHeader);
+  }
 }

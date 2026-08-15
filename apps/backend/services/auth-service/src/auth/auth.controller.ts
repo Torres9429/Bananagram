@@ -55,11 +55,12 @@ export class AuthController {
   }
 
   // Genera el código: lo llama el frontend con el usuario ya logueado.
+  // Restringido a Cliente/Diseñador/Administrador — ver createLinkCode.
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('link-code')
   createLinkCode(@CurrentUser() user: any) {
-    return this.authService.createLinkCode(user.sub);
+    return this.authService.createLinkCode(user.sub, user.roles);
   }
 
   // Canjea el código: lo llama el Lambda de Alexa, sin JWT todavía (es

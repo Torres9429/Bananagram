@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { TokenSignerService } from './token-signer.service';
 import { TokenDenylistService } from './token-denylist.service';
 import { AuthRepository } from './auth.repository';
@@ -183,7 +183,15 @@ export class AuthService {
   // Account-linking de la Alexa Skill — LinkCode, no OAuth2 (contrato ya
   // usado por el equipo externo del Lambda). El usuario logueado genera el
   // código desde el frontend; el Lambda lo canjea una sola vez.
-  async createLinkCode(userId: string) {
+  // La Skill de Alexa está pensada solo para Cliente y Diseñador por ahora
+  // (decisión del usuario) — Administrador se deja pasar por el mismo
+  // criterio que el resto del proyecto (superusuario, ej. soporte/pruebas).
+  // CM queda fuera a propósito.
+  async createLinkCode(userId: string, roles: string[]) {
+    const allowed = ['cliente', 'disenador', 'administrador'];
+    if (!roles.some((role) => allowed.includes(role))) {
+      throw new ForbiddenException('La vinculación con Alexa no está disponible para tu rol todavía');
+    }
     const linkCode = await this.repo.createAccountLinkCode(userId);
     return { code: linkCode.code, expiresAt: linkCode.expiresAt };
   }

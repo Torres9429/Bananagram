@@ -1,5 +1,12 @@
 # Alexa Skill — Asistente Bananagram — Código del Lambda, paso a paso (final)
 
+> ⚠️ **DESCARTADO — no es el código que usa el Lambda real.** En particular, la sección 11
+> (`GenerateContentIdeasIntentHandler`, "Claude directo, sin backend de Bananagram") describe un diseño
+> abandonado — el contrato real (`docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md`) espera
+> que `fetchContentIdeas` reciba las ideas YA generadas por el backend de Bananagram, no que el Lambda
+> llame a Claude por su cuenta. Ver el aviso al inicio de `AlexaSkill-Diseno-Final.md` para el resto de las
+> diferencias (account-linking, endpoints de campañas). Queda solo como referencia histórica.
+>
 > Continúa a `../AlexaSkill-Diseno-Final.md` e `interaction-model-es-MX.json`/
 > `interaction-model-en-US.json` (mismo directorio). Este documento
 > **sustituye** a la versión anterior (100% mock, sin llamadas HTTP): esta

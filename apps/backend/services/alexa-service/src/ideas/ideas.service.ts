@@ -57,6 +57,26 @@ export class IdeasService {
     return prisma.contentIdea.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
+  // deleteIdeaFromBackend del Lambda real borra por título, no por id —
+  // fetchSavedIdeas ni siquiera devuelve uno (solo title/text/createdAt).
+  // Si hay más de una coincidencia, borra la más reciente (mismo criterio
+  // razonable que esperaría un humano pidiéndolo por voz).
+  async removeIdeaByTitle(campaignId: string, title: string, authHeader: string): Promise<any> {
+    await this.assertCampaignAccess(campaignId, authHeader);
+
+    const normalized = title.trim().toLowerCase();
+    const candidates = await prisma.contentIdea.findMany({
+      where: { campaignId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    const match = candidates.find((idea) => idea.title?.trim().toLowerCase() === normalized);
+    if (!match) {
+      throw new NotFoundException(`No se encontró ninguna idea con el título "${title}" en esta campaña`);
+    }
+
+    return prisma.contentIdea.update({ where: { id: match.id }, data: { deletedAt: new Date() } });
+  }
+
   // alexa-service ya no tiene Campaign en su propio Prisma Client — reutiliza
   // la regla de pertenencia que ya vive (correcta) en core-service vía HTTP,
   // en vez de reimplementarla: GET /campaigns ya filtra server-side por
