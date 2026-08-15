@@ -169,6 +169,18 @@ export const postsApi = createApi({
       },
       invalidatesTags: ['Post'],
     }),
+    removeMedia: builder.mutation<RealPost, { id: string; mediaId: string }>({
+      query: ({ id, mediaId }) => ({ url: `posts/${id}/media/${mediaId}`, method: 'DELETE' }),
+      invalidatesTags: ['Post'],
+    }),
+    // Usado para deshacer un borrador recién creado cuando el adjunto de
+    // imagen falla justo después (ver posts/new/page.tsx) — no hay UI para
+    // borrar un post ya "terminado" a propósito, el backend solo lo permite
+    // en borrador/rechazado.
+    deletePost: builder.mutation<void, string>({
+      query: (id) => ({ url: `posts/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Post'],
+    }),
   }),
 });
 
@@ -182,6 +194,8 @@ export const {
   useSchedulePostMutation,
   useCancelPostMutation,
   useUploadMediaMutation,
+  useRemoveMediaMutation,
+  useDeletePostMutation,
   useClientRejectPostMutation,
   useForwardToDesignerMutation,
   useUpdatePostMutation,

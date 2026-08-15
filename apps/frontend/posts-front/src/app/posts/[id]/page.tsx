@@ -18,6 +18,8 @@ import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import CloseIcon from '@mui/icons-material/Close';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { StatusChip, PrimaryButton, useToast } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { ZONE_URLS } from '@repo/ui/config';
@@ -32,9 +34,12 @@ import {
   useUpdatePostMutation,
   useSchedulePostMutation,
   useCancelPostMutation,
+  useUploadMediaMutation,
+  useRemoveMediaMutation,
 } from '../../../store/api/posts.api';
 import { NETWORK_DISPLAY_COLORS, NETWORK_LABELS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
 import { RejectPostDialog } from '../../../components/RejectPostDialog';
+import { MediaCarousel } from '../../../components/MediaCarousel';
 
 const PSA_STATUS_STYLES: Record<PostSocialAccountStatus, { bg: string; color: string; label: string }> = {
   pendiente: { bg: '#F5F5F5', color: '#616161', label: 'Pendiente' },
@@ -88,6 +93,7 @@ export default function PostDetailPage() {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [editInstructions, setEditInstructions] = useState('');
+  const [editFiles, setEditFiles] = useState<File[]>([]);
   const [cmComment, setCmComment] = useState('');
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
@@ -100,6 +106,8 @@ export default function PostDetailPage() {
   const [updatePost, { isLoading: isSaving }] = useUpdatePostMutation();
   const [schedulePost, { isLoading: isScheduling }] = useSchedulePostMutation();
   const [cancelPost, { isLoading: isCancelling }] = useCancelPostMutation();
+  const [uploadMedia, { isLoading: isUploadingMedia }] = useUploadMediaMutation();
+  const [removeMedia] = useRemoveMediaMutation();
 
   if (isFetching) return null;
   if (!post) {
@@ -133,18 +141,49 @@ export default function PostDetailPage() {
     : undefined;
 
   const hasDelivery = post.socialAccounts.length > 0;
-  const primaryNetworkCode = post.socialNetworks[0]?.socialNetwork.code;
-  const primaryColors = primaryNetworkCode ? NETWORK_DISPLAY_COLORS[primaryNetworkCode] : undefined;
+  const carouselItems = post.media.map((pm) => ({
+    url: pm.media.url,
+    type: pm.media.mimeType.startsWith('video') ? ('video' as const) : ('image' as const),
+    alt: pm.media.originalName,
+  }));
 
   function startEditing() {
     setEditContent(post!.content);
     setEditInstructions(post!.instructions ?? '');
+    setEditFiles([]);
     setEditing(true);
+  }
+
+  function handleEditFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    setEditFiles((prev) => [...prev, ...picked]);
+    e.target.value = '';
+  }
+
+  function removeEditFile(index: number) {
+    setEditFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleRemoveExistingMedia(mediaId: string) {
+    try {
+      await removeMedia({ id: post!.id, mediaId }).unwrap();
+    } catch {
+      showError('No se pudo quitar el archivo.');
+    }
   }
 
   async function handleSaveEdit(resendAfter: boolean) {
     try {
       await updatePost({ id: post!.id, content: editContent.trim(), instructions: editInstructions.trim() || undefined }).unwrap();
+      if (editFiles.length > 0) {
+        try {
+          await uploadMedia({ id: post!.id, files: editFiles }).unwrap();
+          setEditFiles([]);
+        } catch {
+          showError('El contenido se guardó, pero no se pudieron adjuntar los archivos nuevos — intenta de nuevo.');
+          return;
+        }
+      }
       if (resendAfter) {
         await approvePost(post!.id).unwrap();
         showSuccess('Publicación editada y reenviada al cliente.');
@@ -314,20 +353,60 @@ export default function PostDetailPage() {
                   value={editInstructions}
                   onChange={(e) => setEditInstructions(e.target.value)}
                 />
+
+                {/* Solo borrador/rechazado permiten tocar media en el
+                    backend (attachMediaToPost/removeMediaFromPost) —
+                    rechazado_cliente (canEditRechazadoCliente) no. */}
+                {canEditNow && (
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary" mb={1}>Imágenes/videos adjuntos</Typography>
+                    <Stack direction="row" gap={1} flexWrap="wrap" mb={1}>
+                      {post.media.map((pm) => (
+                        <Box key={pm.mediaId} sx={{ position: 'relative', width: 64, height: 64 }}>
+                          <Box component="img" src={pm.media.url} alt={pm.media.originalName} sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1.5, border: '1px solid #E8E8E8', display: 'block' }} />
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRemoveExistingMedia(pm.mediaId)}
+                            sx={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFEBEE' } }}
+                          >
+                            <CloseIcon sx={{ fontSize: 12 }} />
+                          </IconButton>
+                        </Box>
+                      ))}
+                      {editFiles.map((f, i) => (
+                        <Box key={`new-${i}`} sx={{ position: 'relative', width: 64, height: 64 }}>
+                          <Box component="img" src={URL.createObjectURL(f)} alt={f.name} sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1.5, border: '1px solid #E0A800', display: 'block' }} />
+                          <IconButton
+                            size="small"
+                            onClick={() => removeEditFile(i)}
+                            sx={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFEBEE' } }}
+                          >
+                            <CloseIcon sx={{ fontSize: 12 }} />
+                          </IconButton>
+                        </Box>
+                      ))}
+                    </Stack>
+                    <Button component="label" size="small" startIcon={<AttachFileIcon fontSize="small" />} sx={{ color: 'secondary.main' }}>
+                      Adjuntar archivos
+                      <input type="file" hidden multiple accept="image/*,video/*" onChange={handleEditFilesSelected} />
+                    </Button>
+                  </Box>
+                )}
+
                 <Stack direction="row" gap={1.5}>
                   <Button variant="outlined" onClick={() => setEditing(false)} sx={{ color: '#6B6B6B', borderColor: '#E8E8E8' }}>
                     Cancelar
                   </Button>
                   <Button
                     variant="outlined"
-                    disabled={isSaving || !editContent.trim()}
+                    disabled={isSaving || isUploadingMedia || !editContent.trim()}
                     onClick={() => handleSaveEdit(false)}
                     sx={{ borderColor: '#E0A800', color: 'secondary.main' }}
                   >
-                    Guardar
+                    {isUploadingMedia ? 'Subiendo archivos…' : 'Guardar'}
                   </Button>
                   {canEditRechazadoCliente && (
-                    <PrimaryButton disabled={isSaving || isApproving || !editContent.trim()} onClick={() => handleSaveEdit(true)}>
+                    <PrimaryButton disabled={isSaving || isApproving || isUploadingMedia || !editContent.trim()} onClick={() => handleSaveEdit(true)}>
                       Guardar y reenviar al Cliente →
                     </PrimaryButton>
                   )}
@@ -339,35 +418,6 @@ export default function PostDetailPage() {
                   {post.content}
                 </Typography>
               </Box>
-            )}
-
-            {post.media.length > 0 && !editing && (
-              <Stack direction="row" gap={1} flexWrap="wrap" mt={1.5}>
-                {post.media.map((pm) => (
-                  <Box
-                    key={pm.mediaId}
-                    component="a"
-                    href={pm.media.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    sx={{ position: 'relative', width: 72, height: 72, display: 'block' }}
-                  >
-                    <Box
-                      component="img"
-                      src={pm.media.url}
-                      alt={pm.media.originalName}
-                      sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1.5, border: '1px solid #E8E8E8' }}
-                    />
-                    {pm.media.mimeType.startsWith('video') && (
-                      <Chip
-                        label="Video"
-                        size="small"
-                        sx={{ position: 'absolute', bottom: 2, left: 2, height: 16, fontSize: 8, bgcolor: 'rgba(0,0,0,0.65)', color: '#fff' }}
-                      />
-                    )}
-                  </Box>
-                ))}
-              </Stack>
             )}
 
             {post.status === 'aprobado' && isClient && (
@@ -551,25 +601,38 @@ export default function PostDetailPage() {
         </Grid>
 
         <Grid item xs={12} md={5}>
-          <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3 }}>
+          <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, position: 'sticky', top: 24 }}>
             <Typography variant="subtitle2" color="text.secondary" mb={2}>
-              Vista previa
+              Vista previa {post.socialNetworks.length > 0 && `(${post.socialNetworks.length} ${post.socialNetworks.length === 1 ? 'red' : 'redes'})`}
             </Typography>
-            <Box sx={{ bgcolor: '#1A1A1A', borderRadius: 2, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Typography variant="caption" sx={{ color: '#666' }}>
-                {primaryNetworkCode ? `Vista previa · ${NETWORK_LABELS[primaryNetworkCode]}` : 'Sin red asignada'}
-              </Typography>
-            </Box>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="body2" sx={{ lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-              {post.content}
-            </Typography>
-            {primaryNetworkCode && (
-              <Chip
-                size="small"
-                label={NETWORK_SHORT_LABELS[primaryNetworkCode]}
-                sx={{ bgcolor: primaryColors?.bg, color: primaryColors?.color, fontWeight: 600, mt: 1 }}
-              />
+            {post.socialNetworks.length === 0 ? (
+              <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
+                <Typography variant="body2" color="text.secondary">Sin red asignada.</Typography>
+              </Box>
+            ) : (
+              <Stack gap={2}>
+                {post.socialNetworks.map((sn) => {
+                  const code = sn.socialNetwork.code;
+                  const colors = NETWORK_DISPLAY_COLORS[code];
+                  return (
+                    <Box key={sn.socialNetworkId} sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
+                      <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
+                        <Avatar sx={{ bgcolor: colors.bg, color: colors.color, width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
+                          {NETWORK_SHORT_LABELS[code]}
+                        </Avatar>
+                        <Typography variant="body2" fontWeight={600}>{NETWORK_LABELS[code]}</Typography>
+                      </Stack>
+                      <Box sx={{ mb: 1.5 }}>
+                        <MediaCarousel items={carouselItems} />
+                      </Box>
+                      <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {post.content || <span style={{ color: '#9E9E9E' }}>Sin contenido</span>}
+                      </Typography>
+                      <StatusChip status={post.status} />
+                    </Box>
+                  );
+                })}
+              </Stack>
             )}
           </Paper>
         </Grid>

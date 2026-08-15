@@ -24,7 +24,8 @@ import { PrimaryButton, useToast } from '@repo/ui/ui';
 import { useListSocialNetworksQuery } from '@repo/ui/state';
 import { POST_CHAR_LIMIT, NETWORK_DISPLAY_COLORS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
 import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
-import { useCreatePostMutation, useUploadMediaMutation, useSubmitForReviewMutation } from '../../../store/api/posts.api';
+import { useCreatePostMutation, useUploadMediaMutation, useDeletePostMutation, useSubmitForReviewMutation } from '../../../store/api/posts.api';
+import { MediaCarousel } from '../../../components/MediaCarousel';
 
 // Reescrita a datos reales (Fase N). Cambios de fondo respecto al mock:
 // - Ya no hay "biblioteca de media" reutilizable (no existe ese concepto en
@@ -50,6 +51,7 @@ export default function NewPostPage() {
   const { data: socialNetworks = [] } = useListSocialNetworksQuery();
   const [createPost] = useCreatePostMutation();
   const [uploadMedia] = useUploadMediaMutation();
+  const [deletePost] = useDeletePostMutation();
   const [submitForReview] = useSubmitForReviewMutation();
 
   const selectedCampaign = campaigns.find((c) => c.id === campaignId);
@@ -61,6 +63,11 @@ export default function NewPostPage() {
   const hashtags = content.match(/#\S+/g) ?? [];
   const previewText = content.length > 140 ? `${content.slice(0, 140)}...` : content;
   const filePreviews = files.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
+  const carouselItems = filePreviews.map((f) => ({
+    url: f.url,
+    type: f.file.type.startsWith('video') ? ('video' as const) : ('image' as const),
+    alt: f.file.name,
+  }));
 
   function toggleSocialNetwork(id: string) {
     setSocialNetworkIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -92,7 +99,11 @@ export default function NewPostPage() {
         try {
           await uploadMedia({ id: post.id, files }).unwrap();
         } catch {
-          showError('El post se creó, pero no se pudieron adjuntar los archivos.');
+          // Si el adjunto falla, no debe quedar un borrador huérfano sin
+          // imagen — se deshace la creación en vez de avisar y seguir.
+          await deletePost(post.id).catch(() => {});
+          showError('No se pudieron adjuntar los archivos — la publicación no se creó, intenta de nuevo.');
+          return;
         }
       }
 
@@ -281,7 +292,6 @@ export default function NewPostPage() {
               <Stack gap={2}>
                 {selectedNetworks.map((n) => {
                   const colors = NETWORK_DISPLAY_COLORS[n.code];
-                  const previewImage = filePreviews.find((f) => f.file.type.startsWith('image'));
                   return (
                     <Box key={n.id} sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
                       <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
@@ -290,12 +300,8 @@ export default function NewPostPage() {
                         </Avatar>
                         <Typography variant="body2" fontWeight={600}>{n.name}</Typography>
                       </Stack>
-                      <Box sx={{ bgcolor: '#E0E0E0', borderRadius: 1.5, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5, overflow: 'hidden' }}>
-                        {previewImage ? (
-                          <Box component="img" src={previewImage.url} alt={previewImage.file.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <Typography variant="caption" sx={{ color: '#9E9E9E' }}>Sin imagen adjunta</Typography>
-                        )}
+                      <Box sx={{ mb: 1.5 }}>
+                        <MediaCarousel items={carouselItems} />
                       </Box>
                       <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 1 }}>
                         {previewText || <span style={{ color: '#9E9E9E' }}>El copy aparecerá aquí…</span>}
