@@ -62,7 +62,7 @@ export default function MyTeamPage() {
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%', p: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Box>
-          <Typography variant="h5" fontWeight={700}>Mi equipo</Typography>
+          <Typography variant="h5" fontWeight={700}>Diseñadores</Typography>
           <Typography variant="body2" color="text.secondary">
             Diseñadores con los que trabajas — elige desde aquí a quién staffear en cada campaña.
           </Typography>

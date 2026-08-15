@@ -38,7 +38,9 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'brands', label: 'Marcas', href: `${BRANDS_FRONT_URL}/brands`, icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
   { key: 'calendar', label: 'Calendario', href: `${BRANDS_FRONT_URL}/profile/calendar`, icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
   { key: 'metrics', label: 'Métricas', href: '/metrics', icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
-  { key: 'team', label: 'Team', href: `${BRANDS_FRONT_URL}/team`, icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  // Faltaba en esta zona (solo estaba en brands-front) — el CM lo perdía al
+  // navegar a Métricas, mismo criterio/permiso que el original.
+  { key: 'my-team', label: 'Diseñadores', href: `${BRANDS_FRONT_URL}/my-team`, icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.ASSIGN }] },
   { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
 ];
 

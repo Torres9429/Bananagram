@@ -32,25 +32,41 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // activeMatchPrefixes: el detalle/equipo/publicaciones de una campaña vive
   // en /profile/campaigns/*, que no tiene su propio ítem de nav — sin esto,
   // ningún ítem quedaba activo al entrar al detalle de una campaña.
-  { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', activeMatchPrefixes: ['/profile/campaigns'], icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
-  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, activeMatchPrefixes: ['/profile/campaigns'], icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }] },
+  // activeMatchSegmentPrefixes: el detalle/lista/equipo de una campaña vive
+  // ahora en /brands/:id/campaigns/* (Fase M consolidó ahí también la vía
+  // /profile/campaigns/[campaignId], que ya no existe) — activeMatchPrefixes
+  // no alcanza porque no puede expresar el id dinámico de la marca en medio.
+  // Solo "Mis Campañas" (CM/Diseñador) lo reclama — Cliente no ve este ítem,
+  // así que en detalle de campaña le corresponde a "Marcas" (ver abajo).
+  { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', activeMatchPrefixes: ['/profile/campaigns'], activeMatchSegmentPrefixes: [['brands', '*', 'campaigns']], icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  // Sin activeMatchSegmentPrefixes de campañas: Cliente sí ve "Marcas" (a
+  // diferencia de CM/Diseñador con "Mis Campañas"), así que el detalle de
+  // campaña le corresponde a ese ítem, no a este — ver el ajuste de
+  // "brands".activeMatchExcludeSegmentPrefixes más abajo (isCliente).
+  // "/profile/alexa" sí queda aquí: no tiene ítem propio en el sidebar, y es
+  // un sub-destino de "Mi perfil" (se entra desde ahí), no de campañas.
+  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, activeMatchPrefixes: ['/profile/campaigns', '/profile/alexa'], icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }] },
   { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.
-  { key: 'brands', label: 'Marcas', href: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
+  // activeMatchExcludeSegmentPrefixes: por defecto (CM/Diseñador) /brands/:id/
+  // campaigns/* no es "Marcas" — es "Mis Campañas" (arriba), aunque URL-mente
+  // viva anidado aquí. Para Cliente (que no ve "Mis Campañas") esta exclusión
+  // se quita en el componente (ver roleAdjusted, más abajo) — ahí sí le
+  // corresponde a "Marcas".
+  { key: 'brands', label: 'Marcas', href: '/brands', activeMatchExcludeSegmentPrefixes: [['brands', '*', 'campaigns']], icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
   // Calendario (fase UX): mismo par de permisos ya usado por "Mi perfil"/"Team"
   // — Cliente (campanas:crear) o CM/Diseñador (campanas:ver). No es un
   // permiso nuevo. Admin queda excluido igual que el resto vía isAdmin, abajo.
   { key: 'calendar', label: 'Calendario', href: '/profile/calendar', icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
   { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
-  { key: 'team', label: 'Team', href: '/team', icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
   // Equipo GENERAL del CM (Fase J) — distinto de "Team" de arriba (esa es
   // de solo lectura, agregado de colaboradores en campañas activas, mock
   // todavía). campanas:asignar solo lo tiene community_manager en el seed,
   // así que este ítem ya queda oculto para Cliente/Diseñador sin necesitar
   // un ajuste de rol explícito como "my-campaigns"/"my-brand" abajo.
-  { key: 'my-team', label: 'Mi equipo', href: '/my-team', icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.ASSIGN }] },
+  { key: 'my-team', label: 'Diseñadores', href: '/my-team', icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.ASSIGN }] },
   { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
 ];
 
@@ -70,11 +86,17 @@ export function Sidebar() {
   // rol explícito cuál de los dos ve cada quien (eran, y siguen siendo,
   // mutuamente excluyentes por diseño: apuntan a landings distintos).
   const isCliente = user?.roles?.includes(AppRole.CLIENTE) ?? false;
-  const roleAdjusted = permissionVisible.filter((item) => {
-    if (item.key === 'my-campaigns') return !isCliente;
-    if (item.key === 'my-brand') return isCliente;
-    return true;
-  });
+  const roleAdjusted = permissionVisible
+    .filter((item) => {
+      if (item.key === 'my-campaigns') return !isCliente;
+      if (item.key === 'my-brand') return isCliente;
+      return true;
+    })
+    // "Marcas" solo cede el active de /brands/:id/campaigns/* a "Mis
+    // Campañas" cuando ese ítem existe (CM/Diseñador, filtrado arriba) — el
+    // Cliente no lo ve (ve "Mi perfil" en su lugar, que ya no reclama
+    // campañas), así que ahí "Marcas" debe quedarse activo él mismo.
+    .map((item) => (item.key === 'brands' && isCliente ? { ...item, activeMatchExcludeSegmentPrefixes: undefined } : item));
   // Ajuste de UX (no de permisos): Admin no debe operar como usuario de negocio
   // (Marcas/Posts/Métricas/Mis Campañas/Team/Mi perfil), solo Dashboard y Admin
   // (que ya contiene Usuarios/Roles/Catálogos/Auditoría vía AdminTabs).
