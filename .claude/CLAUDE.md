@@ -32,38 +32,58 @@ en `apps/backend/services/core-service/src/score/score.service.ts` calcula
 `Consistencia×0.30 + Engagement×0.40 + Cobertura×0.20 + Frecuencia×0.10` (4 factores, no 3). Confirmar con
 el usuario cuál es la vigente antes de tocar el score.
 
-## Estado real del código — léase antes de asumir que algo "ya funciona"
+## Alexa Skill e IA — contrato real (2026-08-13)
 
-El backend de `auth-service`/`core-service` ya tiene bastante dominio real conectado (ver bullets abajo);
-`alexa-service`, `posts`, notificaciones y **todo el frontend** siguen en etapa de scaffold/mock — no
-asumas que algo "ya funciona" sin verificarlo primero.
+`docs/skill/AlexaSkill-Diseno-Final.md` y `docs/skill/lambda-codigo-por-pasos.md` quedaron **descartados**
+(diseño anterior, Lambda llamando a Claude directo) — el contrato real y vigente son las 6 funciones
+documentadas en `docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md` (`fetchUserByLinkCode`,
+`fetchCampaigns`, `fetchContentIdeas`, `fetchSavedIdeas`, `saveIdeaToBackend`, `deleteIdeaFromBackend`).
+La generación de ideas con IA vive del lado del **backend de Bananagram**, no del Lambda — sigue sin
+implementarse, pendiente de una `ANTHROPIC_API_KEY` con facturación activa (nunca al frontend, regla de
+arriba sin cambios). El pipeline real de Ayrshare (publish + métricas) ya se verificó en vivo, publicando
+de verdad en Instagram — detalle de los 5 bugs reales encontrados y arreglados en ese mismo documento,
+sección "Fase P1".
 
-- **`auth-service` y `core-service` ya tienen dominio real conectado** (`auth-service`: `AuthModule` +
-  `PermissionsModule` + `AdminModule` desde 2026-07-27; `core-service`: `CatalogsModule` +
-  `BrandsModule` + `CampaignsModule` + `ReportsModule` + `IdeasModule` + `InternalModule`, mismo corte de
-  fecha). `alexa-service` sigue siendo la excepción real: tiene infraestructura JWT propia desde
-  2026-07-27 (`JwtAuthGuard` aplicado a sus controllers), pero sus módulos de dominio
-  (`campaigns`/`ideas`) siguen siendo stubs sin lógica — solo quedaron protegidos, no implementados (BFF
-  de la Alexa Skill, sin base de datos propia, ver `docs/base/service-boundaries.md`).
-- **Sigue faltando por completo**: `posts` (la máquina de estados en `core-service/src/posts/` existe y
-  está probada, pero no tiene controller/service/module — es el hueco de negocio más grande), métricas/
-  score expuestos por HTTP (`score.service.ts`/`metrics-cron.service.ts` existen, sin controller),
-  notificaciones (modelo existe en `auth-service`, cero service/controller de ningún lado).
+## Estado real del código — léase antes de asumir que algo "ya funciona" (actualizado 2026-08-14)
+
+El proyecto dejó de ser un scaffold: los 4 servicios de backend y la mayoría del frontend (login,
+publicaciones, campañas, métricas/score, notificaciones en vivo, Alexa Skill) están conectados de punta a
+punta. Lo mock/stub es ahora la excepción puntual, no la regla — detalle exhaustivo en
+`.claude/INVENTORY.md` §0; resumen abajo.
+
+- **Los 4 servicios de backend tienen dominio real conectado**, incluido `alexa-service`: sus módulos
+  `campaigns`/`ideas` **ya no son stubs** — `ideas` es dueño único de ese dominio en todo el sistema
+  (se movió de `core-service`), con acceso directo (no HTTP) a la tabla `ContentIdea` de la BD física de
+  `core-service` vía su propio `prisma/schema.prisma` (nunca migra desde ahí). `posts` en `core-service`
+  tiene controller/service/module completo (13 endpoints, máquina de estados de 11 valores) más un
+  scheduler de publicación por temporizadores de evento (ya no sondeo `@Cron`). Score/métricas ya tienen
+  controller HTTP (`GET /brands/:id/score[-history]`, `/campaigns/:id/metrics[-history]`, con refresh
+  manual). Notificaciones son reales de punta a punta, incluido un stream SSE en vivo
+  (`GET me/notifications/stream`).
+- **Sigue faltando de verdad**: generación de ideas con IA (`fetchContentIdeas`, bloqueada sin
+  `ANTHROPIC_API_KEY` de pago), generación real de reportes (`POST /reports` solo registra la solicitud,
+  `fileUrl` queda `null`), y un puñado de rutas/componentes frontend puntuales que siguen mock pese a que
+  el backend ya existe (`admin-front` `/users`/`/roles`/`/audit-log`, `auth-front` registro/activación,
+  `brands-front` `/profile/calendar` y el árbol legacy `/brands/[id]/{metrics,score,reports,calendar}`,
+  y 5 de 15 widgets de `analytics-front` como `EmptyState` honesto por falta de dato nativo) — lista
+  completa en `.claude/INVENTORY.md` §0.
 - **El gateway ya proxea de verdad**: `/api/auth/*`, `/api/me/*`, `/api/admin/*` → `AUTH_SERVICE_URL`;
-  `/api/catalogs/*`, `/api/brands/*`, `/api/campaigns/*`, `/api/reports/*`, `/api/ideas/*` →
-  `CORE_SERVICE_URL` (env vars, con split host/Docker igual que `DATABASE_URL_AUTH`/`CORE`). `main.ts`
-  crea la app con `{ bodyParser: false }` — necesario para que `http-proxy-middleware` reciba el stream
-  del body sin consumir (si Nest lo parseara antes, los POST/PATCH llegarían vacíos al servicio destino).
-  Montado con `app.use(createProxyMiddleware(...))` **sin** pasar el path como argumento de `app.use()` —
-  Express recorta ese prefijo de `req.url` antes de pasarlo al middleware si se hace así, rompiendo el
-  proxy; se usa `pathFilter` en su lugar, que matchea sobre la URL completa sin tocarla. Verificado con
-  `docker run` real, contenedores separados comunicándose por nombre de servicio en la red de Docker.
-  `/api/internal/*` (llamada auth-service → core-service para crear el `UserProfile` al registrar) **no**
-  se proxea a propósito — es tráfico servicio-a-servicio, no debe ser alcanzable desde fuera.
-- **Todo el frontend corre en modo mock**: login/registro/sesión usan JWTs sin firmar generados en
-  `@repo/ui/mocks`, guardados en la cookie `bananagram_token`. Ningún microfrontend hace fetch real a un
-  backend — los 7 slices RTK Query de `web-shell/src/store/api/*.ts` están vacíos y ni siquiera
-  registrados en el store; solo `authApi` (login/register) tiene endpoints definidos, y nada los usa aún.
+  `/api/catalogs/*`, `/api/brands/*`, `/api/campaigns/*`, `/api/cm-team/*`, `/api/posts/*`,
+  `/api/reports/*` → `CORE_SERVICE_URL`; **`/api/ideas/*` → `ALEXA_SERVICE_URL`** (no core-service — el
+  dominio de ideas se mudó entero ahí, ver arriba). `main.ts` crea la app con `{ bodyParser: false }` —
+  necesario para que `http-proxy-middleware` reciba el stream del body sin consumir (si Nest lo parseara
+  antes, los POST/PATCH llegarían vacíos al servicio destino). Montado con
+  `app.use(createProxyMiddleware(...))` **sin** pasar el path como argumento de `app.use()` — Express
+  recorta ese prefijo de `req.url` antes de pasarlo al middleware si se hace así, rompiendo el proxy; se
+  usa `pathFilter` en su lugar, que matchea sobre la URL completa sin tocarla. `/api/internal/*` (tráfico
+  servicio-a-servicio: auth-service↔core-service) **no** se proxea a propósito. **Sin confirmar en vivo**:
+  el override de `docker-compose.yml` para `api-gateway` no incluye `ALEXA_SERVICE_URL`, así que
+  `/api/ideas` probablemente no resuelve dentro del perfil `full` containerizado.
+- **El frontend ya NO corre 100% en modo mock**: el login es real (`auth-front`'s `LoginForm` llama al
+  backend de verdad, con refresh automático de token y 2 cookies de sesión reales). Catálogos en
+  `admin-front`, y la mayoría de `brands-front`/`posts-front`/`analytics-front` (campañas, publicaciones
+  con flujo de aprobación completo, métricas) son reales. Lo que sigue siendo mock quedó en bolsillos
+  específicos, no por zona completa — ver el resumen de arriba y el detalle en `.claude/INVENTORY.md` §0.
 - Detalle completo (rutas, endpoints, componentes, bugs conocidos, credenciales demo) en
   **`.claude/INVENTORY.md`** — consúltalo antes de tareas puntuales tipo "agrega un endpoint a X",
   "crea un componente para Y", "conecta el front Z con el servicio W".
@@ -165,7 +185,7 @@ pnpm lint                      # turbo run lint
 
 `apps/backend/`
 - `gateway/` — único punto de entrada HTTP externo (puerto 4000). Usa `http-proxy-middleware` para enrutar a cada servicio; también aplica `CorrelationIdMiddleware` (propaga `X-Request-ID`) a todas las rutas.
-- `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes, ideas de contenido) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill y **no tiene base de datos propia** (solo consume las APIs de core-service y auth-service). `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **desde 2026-07-23 cada uno con su propio `prisma/schema.prisma` y su propia base de datos** (`gestor_redes_auth`/`gestor_redes_core`, ver `docs/base/modelo2.txt`) — ya no hay schema ni BD compartida entre ellos. Cada uno genera su Prisma Client con `output` propio (`node_modules/.prisma-client`, ver comentario en su `schema.prisma`) para evitar que pnpm resuelva ambos al mismo folder por compartir versión de `@prisma/client`.
+- `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill. **Ideas de contenido (`ContentIdea`) se mudó entera a `alexa-service`** (antes vivía en `core-service`) — `alexa-service` no tiene una base de datos propia que migre, pero **sí tiene su propio `prisma/schema.prisma`** (solo el modelo `ContentIdea`) con acceso directo de lectura/escritura a la misma base física de `core-service` (`gestor_redes_core`), nunca corre `prisma migrate` desde ahí (core-service sigue siendo el dueño de esa migración). Para todo lo demás (campañas, marcas, métricas, score, account-linking) `alexa-service` sí es un BFF puro por HTTP contra `core-service`/`auth-service`. `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **desde 2026-07-23 cada uno con su propio `prisma/schema.prisma` y su propia base de datos** (`gestor_redes_auth`/`gestor_redes_core`, ver `docs/base/modelo2.txt`) — ya no hay schema ni BD compartida entre ellos. Cada uno genera su Prisma Client con `output` propio (`node_modules/.prisma-client`, ver comentario en su `schema.prisma`) para evitar que pnpm resuelva ambos al mismo folder por compartir versión de `@prisma/client`.
 - `commons/` — código compartido importado por **path relativo** (no es un workspace package con alias corto), p.ej. `../../../../../commons/types/post-status.enum`. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases; `auth-service`/`core-service`/`alexa-service` además ya duplican localmente en su propio `src/` sus copias de `JwtAuthGuard`/`CurrentUser`/`PostStatus`/`PermissionGuard`/`RequirePermission` en vez de importarlas de aquí — decisión tomada para que cada servicio sea desplegable solo, ver `feat/catalogos-base`; `PermissionGuard` se sumó a esta lista 2026-07-27):
   - `guards/` — `JwtAuthGuard`, `PermissionGuard` (quedan como referencia/histórico — cada servicio corre su propia copia local, ver arriba; `BrandAccessGuard` ya no vive aquí — se movió a `core-service/src/guards/`, ver nota de `brandIds` arriba)
   - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)`
