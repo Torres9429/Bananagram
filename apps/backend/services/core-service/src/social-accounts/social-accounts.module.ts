@@ -7,5 +7,8 @@ import { SocialAccountsService } from './social-accounts.service';
   imports: [JwtAuthModule],
   controllers: [SocialAccountsController],
   providers: [SocialAccountsService],
+  // Exportado para que BrandsModule pueda ofrecer GET /brands/:id/metrics-history
+  // (historial de seguidores) sin duplicar la query en otro service.
+  exports: [SocialAccountsService],
 })
 export class SocialAccountsModule {}

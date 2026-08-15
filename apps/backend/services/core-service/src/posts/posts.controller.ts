@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { RequirePermission } from '../decorators/require-permission.decorator';
@@ -105,5 +105,21 @@ export class PostsController {
     @CurrentUser() user: Claims,
   ) {
     return this.posts.attachMediaToPost(id, files, user);
+  }
+
+  @Delete(':id/media/:mediaId')
+  @RequirePermission('publicaciones', 'editar')
+  removeMedia(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('mediaId', ParseUUIDPipe) mediaId: string,
+    @CurrentUser() user: Claims,
+  ) {
+    return this.posts.removeMediaFromPost(id, mediaId, user);
+  }
+
+  @Delete(':id')
+  @RequirePermission('publicaciones', 'editar')
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
+    return this.posts.deletePost(id, user);
   }
 }

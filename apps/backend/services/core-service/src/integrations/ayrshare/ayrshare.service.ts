@@ -6,6 +6,7 @@ import { getAyrshareConfig, getAyrshareErrorMessage } from '../../brands/ayrshar
 import { computeEngagement } from './engagement.util';
 import { getMapperForNetwork } from './mappers/mapper.registry';
 import {
+  AccountMetrics,
   AnalyticsContext,
   NormalizedAnalytics,
   PublishResultItem,
@@ -21,9 +22,48 @@ type AyrsharePublishResult = {
   errors?: { message?: string }[];
 };
 
-type AyrsharePublishResponse =
-  | { status: 'success'; id: string; postIds?: AyrsharePublishResult[] }
-  | { status: 'error'; code?: number; message?: string };
+// Forma real confirmada en vivo (Fase P1) contra POST /post: tanto los
+// resultados por red (éxito) como el detalle del error (fallo) vienen
+// anidados en payload.posts[0], no en la raíz como se asumió originalmente
+// — payload.postIds/payload.message/payload.code en la raíz no existen en
+// ninguno de los dos casos. Con la forma vieja, resultsByPlatform quedaba
+// siempre vacío y todo se marcaba 'error' aunque Ayrshare hubiera publicado
+// de verdad (confirmado: el post apareció en Instagram real mientras
+// nuestro backend lo reportaba como fallido), y los errores reales (p.ej.
+// "Media Error") se perdían detrás de un mensaje genérico.
+type AyrsharePublishResponse = {
+  status: 'success' | 'error';
+  id?: string;
+  code?: number;
+  message?: string;
+  posts?: {
+    id?: string;
+    status?: string;
+    postIds?: AyrsharePublishResult[];
+    errors?: { code?: number; message?: string }[];
+  }[];
+};
+
+// Forma confirmada en vivo (ya usada por social-accounts.service.ts): los
+// datos vienen anidados en payload[code].analytics, no en la raíz.
+// Forma real confirmada en vivo (Fase Q3) contra POST /analytics/social —
+// likeCount/commentsCount/shareCount/viewsCount/reachCount son acumulados de
+// toda la cuenta (todas las publicaciones), no de un post. No hay
+// "profileVisitsCount" en este endpoint — Ayrshare no lo expone aquí.
+type AyrshareAccountAnalyticsResponse = Record<
+  string,
+  {
+    analytics?: {
+      followersCount?: number;
+      followers?: number;
+      likeCount?: number;
+      commentsCount?: number;
+      shareCount?: number;
+      viewsCount?: number;
+      reachCount?: number;
+    };
+  } | undefined
+>;
 
 type AyrshareAnalyticsResponse = Record<string, Record<string, unknown>> | { status: 'error'; code?: number; message?: string };
 
@@ -33,7 +73,7 @@ type AyrshareAnalyticsResponse = Record<string, Record<string, unknown>> | { sta
 // cuenta fallos, reintentar dentro de él distorsiona errorThresholdPercentage).
 @Injectable()
 export class AyrshareService implements SocialProvider {
-  async publish(profileKey: string, postId: string, content: string, targets: PublishTarget[]): Promise<PublishResultItem[]> {
+  async publish(profileKey: string, postId: string, content: string, targets: PublishTarget[], mediaUrls?: string[]): Promise<PublishResultItem[]> {
     const { apiKey, baseUrl } = getAyrshareConfig();
     const requestId = randomUUID();
     const startedAt = Date.now();
@@ -46,8 +86,21 @@ export class AyrshareService implements SocialProvider {
           'Profile-Key': profileKey,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ post: content, platforms: targets.map((target) => target.networkCode) }),
+        body: JSON.stringify({
+          post: content,
+          platforms: targets.map((target) => target.networkCode),
+          ...(mediaUrls?.length ? { mediaUrls } : {}),
+        }),
       }),
+      // Hallazgo real de Fase P1: el timeout default del breaker (5s,
+      // opossum.factory.ts) corta la llamada antes de que Ayrshare termine
+      // de procesar/subir la media a Instagram. 30s tampoco alcanzó de
+      // forma consistente en pruebas en vivo contra la cuenta trial — 60s
+      // deja margen real. opossum NO cancela el fetch subyacente al hacer
+      // timeout (no hay AbortController aquí), así que esto solo evita
+      // que NOSOTROS abandonemos antes de que Ayrshare responda, no reduce
+      // la latencia real del lado de Ayrshare.
+      { timeout: 60000 },
     );
 
     let response: Response;
@@ -70,12 +123,21 @@ export class AyrshareService implements SocialProvider {
     });
 
     if (!response.ok || payload.status !== 'success') {
+      const nestedError = payload.posts?.[0]?.errors?.[0];
       throw new InternalServerErrorException(
-        getAyrshareErrorMessage(payload as { message?: string; code?: number }, 'No se pudo publicar en Ayrshare'),
+        getAyrshareErrorMessage(nestedError ?? payload, 'No se pudo publicar en Ayrshare'),
       );
     }
 
-    const resultsByPlatform = new Map((payload.postIds ?? []).map((result) => [result.platform, result]));
+    // El id que exige /analytics/post es el "top level id" de Ayrshare
+    // (payload.posts[0].id), NO el id nativo por red que trae cada entrada
+    // de postIds[] (ese es el id de Instagram/Facebook/etc., útil para
+    // trazabilidad pero Ayrshare lo rechaza con 404 si se lo mandas a
+    // analíticas — confirmado en vivo, Fase P1, mensaje de error de
+    // Ayrshare: "verify the top level ID returned from the /post endpoint").
+    const ayrshareId = payload.posts?.[0]?.id;
+    const postIds = payload.posts?.flatMap((entry) => entry.postIds ?? []) ?? [];
+    const resultsByPlatform = new Map(postIds.map((result) => [result.platform, result]));
     return targets.map((target) => {
       const result = resultsByPlatform.get(target.networkCode);
       if (!result || result.status !== 'success') {
@@ -89,7 +151,8 @@ export class AyrshareService implements SocialProvider {
       return {
         socialAccountId: target.socialAccountId,
         status: 'publicado',
-        socialPostId: result.id,
+        socialPostId: ayrshareId,
+        postUrl: result.postUrl,
         providerStatus: result.status,
       };
     });
@@ -146,11 +209,85 @@ export class AyrshareService implements SocialProvider {
     }
 
     const rawForNetwork = (payload as Record<string, Record<string, unknown>>)[context.networkCode] ?? {};
+    // Forma real confirmada en vivo (Fase P1): los campos que esperan los
+    // mappers (likeCount, reachCount, etc.) NO están al nivel de
+    // rawForNetwork — vienen un nivel más adentro, en rawForNetwork.analytics.
+    // Con la lectura vieja el mapper siempre recibía {} y todo salía null,
+    // aunque `raw` ya guardara el payload real completo (comentario
+    // engañoso: parecía que sí había datos porque raw sí los tenía).
+    const analyticsPayload = (rawForNetwork.analytics as Record<string, unknown> | undefined) ?? rawForNetwork;
     const mapper = getMapperForNetwork(context.networkCode);
-    const mapped = mapper(rawForNetwork);
+    const mapped = mapper(analyticsPayload);
     const { engagement, engagementBase } = computeEngagement(mapped);
 
     return { ...mapped, engagement, engagementBase, raw: rawForNetwork, source: 'ayrshare' };
+  }
+
+  // Mismo endpoint y forma de respuesta que ya usaba
+  // social-accounts.service.ts.fetchFollowerCounts() (confirmado en vivo:
+  // payload[code].analytics.followersCount, un nivel más anidado de lo que
+  // parecía) — promovido al contrato SocialProvider para que
+  // account-metrics-cron.service.ts también pueda usarlo, no solo el sync
+  // manual. Nunca lanza: si Ayrshare falla, followers vuelve null (nunca 0),
+  // el caller decide si vale la pena guardar un snapshot con null.
+  async getAccountMetrics(profileKey: string, networkCode: string): Promise<AccountMetrics> {
+    const { apiKey, baseUrl } = getAyrshareConfig();
+    const requestId = randomUUID();
+    const startedAt = Date.now();
+
+    let response: Response;
+    try {
+      const breaker = createCircuitBreaker(async () =>
+        fetch(`${baseUrl}/analytics/social`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Profile-Key': profileKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ platforms: [networkCode] }),
+        }),
+      );
+      response = (await breaker.fire()) as Response;
+    } catch (error) {
+      await this.logRequest({
+        operation: 'account-metrics',
+        entityType: 'socialAccount',
+        entityId: `${profileKey}:${networkCode}`,
+        requestId,
+        succeeded: false,
+        durationMs: Date.now() - startedAt,
+      });
+      return { followers: null, likes: null, comments: null, shares: null, views: null, reach: null, source: 'ayrshare' };
+    }
+
+    const payload = (await response.json().catch(() => ({}))) as AyrshareAccountAnalyticsResponse;
+    await this.logRequest({
+      operation: 'account-metrics',
+      entityType: 'socialAccount',
+      entityId: `${profileKey}:${networkCode}`,
+      requestId,
+      httpStatus: response.status,
+      succeeded: response.ok,
+      durationMs: Date.now() - startedAt,
+    });
+
+    if (!response.ok) {
+      return { followers: null, likes: null, comments: null, shares: null, views: null, reach: null, source: 'ayrshare' };
+    }
+
+    const analytics = payload[networkCode]?.analytics;
+    const toNullableNumber = (value: number | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+
+    return {
+      followers: toNullableNumber(analytics?.followersCount ?? analytics?.followers),
+      likes: toNullableNumber(analytics?.likeCount),
+      comments: toNullableNumber(analytics?.commentsCount),
+      shares: toNullableNumber(analytics?.shareCount),
+      views: toNullableNumber(analytics?.viewsCount),
+      reach: toNullableNumber(analytics?.reachCount),
+      source: 'ayrshare',
+    };
   }
 
   // Nunca guarda el body completo de la request/response ni la API key —

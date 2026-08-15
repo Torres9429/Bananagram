@@ -1,11 +1,56 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../node_modules/.prisma-client';
 import { prisma } from '../prisma/client';
 
 type LatestEngagement = { postSocialAccountId: string; engagement: number | null };
+type CurrentUser = { sub: string; roles: string[] };
+
+const SCORE_SYNC_WINDOW_HOURS = 5; // mismo criterio que los crons de métricas — evita duplicar filas si corre 2 veces en la ventana
 
 @Injectable()
 export class ScoreService {
+  // Score y crecimiento de cuenta son información de negocio del dueño de
+  // la marca — a diferencia de BrandAccessGuard (que deja pasar también a
+  // CM/Diseñador de cualquier campaña de la marca, pensado para "ver el
+  // detalle de la marca"), aquí el criterio es más estricto a propósito
+  // (decisión confirmada con el usuario): solo dueño de marca o
+  // Administrador, nunca CM ni Diseñador.
+  async assertIsBrandOwnerOrAdmin(brandId: string, user: CurrentUser): Promise<void> {
+    if (user.roles.includes('administrador')) return;
+    const brand = await prisma.brand.findFirst({ where: { id: brandId, deletedAt: null }, select: { ownerId: true } });
+    if (!brand) throw new NotFoundException(`Brand ${brandId} no existe`);
+    if (brand.ownerId !== user.sub) {
+      throw new ForbiddenException('Solo el dueño de la marca puede ver su score y crecimiento de cuenta');
+    }
+  }
+
+  // Antes calculate() se llamaba en cada GET /brands/:id/score — cada
+  // lectura ensuciaba BrandScore con una fila nueva (no un historial
+  // limpio, "una fila por cada vez que alguien miró la pantalla"). Ahora
+  // el cron (account-metrics-cron.service.ts) es quien mantiene el
+  // historial poblado cada 6h; el controller solo llama esto como fallback
+  // si no hay ningún snapshot reciente (marca nueva, o el cron todavía no
+  // corrió). Devuelve el existente sin insertar si ya hay uno fresco.
+  async calculateIfStale(brandId: string) {
+    const windowStart = new Date(Date.now() - SCORE_SYNC_WINDOW_HOURS * 3600 * 1000);
+    const recent = await prisma.brandScore.findFirst({
+      where: { brandId, snapshotDate: { gte: windowStart } },
+      orderBy: { snapshotDate: 'desc' },
+    });
+    if (recent) return recent;
+    return this.calculate(brandId);
+  }
+
+  async getScoreHistory(brandId: string, from?: Date, to?: Date) {
+    return prisma.brandScore.findMany({
+      where: {
+        brandId,
+        snapshotDate: { gte: from, lte: to },
+      },
+      orderBy: { snapshotDate: 'asc' },
+    });
+  }
+
   async calculate(brandId: string) {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);

@@ -13,13 +13,14 @@ import { PostsModule } from './posts/posts.module';
 import { ReportsModule } from './reports/reports.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { CronModule } from './cron/cron.module';
+import { ScoreModule } from './score/score.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // Sin esto, los @Cron() de PostSchedulerService/MetricsCronService nunca
-    // corren (confirmado: código muerto hasta esta fase, ni siquiera en modo
-    // simulación) — @nestjs/schedule ya estaba en package.json, nunca registrado.
+    // Necesario para MetricsCronService/AccountMetricsCronService (@Cron) y
+    // para SchedulerRegistry (PostSchedulerService ya no usa @Cron — arma
+    // timers por evento, pero SchedulerRegistry también lo provee este módulo).
     ScheduleModule.forRoot(),
     JwtAuthModule,
     CatalogsModule,
@@ -33,6 +34,7 @@ import { CronModule } from './cron/cron.module';
     ReportsModule,
     SchedulerModule,
     CronModule,
+    ScoreModule,
   ],
 })
 export class AppModule {}

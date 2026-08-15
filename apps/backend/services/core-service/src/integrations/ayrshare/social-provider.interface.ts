@@ -12,6 +12,7 @@ export interface PublishResultItem {
   socialAccountId: string;
   status: 'publicado' | 'error';
   socialPostId?: string;
+  postUrl?: string;
   providerStatus?: string;
   errorCode?: string;
   errorMessage?: string;
@@ -27,6 +28,23 @@ export interface AnalyticsContext {
   followers: number;
   baseEngagementRate: number; // 0–1, ya dividido /100
   publishedAt: Date;
+}
+
+// Resultado de getAccountMetrics — a diferencia de NormalizedAnalytics (por
+// post), esto es a nivel de cuenta/red completa, sin depender de ningún post
+// publicado. Todo null = no disponible, nunca 0 (mismo criterio que el resto
+// de las métricas normalizadas). likes/comments/shares/views/reach son
+// acumulados de toda la cuenta (todas las publicaciones), confirmados en
+// vivo contra POST /analytics/social de Ayrshare — ese endpoint NO expone
+// "visitas al perfil", por eso no hay un campo para eso aquí.
+export interface AccountMetrics {
+  followers: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  views: number | null;
+  reach: number | null;
+  source: string; // 'ayrshare' | 'simulated'
 }
 
 // null = no disponible, nunca 0 (auditoría §7/§16) — ver mappers en Fase 3.
@@ -51,8 +69,18 @@ export interface SocialProvider {
   // — MockSocialProvider lo ignora, AyrshareProvider lo manda como header
   // 'Profile-Key' (mismo patrón ya usado en social-accounts.service.ts).
   // postId es solo para trazabilidad (ProviderRequestLog) — no se manda a Ayrshare.
-  publish(profileKey: string, postId: string, content: string, targets: PublishTarget[]): Promise<PublishResultItem[]>;
+  // mediaUrls: hallazgo real de Fase P1 — Instagram rechaza posts sin media
+  // (Ayrshare error 139, "Media Error"), así que ya no es opcional para esa
+  // red en la práctica. URLs públicas ya subidas (Media.url, Cloudinary) —
+  // el provider nunca sube archivos, solo reenvía URLs.
+  publish(profileKey: string, postId: string, content: string, targets: PublishTarget[], mediaUrls?: string[]): Promise<PublishResultItem[]>;
   getAnalytics(profileKey: string, socialPostId: string, context: AnalyticsContext): Promise<NormalizedAnalytics>;
+  // Métricas de la cuenta/red completa (seguidores) — no depende de ningún
+  // post. Mismo profileKey de la marca, networkCode identifica qué red
+  // dentro del perfil (Ayrshare devuelve todas las redes del perfil en una
+  // sola llamada, pero el contrato pide una por invocación para que el
+  // caller no tenga que conocer el shape crudo de Ayrshare).
+  getAccountMetrics(profileKey: string, networkCode: string): Promise<AccountMetrics>;
 }
 
 // Token de inyección — NestJS no puede inyectar por interfaz (se borra en

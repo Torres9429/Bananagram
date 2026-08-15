@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { prisma } from '../prisma/client';
 import { getAyrshareConfig, getAyrshareErrorMessage } from '../brands/ayrshare.util';
+
+type CurrentUser = { sub: string; roles: string[] };
 
 type AyrshareUserResponse =
   | {
@@ -37,6 +39,30 @@ export class SocialAccountsService {
       where: { brandId, deletedAt: null },
       include: { socialNetwork: true },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  // Crecimiento de seguidores es información de negocio del dueño de la
+  // marca — mismo criterio (más estricto que BrandAccessGuard) que
+  // score.service.ts.assertIsBrandOwnerOrAdmin: solo dueño o Administrador,
+  // nunca CM ni Diseñador aunque tengan acceso a alguna campaña de la marca.
+  async assertIsBrandOwnerOrAdmin(brandId: string, user: CurrentUser): Promise<void> {
+    if (user.roles.includes('administrador')) return;
+    const brand = await prisma.brand.findFirst({ where: { id: brandId, deletedAt: null }, select: { ownerId: true } });
+    if (!brand) throw new NotFoundException(`Brand ${brandId} no existe`);
+    if (brand.ownerId !== user.sub) {
+      throw new ForbiddenException('Solo el dueño de la marca puede ver el crecimiento de sus cuentas conectadas');
+    }
+  }
+
+  async getMetricsHistory(brandId: string, from?: Date, to?: Date) {
+    return prisma.socialAccountMetricSnapshot.findMany({
+      where: {
+        socialAccount: { brandId },
+        capturedAt: { gte: from, lte: to },
+      },
+      include: { socialAccount: { include: { socialNetwork: true } } },
+      orderBy: { capturedAt: 'asc' },
     });
   }
 

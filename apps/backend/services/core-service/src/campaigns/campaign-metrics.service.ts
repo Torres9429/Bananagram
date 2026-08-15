@@ -17,6 +17,8 @@ type NetworkGroup = {
   deliveries: { id: string }[];
 };
 
+type TopPost = { postId: string; network: string; date: Date | null; engagementRate: number };
+
 // Diseño completo en docs/backend/auditoria-integracion-ayrshare.md §22:
 // dinámico en cada request (no hay snapshot todavía, no hace falta con el
 // volumen actual), última captura por PostSocialAccount vía DISTINCT ON,
@@ -76,10 +78,14 @@ export class CampaignMetricsService {
       orderBy: { finishedAt: 'desc' },
     });
 
+    const postById = new Map(posts.map((post) => [post.id, post]));
+    const topPost = this.computeTopPost(deliveries, metricsByDeliveryId, postById);
+
     return {
       campaignId,
       summary,
       byNetwork,
+      topPost,
       dataStatus: {
         lastSyncedAt: lastSyncRun?.finishedAt ?? null,
         partial: coveragePercentage < 100,
@@ -87,6 +93,149 @@ export class CampaignMetricsService {
         coveragePercentage,
       },
     };
+  }
+
+  // Serie diaria (para EngagementChart/TrendAnalysis) + heatmap de horario
+  // de publicación (para PostingHeatMap) — ambos reusan PostMetric, que ya
+  // es un log histórico completo (el cron nunca hace update, solo insert);
+  // getCampaignMetrics() de arriba descarta ese historial a propósito
+  // (DISTINCT ON = solo la última captura). Aquí es al revés: se necesita
+  // TODO el historial, agrupado por día.
+  async getMetricsHistory(campaignId: string, from?: Date, to?: Date) {
+    const campaign = await prisma.campaign.findFirst({ where: { id: campaignId, deletedAt: null } });
+    if (!campaign) throw new NotFoundException('Campaña no encontrada');
+
+    const rangeEnd = to ?? new Date();
+    const series = await this.buildDailySeries(campaignId, from, rangeEnd);
+    const heatmap = await this.buildPostingHeatmap(campaignId);
+
+    return { campaignId, series, heatmap };
+  }
+
+  // Cada fila de PostMetric es un TOTAL acumulado a esa fecha, no un
+  // incremento (mismo criterio que getLatestMetrics) — por eso el punto de
+  // cada día no es "sumar las capturas de ese día", es "sumar, por cada
+  // entrega, su última captura conocida hasta el final de ese día". Se
+  // recorre en JS (no otra query $queryRaw por día) porque el volumen de
+  // este proyecto no lo justifica — mismo criterio que ya usa
+  // getCampaignMetrics para el resto de los cálculos.
+  private async buildDailySeries(campaignId: string, from: Date | undefined, rangeEnd: Date) {
+    const rows = await prisma.postMetric.findMany({
+      where: {
+        postSocialAccount: { post: { campaignId, deletedAt: null } },
+        capturedAt: { lte: rangeEnd },
+      },
+      select: { postSocialAccountId: true, likes: true, comments: true, shares: true, views: true, reach: true, capturedAt: true },
+      orderBy: { capturedAt: 'asc' },
+    });
+
+    if (rows.length === 0) return [];
+
+    const rangeStart = from ?? rows[0].capturedAt;
+    const cursor = new Date(Date.UTC(rangeStart.getUTCFullYear(), rangeStart.getUTCMonth(), rangeStart.getUTCDate()));
+    const end = new Date(Date.UTC(rangeEnd.getUTCFullYear(), rangeEnd.getUTCMonth(), rangeEnd.getUTCDate()));
+
+    const latestByDelivery = new Map<string, (typeof rows)[number]>();
+    const series: Array<{
+      date: string;
+      likes: number;
+      comments: number;
+      shares: number;
+      views: number;
+      reach: number;
+      interactions: number;
+      engagementRate: number | null;
+    }> = [];
+
+    let rowIndex = 0;
+    for (let day = cursor; day <= end; day = new Date(day.getTime() + 86_400_000)) {
+      const dayEnd = new Date(day.getTime() + 86_400_000 - 1);
+      while (rowIndex < rows.length && rows[rowIndex].capturedAt <= dayEnd) {
+        latestByDelivery.set(rows[rowIndex].postSocialAccountId, rows[rowIndex]);
+        rowIndex += 1;
+      }
+
+      const totals = { likes: 0, comments: 0, shares: 0, views: 0, reach: 0 };
+      for (const row of latestByDelivery.values()) {
+        totals.likes += row.likes ?? 0;
+        totals.comments += row.comments ?? 0;
+        totals.shares += row.shares ?? 0;
+        totals.views += row.views ?? 0;
+        totals.reach += row.reach ?? 0;
+      }
+      const interactions = totals.likes + totals.comments + totals.shares;
+      const denominator = totals.reach > 0 ? totals.reach : totals.views > 0 ? totals.views : null;
+      const engagementRate = denominator ? Math.round((interactions / denominator) * 10000) / 100 : null;
+
+      series.push({ date: day.toISOString().slice(0, 10), ...totals, interactions, engagementRate });
+    }
+
+    return series;
+  }
+
+  // Interacciones por día-de-semana × hora de publicación — Post.publishedAt
+  // ya es un timestamp real con hora (no hacía falta ningún dato nuevo). Usa
+  // la ÚLTIMA captura de cada entrega (no la serie diaria) — la pregunta es
+  // "qué tan bien funcionan los posts publicados a esta hora", no cómo
+  // evolucionó cada uno con el tiempo.
+  private async buildPostingHeatmap(campaignId: string) {
+    const posts = await prisma.post.findMany({
+      where: { campaignId, deletedAt: null, publishedAt: { not: null } },
+      include: { socialAccounts: true },
+    });
+
+    const deliveries = posts.flatMap((post) =>
+      post.socialAccounts.map((delivery) => ({ id: delivery.id, publishedAt: post.publishedAt! })),
+    );
+    const latestMetrics = await this.getLatestMetrics(deliveries.map((delivery) => delivery.id));
+    const metricsByDeliveryId = new Map(latestMetrics.map((metric) => [metric.postSocialAccountId, metric]));
+
+    const buckets = new Map<string, { dayOfWeek: number; hour: number; interactions: number; posts: number }>();
+    for (const delivery of deliveries) {
+      const metric = metricsByDeliveryId.get(delivery.id);
+      const interactions = (metric?.likes ?? 0) + (metric?.comments ?? 0) + (metric?.shares ?? 0);
+      const dayOfWeek = delivery.publishedAt.getUTCDay();
+      const hour = delivery.publishedAt.getUTCHours();
+      const key = `${dayOfWeek}-${hour}`;
+      const bucket = buckets.get(key) ?? { dayOfWeek, hour, interactions: 0, posts: 0 };
+      bucket.interactions += interactions;
+      bucket.posts += 1;
+      buckets.set(key, bucket);
+    }
+
+    return Array.from(buckets.values());
+  }
+
+  // Mejor publicación individual de la campaña por engagementRate — a
+  // diferencia de `byNetwork` (agregado, nunca combina redes con
+  // denominador distinto), aquí cada delivery ya es de UNA sola red, así
+  // que comparar su propio engagementRate entre deliveries de redes
+  // distintas es válido (cada uno normalizado sobre su propio reach/views).
+  private computeTopPost(
+    deliveries: Array<{ id: string; postId: string; socialAccount: { socialNetwork: { code: string } } }>,
+    metricsByDeliveryId: Map<string, LatestMetricRow>,
+    postById: Map<string, { publishedAt: Date | null }>,
+  ): TopPost | null {
+    let best: TopPost | null = null;
+    for (const delivery of deliveries) {
+      const metric = metricsByDeliveryId.get(delivery.id);
+      if (!metric) continue;
+
+      const interactions = (metric.likes ?? 0) + (metric.comments ?? 0) + (metric.shares ?? 0);
+      const denominator = (metric.reach ?? 0) > 0 ? metric.reach! : (metric.views ?? 0) > 0 ? metric.views! : null;
+      if (!denominator) continue;
+
+      const engagementRate = Math.round((interactions / denominator) * 100 * 100) / 100;
+      if (!best || engagementRate > best.engagementRate) {
+        best = {
+          postId: delivery.postId,
+          network: delivery.socialAccount.socialNetwork.code,
+          date: postById.get(delivery.postId)?.publishedAt ?? null,
+          engagementRate,
+        };
+      }
+    }
+    return best;
   }
 
   private groupByNetwork(

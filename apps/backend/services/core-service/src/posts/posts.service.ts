@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { CampaignStatus } from '../../node_modules/.prisma-client';
 import { CloudinaryService, UploadableFile } from '../cloudinary/cloudinary.service';
 import { NotificationsClient } from '../notifications/notifications-client.service';
+import { PostSchedulerService } from '../scheduler/post-scheduler.service';
 import { prisma } from '../prisma/client';
 import { PostStatus } from '../types/post-status.enum';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -38,6 +39,7 @@ export class PostsService {
   constructor(
     private readonly cloudinary: CloudinaryService,
     private readonly notifications: NotificationsClient,
+    private readonly postScheduler: PostSchedulerService,
   ) {}
 
   async createPost(dto: CreatePostDto, user: CurrentUser): Promise<any> {
@@ -417,16 +419,22 @@ export class PostsService {
 
     validateTransition(post.status as PostStatus, PostStatus.PROGRAMADO, undefined, post.createdBy, user.sub);
 
-    return prisma.$transaction(async (tx) => {
-      const updatedPost = await tx.post.update({
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({
         where: { id: postId },
         data: { status: PostStatus.PROGRAMADO, scheduledAt },
       });
       await tx.postStatusHistory.create({
         data: { postId, fromStatus: post.status, toStatus: PostStatus.PROGRAMADO, changedBy: user.sub },
       });
-      return updatedPost;
+      return updated;
     });
+
+    // Sin cron por sondeo (ver post-scheduler.service.ts) — el timer exacto
+    // se arma aquí, justo después de confirmar la transición.
+    this.postScheduler.scheduleTimer(postId, scheduledAt);
+
+    return updatedPost;
   }
 
   async cancelPost(postId: string, user: CurrentUser): Promise<any> {
@@ -440,13 +448,19 @@ export class PostsService {
 
     validateTransition(post.status as PostStatus, PostStatus.CANCELADO, undefined, post.createdBy, user.sub);
 
-    return prisma.$transaction(async (tx) => {
-      const updatedPost = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.CANCELADO } });
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.CANCELADO } });
       await tx.postStatusHistory.create({
         data: { postId, fromStatus: post.status, toStatus: PostStatus.CANCELADO, changedBy: user.sub },
       });
-      return updatedPost;
+      return updated;
     });
+
+    // Si el post tenía un timer de publicación pendiente, se desarma —
+    // nunca debe publicarse algo que ya se canceló.
+    this.postScheduler.cancelTimer(postId);
+
+    return updatedPost;
   }
 
   // Lectura (Fase N) — mismo criterio de pertenencia que el resto del
@@ -519,6 +533,84 @@ export class PostsService {
     };
   }
 
+  // Borrador recién creado que se queda sin imagen porque Cloudinary falló
+  // (ver posts-front/app/posts/new): en vez de dejar el post huérfano, el
+  // front lo borra llamando esto justo después del fallo — mismo criterio de
+  // "solo se puede tocar en borrador/rechazado" que updatePost/attachMedia.
+  async deletePost(postId: string, user: CurrentUser): Promise<void> {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { brand: true, campaign: { include: { designers: true } } },
+    });
+
+    if (!post) {
+      throw new NotFoundException('La publicación indicada no existe o fue eliminada');
+    }
+
+    if (post.status !== PostStatus.BORRADOR && post.status !== PostStatus.RECHAZADO) {
+      throw new BadRequestException('Solo se puede eliminar una publicación en borrador o rechazada');
+    }
+
+    if (
+      !user.roles.includes('administrador') &&
+      post.brand.ownerId !== user.sub &&
+      post.campaign.cmId !== user.sub &&
+      !post.campaign.designers.some((designer) => designer.userId === user.sub)
+    ) {
+      throw new ForbiddenException('No tienes permiso para eliminar esta publicación');
+    }
+
+    await prisma.post.update({ where: { id: postId }, data: { deletedAt: new Date() } });
+  }
+
+  // Quita una imagen/video ya adjuntado — el join PostMedia y el propio
+  // Media no tienen deletedAt (no son "tabla principal", ver schema.prisma:
+  // Media solo vive colgado de un Post), así que se borran físicamente aquí
+  // y se limpia el archivo real en Cloudinary — mismo public_id que se
+  // guardó como fileName al subirlo (ver attachMediaToPost).
+  async removeMediaFromPost(postId: string, mediaId: string, user: CurrentUser): Promise<any> {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { brand: true, campaign: { include: { designers: true } } },
+    });
+
+    if (!post) {
+      throw new NotFoundException('La publicación indicada no existe o fue eliminada');
+    }
+
+    if (post.status !== PostStatus.BORRADOR && post.status !== PostStatus.RECHAZADO) {
+      throw new BadRequestException('Solo se pueden quitar recursos de una publicación en borrador o rechazada');
+    }
+
+    if (
+      !user.roles.includes('administrador') &&
+      post.brand.ownerId !== user.sub &&
+      post.campaign.cmId !== user.sub &&
+      !post.campaign.designers.some((designer) => designer.userId === user.sub)
+    ) {
+      throw new ForbiddenException('No tienes permiso para editar los recursos de esta publicación');
+    }
+
+    const postMedia = await prisma.postMedia.findFirst({ where: { postId, mediaId }, include: { media: true } });
+    if (!postMedia) {
+      throw new NotFoundException('El recurso indicado no está adjunto a esta publicación');
+    }
+
+    await prisma.$transaction([
+      prisma.postMedia.delete({ where: { postId_mediaId: { postId, mediaId } } }),
+      prisma.media.delete({ where: { id: mediaId } }),
+    ]);
+
+    if (postMedia.media.fileName) {
+      await this.cloudinary.deleteFile(postMedia.media.fileName);
+    }
+
+    return prisma.post.findUniqueOrThrow({
+      where: { id: postId },
+      include: { media: { include: { media: true }, orderBy: { order: 'asc' } } },
+    });
+  }
+
   async attachMediaToPost(postId: string, files: UploadableFile[] | undefined, user: CurrentUser): Promise<any> {
     if (!files?.length) {
       throw new BadRequestException('Debes adjuntar al menos un archivo');
@@ -540,8 +632,12 @@ export class PostsService {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
 
-    if (post.status !== PostStatus.BORRADOR) {
-      throw new BadRequestException('Solo se pueden adjuntar recursos a una publicación en borrador');
+    // Antes solo permitía borrador — el Diseñador que corrige una imagen
+    // tras un rechazo del CM (status rechazado) no podía tocarla (bug real
+    // reportado en vivo). Mismo criterio de estados que canEditNow en el
+    // front y que updatePost.
+    if (post.status !== PostStatus.BORRADOR && post.status !== PostStatus.RECHAZADO) {
+      throw new BadRequestException('Solo se pueden adjuntar recursos a una publicación en borrador o rechazada');
     }
 
     if (

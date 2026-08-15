@@ -45,6 +45,21 @@ export class CampaignsController {
     return this.campaigns.listEligibleDesigners();
   }
 
+  // Para analytics-front (Fase Q1): evita que el dashboard tenga que golpear
+  // GET /:id/metrics una vez por campaña desde el cliente — mismo criterio
+  // de pertenencia que listCampaigns (server-side, sin reimplementar nada).
+  @Get('metrics-summary')
+  @RequirePermission('metricas', 'ver')
+  async findAllWithMetrics(@CurrentUser() user: Claims) {
+    const campaigns = await this.campaigns.listCampaigns(user);
+    return Promise.all(
+      campaigns.map(async (campaign: { id: string; name: string; brandId: string }) => {
+        const metrics = await this.campaignMetrics.getCampaignMetrics(campaign.id);
+        return { campaignId: campaign.id, name: campaign.name, brandId: campaign.brandId, ...metrics };
+      }),
+    );
+  }
+
   @Get(':id')
   @RequirePermission('campanas', 'ver')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
@@ -60,6 +75,22 @@ export class CampaignsController {
     await this.campaigns.getCampaign(id);
     await this.campaigns.assertCanView(id, user);
     return this.campaignMetrics.getCampaignMetrics(id);
+  }
+
+  // Mismo criterio de pertenencia que /metrics de arriba (assertCanView) —
+  // a diferencia de Score/crecimiento de cuenta, el historial de campaña sí
+  // es visible para CM/Diseñador asignados, no solo el dueño de la marca.
+  @Get(':id/metrics-history')
+  @RequirePermission('metricas', 'ver')
+  async getMetricsHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: Claims,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    await this.campaigns.getCampaign(id);
+    await this.campaigns.assertCanView(id, user);
+    return this.campaignMetrics.getMetricsHistory(id, from ? new Date(from) : undefined, to ? new Date(to) : undefined);
   }
 
   // Atajo para no esperar el cron automático de cada 6h (MetricsCronService)

@@ -198,6 +198,7 @@ model SocialAccount {
   lastAuthenticatedAt DateTime?
 
   postSocialAccounts PostSocialAccount[]
+  metricSnapshots    SocialAccountMetricSnapshot[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -205,6 +206,34 @@ model SocialAccount {
 
   @@unique([brandId, socialNetworkId])
   @@map("social_accounts")
+}
+
+// Historial de seguidores por cuenta conectada — a diferencia de
+// SocialAccount.followers (un solo número, se pisa en cada sync), esta tabla
+// nunca hace update, solo insert (mismo patrón append-only que PostMetric) —
+// permite graficar crecimiento aunque la marca no tenga ninguna campaña
+// todavía. Poblada por account-metrics-cron.service.ts cada 6h.
+model SocialAccountMetricSnapshot {
+  id              String        @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  followers Int
+  // Métricas de cuenta completa (todas las publicaciones, no una en
+  // particular) confirmadas en vivo contra POST /analytics/social de
+  // Ayrshare — nullable, null = no disponible, nunca 0 de relleno (mismo
+  // criterio que PostMetric). Ayrshare NO expone "visitas al perfil" en
+  // este endpoint — no se agrega ese campo porque no hay de dónde llenarlo.
+  likes    Int?
+  comments Int?
+  shares   Int?
+  views    Int?
+  reach    Int?
+
+  source     String   @default("simulated") // 'ayrshare' | 'simulated'
+  capturedAt DateTime @default(now())
+
+  @@map("social_account_metric_snapshots")
 }
 
 model Campaign {
