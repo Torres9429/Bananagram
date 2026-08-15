@@ -43,11 +43,16 @@ síncrono entre servicios (sin mensajería async).
 ## Puesta en marcha
 
 ```bash
-cp .env.example .env      # valores por defecto ya sirven para desarrollo local
+# Cada servicio de backend tiene su propio .env — no hay uno solo en la raíz.
+cp apps/backend/services/auth-service/.env.example apps/backend/services/auth-service/.env
+cp apps/backend/services/core-service/.env.example apps/backend/services/core-service/.env
+cp apps/backend/services/alexa-service/.env.example apps/backend/services/alexa-service/.env
+cp apps/backend/gateway/.env.example apps/backend/gateway/.env
+# los valores por defecto ya sirven para desarrollo local
+
 pnpm install
 pnpm generate-keys        # genera el par RS256 en keys/ (no sobrescribe si ya existe, nunca se commitea)
 docker compose up -d      # levanta Postgres + Adminer + Redis
-set -a && source .env && set +a   # para cargar las variables de entorno antes de migrate y seed
 pnpm db:migrate           # aplica las migraciones (auth-service y core-service)
 pnpm seed                 # carga roles, permisos y usuarios de prueba
 ```
@@ -71,22 +76,56 @@ pnpm seed                 # carga roles, permisos y usuarios de prueba
 > [ayrshare.com](https://www.ayrshare.com) alcanza). Sin esto, todo el flujo se corta en el paso 3 de
 > abajo.
 >
-> **Cada servicio de backend lee su propio `.env` local** (`apps/backend/{gateway,services/*}/.env`), no
-> solo el de la raíz — `ConfigModule.forRoot()` de NestJS carga desde el directorio de trabajo del
-> proceso. Si cambias una variable (ej. `SOCIAL_PROVIDER` para probar publicación real, ver el paso 9),
-> edítala en el `.env` del servicio puntual, no solo en el de la raíz, y reinicia ese servicio. Estos
-> `.env` por servicio no están versionados (mismo patrón que el de la raíz) — cópialos de
-> `.env.example` la primera vez si no existen todavía.
+> **Cada servicio de backend lee su propio `.env` local** (`apps/backend/{gateway,services/*}/.env`,
+> no hay un `.env` compartido en la raíz) — los 4 servicios usan `ConfigModule.forRoot({ isGlobal: true })`
+> de NestJS, que carga `.env` desde el directorio de trabajo del propio proceso. Si cambias una variable
+> (ej. `SOCIAL_PROVIDER` para probar publicación real, ver el paso 9), edítala en el `.env` del servicio
+> puntual y reinicia ese servicio — cambiarla en otro `.env` no tiene efecto. Ninguno de estos `.env` está
+> versionado — cópialos de su `.env.example` correspondiente la primera vez si no existen todavía (ver
+> [Puesta en marcha](#puesta-en-marcha) arriba).
+
+## Compartir datos de prueba entre el equipo
+
+Para que todo el equipo pruebe publicaciones/métricas sobre las mismas marcas, campañas y cuenta de red
+social conectada — en vez de que cada quien recree su propio set de datos siguiendo el
+[flujo de punta a punta](#flujo-esperado-de-punta-a-punta) por separado — se puede exportar/restaurar un
+dump de las 2 bases.
+
+> [!IMPORTANT]
+> Las 2 bases (`gestor_redes_auth`/`gestor_redes_core`) se exportan y restauran **siempre juntas, del mismo
+> momento**: `UserProfile.userId` (core) apunta a `User.id` (auth) sin FK real entre bases (son bases
+> separadas, ver [Arquitectura](#arquitectura)) — restaurar una sin la otra deja campañas/perfiles
+> huérfanos apuntando a usuarios que no existen.
+>
+> Las marcas del dump traen guardado un `profileKey` de Ayrshare — solo sirve si todo el equipo usa la
+> **misma** cuenta de Ayrshare (`AYRSHARE_API_KEY`/`AYRSHARE_DOMAIN`/`AYRSHARE_PRIVATE_KEY` iguales en su
+> `core-service/.env`, los que ya trae `.env.example`). No cambiar esas 3 variables si vas a usar datos
+> compartidos.
+
+**Exportar** (quien tiene los datos que el equipo debe usar, con `docker compose up -d` corriendo):
+
+```bash
+docker compose exec -T postgres pg_dump -U postgres --clean --if-exists gestor_redes_auth > auth_dump.sql
+docker compose exec -T postgres pg_dump -U postgres --clean --if-exists gestor_redes_core > core_dump.sql
+```
+
+Compartir ambos `.sql` por fuera del repo (Slack, Drive, etc. — son datos, no código, y no van versionados).
+
+**Restaurar** (el resto del equipo, con su propio `docker compose up -d` ya levantado):
+
+```bash
+docker compose exec -T postgres psql -U postgres -d gestor_redes_auth < auth_dump.sql
+docker compose exec -T postgres psql -U postgres -d gestor_redes_core < core_dump.sql
+```
+
+`--clean --if-exists` hace que el restore reemplace lo que ya hubiera localmente (dropea antes de
+recrear) — es un reemplazo completo, no una fusión con datos propios existentes.
 
 ## Correr el proyecto
 
-Nada carga `.env` automáticamente al usar `pnpm dev` — cárgalo en la terminal antes:
-
-```bash
-set -a && source .env && set +a
-```
-
-Luego, según qué necesites levantar (para no saturar la máquina corriendo todo a la vez):
+Cada servicio carga su propio `.env` solo (`ConfigModule.forRoot()`, ver nota de arriba) — no hace falta
+cargar nada a mano en la terminal antes de `pnpm dev`. Según qué necesites levantar (para no saturar la
+máquina corriendo todo a la vez):
 
 ```bash
 pnpm dev              # todo: backend + frontend completos

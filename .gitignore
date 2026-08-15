@@ -18,3 +18,5 @@ coverage/
 keys/*
 !keys/.gitkeep
 *.pem
+*.sql
+
