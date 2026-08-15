@@ -22,13 +22,9 @@ import {
   setSpecialty,
   setStatuses,
 } from '../../store/analyticsFilters.slice';
-import {
-  selectActiveFiltersCount,
-  selectAnalyticsFilters,
-  selectProfileOptions,
-  selectCampaignOptions,
-  selectSelectedPostLabel,
-} from '../../store/analytics.selectors';
+import { selectActiveFiltersCount, selectAnalyticsFilters, selectSelectedPostLabel } from '../../store/analytics.selectors';
+import { useGetBrandsQuery, useGetCampaignsMetricsSummaryQuery } from '../../store/api/analytics.api';
+import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { AnalyticsFilterDrawer } from './AnalyticsFilterDrawer';
 import { useDateRangeFilter } from './useDateRangeFilter';
 
@@ -36,21 +32,24 @@ import { useDateRangeFilter } from './useDateRangeFilter';
  * Encabezado de filtros del dashboard — solo período, botón "Filtros" y chips
  * activos quedan siempre visibles; todo lo demás vive en AnalyticsFilterDrawer.
  * No mantiene estado de filtro propio: lee/escribe exclusivamente sobre
- * analyticsFilters.slice (Fase 1/2, sin tocar).
+ * analyticsFilters.slice. Los nombres de los chips (marca/campaña) salen de
+ * datos reales (GET /brands, GET /campaigns/metrics-summary), ya cacheados
+ * por el Drawer/los widgets — no dispara peticiones nuevas.
  */
 export function AnalyticsFilterBar() {
   const dispatch = useDispatch();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filters = useSelector(selectAnalyticsFilters);
-  const profileOptions = useSelector(selectProfileOptions);
-  const campaignOptions = useSelector(selectCampaignOptions);
   const activeCount = useSelector(selectActiveFiltersCount);
   const selectedPostLabel = useSelector(selectSelectedPostLabel);
   const { dateRange, setStart, setEnd } = useDateRangeFilter();
 
-  const selectedProfileName = profileOptions.find((b) => b.id === filters.profileId)?.name;
-  const selectedCampaignName = campaignOptions.find((c) => c.id === filters.campaignId)?.name;
+  const { data: brands = [] } = useGetBrandsQuery();
+  const { data: campaigns = [] } = useGetCampaignsMetricsSummaryQuery();
+
+  const selectedProfileName = brands.find((b) => b.id === filters.profileId)?.name;
+  const selectedCampaignName = campaigns.find((c) => c.campaignId === filters.campaignId)?.name;
 
   return (
     <Box mb={3}>
@@ -94,22 +93,25 @@ export function AnalyticsFilterBar() {
       {activeCount > 0 && (
         <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center" mt={1.5}>
           {filters.profileId && (
-            <Chip size="small" label={selectedProfileName ?? filters.profileId} onDelete={() => dispatch(setProfile(null))} />
+            <Chip size="small" label={selectedProfileName ?? 'Marca'} onDelete={() => dispatch(setProfile(null))} />
           )}
           {filters.networks.map((code) => (
             <Chip
               key={code}
               size="small"
-              label={code}
+              label={NETWORK_DISPLAY[code as keyof typeof NETWORK_DISPLAY]?.label ?? code}
               onDelete={() => dispatch(setNetworks(filters.networks.filter((n) => n !== code)))}
             />
           ))}
           {filters.campaignId && (
             <Chip
               size="small"
-              label={selectedCampaignName ?? filters.campaignId}
+              label={selectedCampaignName ?? 'Campaña'}
               onDelete={() => dispatch(selectCampaign(null))}
             />
+          )}
+          {filters.postId && (
+            <Chip size="small" label={selectedPostLabel ?? filters.postId} onDelete={() => dispatch(selectPost(null))} />
           )}
           {(filters.status ?? []).map((status) => (
             <Chip
@@ -125,9 +127,6 @@ export function AnalyticsFilterBar() {
               label={`${filters.dateRange.start} – ${filters.dateRange.end}`}
               onDelete={() => setStart('')}
             />
-          )}
-          {filters.postId && (
-            <Chip size="small" label={selectedPostLabel ?? filters.postId} onDelete={() => dispatch(selectPost(null))} />
           )}
           {filters.cmName && (
             <Chip size="small" label={`CM ${filters.cmName}`} onDelete={() => dispatch(setCmName(null))} />

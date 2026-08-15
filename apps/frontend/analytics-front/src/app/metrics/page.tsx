@@ -14,7 +14,6 @@ import { AnalyticsBreadcrumb } from '../../components/dashboard/AnalyticsBreadcr
 import { NetworkOverview } from '../../components/dashboard/NetworkOverview';
 import { EngagementChart } from '../../components/dashboard/EngagementChart';
 import { NetworkMetricCards } from '../../components/dashboard/NetworkMetricCards';
-import { GeneralMetricCards } from '../../components/dashboard/GeneralMetricCards';
 import { CampaignBreakdown } from '../../components/dashboard/CampaignBreakdown';
 import { TopContent } from '../../components/dashboard/TopContent';
 import { InsightsPanel } from '../../components/dashboard/InsightsPanel';
@@ -25,12 +24,14 @@ import { CampaignComparison } from '../../components/dashboard/CampaignCompariso
 import { TrendAnalysis } from '../../components/dashboard/TrendAnalysis';
 import { PostingHeatMap } from '../../components/dashboard/PostingHeatMap';
 import { AudienceOverview } from '../../components/dashboard/AudienceOverview';
+import { AccountGrowthOverview } from '../../components/dashboard/AccountGrowthOverview';
+import { useGetBrandSocialAccountsQuery } from '../../store/api/analytics.api';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectSelectedNetwork } from '../../store/analytics.selectors';
+import { useFilteredCampaigns } from '../../components/dashboard/useFilteredCampaigns';
 import type { TabValue } from '../../interfaces/interface';
 
-const TABS: { value: TabValue; label: string }[] = [
-  { value: 'general', label: 'General' },
+const ALL_NETWORK_TABS: { value: TabValue; label: string }[] = [
   { value: 'instagram', label: 'Instagram' },
   { value: 'facebook', label: 'Facebook' },
   { value: 'tiktok', label: 'TikTok' },
@@ -46,6 +47,30 @@ export default function MetricsPage() {
   const filters = useSelector(selectAnalyticsFilters);
   const selectedNetwork = useSelector(selectSelectedNetwork);
   const activeTab: TabValue = selectedNetwork ?? 'general';
+
+  // Score + crecimiento de cuenta: exclusivo de Cliente/Administrador
+  // (decisión confirmada) — el backend ya lo exige aparte
+  // (assertIsBrandOwnerOrAdmin, 403 para CM/Diseñador), esto solo decide si
+  // la sección existe en la página. El resto del dashboard (por campaña) no
+  // necesita ningún chequeo de rol aquí: GET /campaigns/metrics-summary y
+  // /campaigns/:id/metrics-history ya vienen acotados server-side por
+  // pertenencia (CampaignsService.listCampaigns/assertCanView) — un usuario
+  // con varios roles (ej. CM + Diseñador) ve la unión automáticamente,
+  // porque el filtrado real ocurre en el backend, no aquí.
+  const roles = user?.roles ?? [];
+  const showAccountOverview = roles.includes('cliente') || roles.includes('administrador');
+
+  // Solo mostrar pestañas de redes que el usuario tiene realmente
+  // conectadas — antes las 6 aparecían siempre, aunque no hubiera ninguna
+  // cuenta vinculada para esa red.
+  const campaigns = useFilteredCampaigns();
+  const brandId = campaigns[0]?.brandId;
+  const { data: socialAccounts = [] } = useGetBrandSocialAccountsQuery(brandId ?? '', { skip: !brandId });
+  const connectedCodes = new Set(socialAccounts.filter((account) => account.active).map((account) => account.socialNetwork.code));
+  const TABS = [
+    { value: 'general' as TabValue, label: 'General' },
+    ...ALL_NETWORK_TABS.filter((tab) => connectedCodes.has(tab.value)),
+  ];
 
   // Mientras la sesión aún no hidrata desde la cookie, `can()` siempre da
   // false (permissions arranca en {}) — sin este guard se veía un flash de
@@ -98,6 +123,7 @@ export default function MetricsPage() {
       ) : selectedNetwork ? (
         // ── Pestaña de red — estructura estricta, idéntica en las 6 (§B.2) ──
         <>
+          {showAccountOverview && <AccountGrowthOverview networkCode={selectedNetwork} />}
           <NetworkOverview networkCode={selectedNetwork} />
           <EngagementChart />
           <NetworkMetricCards />
@@ -108,13 +134,13 @@ export default function MetricsPage() {
       ) : (
         // ── General — misma base de 6 secciones + widgets embebidos (§B.3), nunca sub-tabs ──
         <>
+          {showAccountOverview && <AccountGrowthOverview />}
           <NetworkOverview networkCode={null} />
           <EngagementChart />
-          <GeneralMetricCards />
           <CampaignBreakdown />
           <TopContent />
           <InsightsPanel />
-          <ScoreExplanationPanel />
+          {showAccountOverview && <ScoreExplanationPanel />}
 
           <NetworkComparison />
           <CampaignComparison />

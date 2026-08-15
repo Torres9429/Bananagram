@@ -32,12 +32,9 @@ import {
   setSpecialty,
   setStatuses,
 } from '../../store/analyticsFilters.slice';
-import {
-  selectAnalyticsFilters,
-  selectProfileOptions,
-  selectCampaignOptions,
-  selectNetworkOptions,
-} from '../../store/analytics.selectors';
+import { selectAnalyticsFilters } from '../../store/analytics.selectors';
+import { useGetBrandsQuery, useGetCampaignsMetricsSummaryQuery, useGetBrandSocialAccountsQuery } from '../../store/api/analytics.api';
+import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import {
   MOCK_CATEGORY_OPTIONS,
   MOCK_CM_OPTIONS,
@@ -61,10 +58,17 @@ const ALL_STATUSES: PostStatus[] = [
   'cancelado',
 ];
 
+// Estado/CM/Diseñador/Categoría/Especialidad siguen sin dato real detrás
+// (equipo por publicación, catálogo de categorías) — se oculta la sección
+// completa en vez de mostrar controles deshabilitados; un solo flag para
+// reactivarla cuando exista el dato.
+const SHOW_ADVANCED_FILTERS = false;
+
 /**
  * Drawer lateral (desktop) / Bottom sheet (mobile) con el detalle completo de filtros.
- * Todos los controles despachan las mismas acciones de analyticsFilters.slice ya
- * usadas por AnalyticsFilterBar — no hay lógica de filtrado nueva aquí.
+ * Marca/Campaña/Red social ya filtran datos reales (ver useFilteredCampaigns/
+ * useNetworkCodesFilter, consumidos por los widgets) — las opciones de cada
+ * uno también salen de datos reales, no del dataset mock viejo.
  */
 export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerProps) {
   const dispatch = useDispatch();
@@ -72,10 +76,18 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const filters = useSelector(selectAnalyticsFilters);
-  const profileOptions = useSelector(selectProfileOptions);
-  const networkOptions = useSelector(selectNetworkOptions);
-  const campaignOptions = useSelector(selectCampaignOptions);
   const { dateRange, setStart, setEnd } = useDateRangeFilter();
+
+  const { data: brands = [] } = useGetBrandsQuery();
+  const { data: allCampaigns = [] } = useGetCampaignsMetricsSummaryQuery();
+  // Una campaña filtrada no debe ocultar sus propias opciones — se listan
+  // sobre el universo completo, acotado solo por la Marca elegida (si hay).
+  const campaignOptions = filters.profileId ? allCampaigns.filter((c) => c.brandId === filters.profileId) : allCampaigns;
+  // Mismo criterio que arma los Tabs en metrics/page.tsx: redes realmente
+  // conectadas de la marca activa, no una lista fija de 6.
+  const networkBrandId = filters.profileId ?? allCampaigns[0]?.brandId;
+  const { data: socialAccounts = [] } = useGetBrandSocialAccountsQuery(networkBrandId ?? '', { skip: !networkBrandId });
+  const networkOptions = Array.from(new Set(socialAccounts.filter((a) => a.active).map((a) => a.socialNetwork.code)));
 
   function handleNetworksChange(event: SelectChangeEvent<unknown>) {
     dispatch(setNetworks(event.target.value as SocialNetworkCode[]));
@@ -113,17 +125,21 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
         </Typography>
 
         <Box mt={1.5}>
-          <LabeledSelect
-            label="Perfil"
-            displayEmpty
-            value={filters.profileId ?? ''}
-            onChange={(e) => dispatch(setProfile((e.target.value as string) || null))}
-          >
-            <MenuItem value="">Todos los perfiles</MenuItem>
-            {profileOptions.map((b) => (
-              <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
-            ))}
-          </LabeledSelect>
+          {/* Solo tiene sentido elegir si hay más de una marca — con una sola,
+              ya está implícita en todo lo demás. */}
+          {brands.length > 1 && (
+            <LabeledSelect
+              label="Marca"
+              displayEmpty
+              value={filters.profileId ?? ''}
+              onChange={(e) => dispatch(setProfile((e.target.value as string) || null))}
+            >
+              <MenuItem value="">Todas las marcas</MenuItem>
+              {brands.map((b) => (
+                <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+              ))}
+            </LabeledSelect>
+          )}
 
           <LabeledSelect
             label="Campaña"
@@ -133,25 +149,33 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
           >
             <MenuItem value="">Todas las campañas</MenuItem>
             {campaignOptions.map((c) => (
-              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              <MenuItem key={c.campaignId} value={c.campaignId}>{c.name}</MenuItem>
             ))}
           </LabeledSelect>
 
-          <LabeledSelect
-            label="Red social"
-            multiple
-            displayEmpty
-            value={filters.networks}
-            onChange={handleNetworksChange}
-            renderValue={(selected) => ((selected as string[]).length > 0 ? (selected as string[]).join(', ') : 'Todas las redes')}
-          >
-            {networkOptions.map((code) => (
-              <MenuItem key={code} value={code}>
-                <Checkbox size="small" checked={filters.networks.includes(code)} />
-                <ListItemText primary={code} />
-              </MenuItem>
-            ))}
-          </LabeledSelect>
+          {/* Oculto en la pestaña de una red específica: esa pestaña ya ES el
+              filtro de red, tenerlos los dos a la vez sería redundante/confuso. */}
+          {!filters.selectedNetwork && (
+            <LabeledSelect
+              label="Red social"
+              multiple
+              displayEmpty
+              value={filters.networks}
+              onChange={handleNetworksChange}
+              renderValue={(selected) =>
+                (selected as string[]).length > 0
+                  ? (selected as string[]).map((code) => NETWORK_DISPLAY[code as keyof typeof NETWORK_DISPLAY]?.label ?? code).join(', ')
+                  : 'Todas las redes'
+              }
+            >
+              {networkOptions.map((code) => (
+                <MenuItem key={code} value={code}>
+                  <Checkbox size="small" checked={filters.networks.includes(code as SocialNetworkCode)} />
+                  <ListItemText primary={NETWORK_DISPLAY[code as keyof typeof NETWORK_DISPLAY]?.label ?? code} />
+                </MenuItem>
+              ))}
+            </LabeledSelect>
+          )}
 
           <Stack direction="row" gap={2}>
             <Box flex={1}>
@@ -175,105 +199,107 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
           </Stack>
         </Box>
 
-        <Accordion
-          disableGutters
-          elevation={0}
-          defaultExpanded={false}
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mt: 1, '&:before': { display: 'none' }, overflow: 'hidden' }}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle2" fontWeight={700}>Filtros avanzados</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <LabeledSelect
-              label="Estado de publicación"
-              multiple
-              displayEmpty
-              value={filters.status ?? []}
-              onChange={handleStatusesChange}
-              renderValue={(selected) =>
-                (selected as PostStatus[]).length > 0
-                  ? (selected as PostStatus[]).map((s) => STATUS_LABELS[s]).join(', ')
-                  : 'Todos los estados'
-              }
-            >
-              {ALL_STATUSES.map((status) => (
-                <MenuItem key={status} value={status}>
-                  <Checkbox size="small" checked={(filters.status ?? []).includes(status)} />
-                  <ListItemText primary={STATUS_LABELS[status]} />
-                </MenuItem>
-              ))}
-            </LabeledSelect>
+        {SHOW_ADVANCED_FILTERS && (
+          <Accordion
+            disableGutters
+            elevation={0}
+            defaultExpanded={false}
+            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mt: 1, '&:before': { display: 'none' }, overflow: 'hidden' }}
+          >
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle2" fontWeight={700}>Filtros avanzados</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <LabeledSelect
+                label="Estado de publicación"
+                multiple
+                displayEmpty
+                value={filters.status ?? []}
+                onChange={handleStatusesChange}
+                renderValue={(selected) =>
+                  (selected as PostStatus[]).length > 0
+                    ? (selected as PostStatus[]).map((s) => STATUS_LABELS[s]).join(', ')
+                    : 'Todos los estados'
+                }
+              >
+                {ALL_STATUSES.map((status) => (
+                  <MenuItem key={status} value={status}>
+                    <Checkbox size="small" checked={(filters.status ?? []).includes(status)} />
+                    <ListItemText primary={STATUS_LABELS[status]} />
+                  </MenuItem>
+                ))}
+              </LabeledSelect>
 
-            <Tooltip title="Disponible cuando se conecten los datos de equipo por publicación">
-              <Box>
-                <LabeledSelect
-                  label="Community Manager"
-                  displayEmpty
-                  disabled
-                  value={filters.cmName ?? ''}
-                  onChange={(e) => dispatch(setCmName((e.target.value as string) || null))}
-                >
-                  <MenuItem value="">Todos</MenuItem>
-                  {MOCK_CM_OPTIONS.map((name) => (
-                    <MenuItem key={name} value={name}>{name}</MenuItem>
-                  ))}
-                </LabeledSelect>
-              </Box>
-            </Tooltip>
+              <Tooltip title="Disponible cuando se conecten los datos de equipo por publicación">
+                <Box>
+                  <LabeledSelect
+                    label="Community Manager"
+                    displayEmpty
+                    disabled
+                    value={filters.cmName ?? ''}
+                    onChange={(e) => dispatch(setCmName((e.target.value as string) || null))}
+                  >
+                    <MenuItem value="">Todos</MenuItem>
+                    {MOCK_CM_OPTIONS.map((name) => (
+                      <MenuItem key={name} value={name}>{name}</MenuItem>
+                    ))}
+                  </LabeledSelect>
+                </Box>
+              </Tooltip>
 
-            <Tooltip title="Disponible cuando se conecten los datos de equipo por publicación">
-              <Box>
-                <LabeledSelect
-                  label="Diseñador"
-                  displayEmpty
-                  disabled
-                  value={filters.designerName ?? ''}
-                  onChange={(e) => dispatch(setDesignerName((e.target.value as string) || null))}
-                >
-                  <MenuItem value="">Todos</MenuItem>
-                  {MOCK_DESIGNER_OPTIONS.map((name) => (
-                    <MenuItem key={name} value={name}>{name}</MenuItem>
-                  ))}
-                </LabeledSelect>
-              </Box>
-            </Tooltip>
+              <Tooltip title="Disponible cuando se conecten los datos de equipo por publicación">
+                <Box>
+                  <LabeledSelect
+                    label="Diseñador"
+                    displayEmpty
+                    disabled
+                    value={filters.designerName ?? ''}
+                    onChange={(e) => dispatch(setDesignerName((e.target.value as string) || null))}
+                  >
+                    <MenuItem value="">Todos</MenuItem>
+                    {MOCK_DESIGNER_OPTIONS.map((name) => (
+                      <MenuItem key={name} value={name}>{name}</MenuItem>
+                    ))}
+                  </LabeledSelect>
+                </Box>
+              </Tooltip>
 
-            <Tooltip title="Disponible cuando se conecte el catálogo de categorías a la métrica">
-              <Box>
-                <LabeledSelect
-                  label="Categoría"
-                  displayEmpty
-                  disabled
-                  value={filters.category ?? ''}
-                  onChange={(e) => dispatch(setCategory((e.target.value as string) || null))}
-                >
-                  <MenuItem value="">Todas</MenuItem>
-                  {MOCK_CATEGORY_OPTIONS.map((name) => (
-                    <MenuItem key={name} value={name}>{name}</MenuItem>
-                  ))}
-                </LabeledSelect>
-              </Box>
-            </Tooltip>
+              <Tooltip title="Disponible cuando se conecte el catálogo de categorías a la métrica">
+                <Box>
+                  <LabeledSelect
+                    label="Categoría"
+                    displayEmpty
+                    disabled
+                    value={filters.category ?? ''}
+                    onChange={(e) => dispatch(setCategory((e.target.value as string) || null))}
+                  >
+                    <MenuItem value="">Todas</MenuItem>
+                    {MOCK_CATEGORY_OPTIONS.map((name) => (
+                      <MenuItem key={name} value={name}>{name}</MenuItem>
+                    ))}
+                  </LabeledSelect>
+                </Box>
+              </Tooltip>
 
-            <Tooltip title="Disponible cuando se conecte el catálogo de especialidades a la métrica">
-              <Box>
-                <LabeledSelect
-                  label="Especialidad"
-                  displayEmpty
-                  disabled
-                  value={filters.specialty ?? ''}
-                  onChange={(e) => dispatch(setSpecialty((e.target.value as string) || null))}
-                >
-                  <MenuItem value="">Todas</MenuItem>
-                  {MOCK_SPECIALTY_OPTIONS.map((name) => (
-                    <MenuItem key={name} value={name}>{name}</MenuItem>
-                  ))}
-                </LabeledSelect>
-              </Box>
-            </Tooltip>
-          </AccordionDetails>
-        </Accordion>
+              <Tooltip title="Disponible cuando se conecte el catálogo de especialidades a la métrica">
+                <Box>
+                  <LabeledSelect
+                    label="Especialidad"
+                    displayEmpty
+                    disabled
+                    value={filters.specialty ?? ''}
+                    onChange={(e) => dispatch(setSpecialty((e.target.value as string) || null))}
+                  >
+                    <MenuItem value="">Todas</MenuItem>
+                    {MOCK_SPECIALTY_OPTIONS.map((name) => (
+                      <MenuItem key={name} value={name}>{name}</MenuItem>
+                    ))}
+                  </LabeledSelect>
+                </Box>
+              </Tooltip>
+            </AccordionDetails>
+          </Accordion>
+        )}
 
         <Divider sx={{ my: 2 }} />
 

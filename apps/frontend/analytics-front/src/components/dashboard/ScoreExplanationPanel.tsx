@@ -1,34 +1,41 @@
 'use client';
 
-import { useSelector } from 'react-redux';
 import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
 import { EmptyState, ScoreGauge } from '@repo/ui/ui';
-import { selectScoreExplanation } from '../../store/analytics.selectors';
+import { useGetBrandScoreQuery } from '../../store/api/analytics.api';
+import { totalsByNetwork } from '../../lib/analytics/real-metrics';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
+import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useNetworkCodesFilter } from './useNetworkCodesFilter';
 
 /**
- * Explica el Score Digital existente (buildScoreExplanation, Fase 4) — no
- * introduce una fórmula nueva, decompone los 3 componentes que PONDERAN
- * (Consistencia/Engagement/Frecuencia) y señala qué red/campaña/publicaciones
- * más influyeron. `coverage` se muestra aparte, como dato informativo — nunca
- * como un 4º factor del score (ver modelo.txt / docs/frontend-db-alignment.md §1.4).
+ * Explica el Score Digital real (GET /brands/:id/score, Fase P3/Q) —
+ * decompone los 3 factores que PONDERAN (Consistencia/Engagement/Frecuencia,
+ * ver modelo.txt) y señala la red que más contribuyó. "Campaña que más
+ * contribuyó" y "publicaciones que más ayudaron/restaron" se quitan: el
+ * backend no calcula ese desglose todavía (score.service.ts es a nivel de
+ * marca, no hay atribución por campaña/post en el modelo de datos actual).
  */
 export function ScoreExplanationPanel() {
-  const explanation = useSelector(selectScoreExplanation);
-  if (!explanation) {
+  const campaigns = useFilteredCampaigns();
+  const networkCodes = useNetworkCodesFilter();
+  const brandId = campaigns[0]?.brandId;
+  const { data: score } = useGetBrandScoreQuery(brandId ?? '', { skip: !brandId });
+
+  if (!score) {
     return (
       <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-        <EmptyState title="Sin score disponible" description="Selecciona un perfil para ver su explicación de score." />
+        <EmptyState title="Sin score disponible" description="Se necesita al menos una marca con campañas para calcular el score." />
       </Paper>
     );
   }
 
-  const { score, positiveFactors, negativeFactors, topNetwork, topCampaign, bestPosts, worstPosts } = explanation;
+  const networks = totalsByNetwork(campaigns, networkCodes).filter((n) => n.engagementRate !== null);
+  const topNetwork = networks.length > 0 ? networks.reduce((best, n) => (n.engagementRate! > best.engagementRate! ? n : best)) : null;
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
@@ -40,8 +47,8 @@ export function ScoreExplanationPanel() {
         </Grid>
         <Grid item xs={12} sm={8}>
           {/* Solo los 3 factores que PONDERAN (Score = Consistencia×0.30 + Engagement×0.40 +
-              Frecuencia×0.30, ver modelo.txt) — Cobertura se muestra aparte más abajo, nunca
-              en pie de igualdad con estos, ver docs/frontend-db-alignment.md §1.4. */}
+              Frecuencia×0.30, ver modelo.txt) — Cobertura se muestra aparte, nunca en pie de
+              igualdad con estos, ver docs/frontend-db-alignment.md §1.4. */}
           <Stack gap={1.5}>
             {[
               { label: 'Consistencia', value: score.consistency },
@@ -51,7 +58,7 @@ export function ScoreExplanationPanel() {
               <Stack key={component.label}>
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="caption">{component.label}</Typography>
-                  <Typography variant="caption" fontWeight={700}>{component.value}</Typography>
+                  <Typography variant="caption" fontWeight={700}>{Math.round(component.value * 10) / 10}</Typography>
                 </Stack>
                 <LinearProgress
                   variant="determinate"
@@ -69,12 +76,10 @@ export function ScoreExplanationPanel() {
         </Grid>
       </Grid>
 
-      {/* Cobertura vive separada de los 3 factores ponderados de arriba — es informativa,
-          NO forma parte de la fórmula del Score (ver modelo.txt / docs/frontend-db-alignment.md §1.4). */}
       <Stack sx={{ p: 1.5, mb: 3, bgcolor: '#FAFAFA', borderRadius: 2 }}>
         <Stack direction="row" justifyContent="space-between">
           <Typography variant="caption" color="text.secondary">Cobertura (informativa — no pondera en el score)</Typography>
-          <Typography variant="caption" fontWeight={700} color="text.secondary">{score.coverage}</Typography>
+          <Typography variant="caption" fontWeight={700} color="text.secondary">{Math.round(score.coverage * 10) / 10}</Typography>
         </Stack>
         <LinearProgress
           variant="determinate"
@@ -83,58 +88,12 @@ export function ScoreExplanationPanel() {
         />
       </Stack>
 
-      <Grid container spacing={2} mb={2}>
-        <Grid item xs={12} sm={6}>
-          <Typography variant="body2" fontWeight={700} mb={1}>Factores positivos</Typography>
-          <Stack direction="row" gap={1} flexWrap="wrap">
-            {positiveFactors.length === 0 && <Typography variant="caption" color="text.secondary">Ninguno por encima del umbral.</Typography>}
-            {positiveFactors.map((f) => (
-              <Chip key={f.key} size="small" label={`${f.label}: ${f.value}`} sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', fontWeight: 600 }} />
-            ))}
-          </Stack>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Typography variant="body2" fontWeight={700} mb={1}>Factores a mejorar</Typography>
-          <Stack direction="row" gap={1} flexWrap="wrap">
-            {negativeFactors.length === 0 && <Typography variant="caption" color="text.secondary">Ninguno por debajo del umbral.</Typography>}
-            {negativeFactors.map((f) => (
-              <Chip key={f.key} size="small" label={`${f.label}: ${f.value}`} sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
-            ))}
-          </Stack>
-        </Grid>
-      </Grid>
-
-      <Grid container spacing={2} mb={2}>
+      <Grid container spacing={2}>
         <Grid item xs={12} sm={6}>
           <Typography variant="body2" fontWeight={700}>Red que más contribuyó</Typography>
           <Typography variant="body2" color="text.secondary">
-            {topNetwork ? `${NETWORK_DISPLAY[topNetwork.networkCode].label} (${topNetwork.engagement}% engagement)` : 'Sin datos suficientes'}
+            {topNetwork ? `${NETWORK_DISPLAY[topNetwork.networkCode as keyof typeof NETWORK_DISPLAY]?.label ?? topNetwork.networkName} (${topNetwork.engagementRate}% engagement)` : 'Sin datos suficientes'}
           </Typography>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Typography variant="body2" fontWeight={700}>Campaña que más contribuyó</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {topCampaign ? `${topCampaign.campaignName} (${topCampaign.sharePercent}% del crecimiento)` : 'Sin datos suficientes'}
-          </Typography>
-        </Grid>
-      </Grid>
-
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}>
-          <Typography variant="body2" fontWeight={700} mb={1}>Publicaciones que más ayudaron</Typography>
-          <Stack gap={0.5}>
-            {bestPosts.map((p) => (
-              <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagement}%)</Typography>
-            ))}
-          </Stack>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Typography variant="body2" fontWeight={700} mb={1}>Publicaciones que más restaron</Typography>
-          <Stack gap={0.5}>
-            {worstPosts.map((p) => (
-              <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagement}%)</Typography>
-            ))}
-          </Stack>
         </Grid>
       </Grid>
 

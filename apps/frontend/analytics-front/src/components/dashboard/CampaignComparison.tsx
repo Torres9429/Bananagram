@@ -1,43 +1,48 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useState } from 'react';
 import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MenuItem from '@mui/material/MenuItem';
 import { EmptyState, LabeledSelect } from '@repo/ui/ui';
-import { selectCampaignOptions, selectFactsForNetworkTabs } from '../../store/analytics.selectors';
-import { compareCampaigns } from '../../lib/analytics/engine';
+import { scopedMetrics } from '../../lib/analytics/real-metrics';
+import { useSelectedNetwork } from './useSelectedNetwork';
+import { useFilteredCampaigns } from './useFilteredCampaigns';
 
-const ROWS: { key: 'totalReach' | 'avgEngagement' | 'postsCount' | 'totalInteractions'; label: string; unit?: string }[] = [
-  { key: 'totalReach', label: 'Alcance' },
-  { key: 'avgEngagement', label: 'Engagement', unit: '%' },
-  { key: 'postsCount', label: 'Publicaciones' },
-  { key: 'totalInteractions', label: 'Interacciones' },
+const ROWS: { key: 'reach' | 'engagementRate' | 'posts' | 'interactions'; label: string; unit?: string }[] = [
+  { key: 'reach', label: 'Alcance' },
+  { key: 'engagementRate', label: 'Engagement', unit: '%' },
+  { key: 'posts', label: 'Publicaciones' },
+  { key: 'interactions', label: 'Interacciones' },
 ];
 
 /**
- * Compara 2 campañas lado a lado. La selección de campañas es estado local de
- * UI (no un filtro global — no debe afectar al resto del dashboard), pero los
- * datos comparados vienen siempre de compareCampaigns (Fase 4, engine puro).
+ * Compara 2 campañas lado a lado — datos reales (Fase Q). "Top de campaña"
+ * muestra un solo post (topPost, lo único que calcula el backend hoy) en vez
+ * de una lista — la versión mock mostraba varios porque tenía facts por-post
+ * completos, que el backend no expone.
  */
 export function CampaignComparison() {
-  const facts = useSelector(selectFactsForNetworkTabs);
-  const campaignOptions = useSelector(selectCampaignOptions);
-  const [campaignIdA, setCampaignIdA] = useState<string | null>(campaignOptions[0]?.id ?? null);
-  const [campaignIdB, setCampaignIdB] = useState<string | null>(campaignOptions[1]?.id ?? null);
+  const campaigns = useFilteredCampaigns();
+  const networkCode = useSelectedNetwork();
+  const [campaignIdA, setCampaignIdA] = useState<string | null>(null);
+  const [campaignIdB, setCampaignIdB] = useState<string | null>(null);
 
-  const result = useMemo(() => compareCampaigns(facts, campaignIdA, campaignIdB), [facts, campaignIdA, campaignIdB]);
+  const campaignA = campaigns.find((c) => c.campaignId === (campaignIdA ?? campaigns[0]?.campaignId)) ?? null;
+  const campaignB = campaigns.find((c) => c.campaignId === (campaignIdB ?? campaigns[1]?.campaignId)) ?? null;
 
-  if (campaignOptions.length < 2) {
+  if (campaigns.length < 2) {
     return (
       <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-        <EmptyState title="Se necesitan al menos 2 campañas" description="Ajusta los filtros de perfil activos." />
+        <EmptyState title="Se necesitan al menos 2 campañas" description="Todavía no hay suficientes campañas con datos para comparar." />
       </Paper>
     );
   }
+
+  const metricsA = campaignA ? scopedMetrics(campaignA, networkCode) : null;
+  const metricsB = campaignB ? scopedMetrics(campaignB, networkCode) : null;
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
@@ -45,18 +50,18 @@ export function CampaignComparison() {
 
       <Grid container spacing={2} mb={2}>
         <Grid item xs={12} sm={6}>
-          <LabeledSelect label="Campaña A" value={campaignIdA ?? ''} onChange={(e) => setCampaignIdA((e.target.value as string) || null)}>
-            {campaignOptions.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+          <LabeledSelect label="Campaña A" value={campaignA?.campaignId ?? ''} onChange={(e) => setCampaignIdA((e.target.value as string) || null)}>
+            {campaigns.map((c) => <MenuItem key={c.campaignId} value={c.campaignId}>{c.name}</MenuItem>)}
           </LabeledSelect>
         </Grid>
         <Grid item xs={12} sm={6}>
-          <LabeledSelect label="Campaña B" value={campaignIdB ?? ''} onChange={(e) => setCampaignIdB((e.target.value as string) || null)}>
-            {campaignOptions.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+          <LabeledSelect label="Campaña B" value={campaignB?.campaignId ?? ''} onChange={(e) => setCampaignIdB((e.target.value as string) || null)}>
+            {campaigns.map((c) => <MenuItem key={c.campaignId} value={c.campaignId}>{c.name}</MenuItem>)}
           </LabeledSelect>
         </Grid>
       </Grid>
 
-      {!result.campaignA || !result.campaignB ? (
+      {!campaignA || !campaignB || !metricsA || !metricsB ? (
         <EmptyState title="Sin datos para alguna de las campañas seleccionadas" />
       ) : (
         <>
@@ -65,7 +70,7 @@ export function CampaignComparison() {
               <Grid container spacing={2} key={row.key} alignItems="center">
                 <Grid item xs={4}>
                   <Typography variant="body2" fontWeight={700} sx={{ color: 'primary.contrastTextMuted' }}>
-                    {result.campaignA!.kpis[row.key]}{row.unit ?? ''}
+                    {metricsA[row.key] ?? 0}{row.unit ?? ''}
                   </Typography>
                 </Grid>
                 <Grid item xs={4} textAlign="center">
@@ -73,7 +78,7 @@ export function CampaignComparison() {
                 </Grid>
                 <Grid item xs={4} textAlign="right">
                   <Typography variant="body2" fontWeight={700} sx={{ color: '#1565C0' }}>
-                    {result.campaignB!.kpis[row.key]}{row.unit ?? ''}
+                    {metricsB[row.key] ?? 0}{row.unit ?? ''}
                   </Typography>
                 </Grid>
               </Grid>
@@ -82,20 +87,20 @@ export function CampaignComparison() {
 
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2" fontWeight={700} mb={1}>Top de {result.campaignA.campaignName}</Typography>
-              <Stack gap={0.5}>
-                {result.campaignA.topPosts.map((p) => (
-                  <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagement}%)</Typography>
-                ))}
-              </Stack>
+              <Typography variant="body2" fontWeight={700} mb={1}>Top de {campaignA.name}</Typography>
+              {campaignA.topPost ? (
+                <Typography variant="caption" color="text.secondary">• {campaignA.topPost.network} ({campaignA.topPost.engagementRate}%)</Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary">Sin post destacado todavía.</Typography>
+              )}
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Typography variant="body2" fontWeight={700} mb={1}>Top de {result.campaignB.campaignName}</Typography>
-              <Stack gap={0.5}>
-                {result.campaignB.topPosts.map((p) => (
-                  <Typography key={p.id} variant="caption" color="text.secondary">• {p.postTitle} ({p.engagement}%)</Typography>
-                ))}
-              </Stack>
+              <Typography variant="body2" fontWeight={700} mb={1}>Top de {campaignB.name}</Typography>
+              {campaignB.topPost ? (
+                <Typography variant="caption" color="text.secondary">• {campaignB.topPost.network} ({campaignB.topPost.engagementRate}%)</Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary">Sin post destacado todavía.</Typography>
+              )}
             </Grid>
           </Grid>
 
