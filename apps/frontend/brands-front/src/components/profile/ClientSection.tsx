@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
@@ -12,140 +12,270 @@ import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
-import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
+import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { EmptyState, FormDialog, LabeledField, LabeledSelect, ScoreGauge, PrimaryButton } from '@repo/ui/ui';
-import { selectUser } from '@repo/ui/state';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast } from '@repo/ui/ui';
+import { selectUser, useListCategoriesQuery } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
-import { useListMyBrandsQuery } from '../../store/api/brands.api';
+import { CreateBrandDialog } from '../CreateBrandDialog';
+import { useUpdateBrandMutation, useCreateConnectUrlMutation } from '../../store/api/brands.api';
 import { useListCampaignsQuery } from '../../store/api/campaigns.api';
 import {
-  MOCK_CATEGORIES,
-  PROFILE_TYPE_LABELS,
-  AVAILABLE_SOCIAL_NETWORKS,
-  CAMPAIGN_STATUS_LABEL,
-  getSocialNetwork,
-  getSocialAccountsByProfile,
-  getCurrentClientProfile,
-} from '../../lib/mock-data';
-import type { ProfileType, MockProfile, SocialAccount, SocialNetworkCode } from '../../interfaces/interface';
+  useListSocialAccountsQuery,
+  useSyncSocialAccountsMutation,
+  useDisconnectSocialAccountMutation,
+  type SocialAccountWithNetwork,
+} from '../../store/api/social-accounts.api';
+import { useSelectedBrand } from '../../hooks/useSelectedBrand';
+import { PROFILE_TYPE_LABELS, BRAND_TYPE_OPTIONS, CAMPAIGN_STATUS_LABEL } from '../../lib/mock-data';
+import type { ProfileType } from '../../interfaces/interface';
+
+// Colores por red solo para el Chip — el catálogo real (SocialNetwork) no
+// trae color, es puramente visual y no vale la pena agregarlo al modelo.
+const SOCIAL_NETWORK_COLORS: Record<string, string> = {
+  instagram: '#E1306C',
+  tiktok: '#010101',
+  facebook: '#1877F2',
+  linkedin: '#0A66C2',
+  x: '#000000',
+  youtube: '#FF0000',
+};
 
 // Estructura de la sección Cliente en ProfilePage (§3 del rediseño de dominio).
-// Placeholder: usa el primer MockProfile como "el Perfil del Cliente" porque hoy
-// no existe una asociación real usuario↔perfil en los mocks — ninguna pantalla
-// anterior la tenía tampoco (/brands se navega por id, no por "mi perfil").
-// Vale para brand/company/organization/creator por igual: los 4 ProfileType
-// del Cliente comparten esta misma sección (§A.1 — el tipo nunca bifurca flujo).
+// La "marca activa" viene de useSelectedBrand (Redux) — un Cliente puede
+// tener varias marcas (GET /brands ya las devuelve todas, sin límite), el
+// selector solo aparece si hay más de una. Vale para brand/company/
+// organization/creator por igual: los 4 ProfileType del Cliente comparten
+// esta misma sección (§A.1 — el tipo nunca bifurca flujo).
 //
-// Perfil, campañas y redes sociales usan estado local (useState) porque
-// MOCK_PROFILES / MOCK_SOCIAL_ACCOUNTS son arrays en memoria sin reactividad
-// propia — mismo patrón que ya usa app/brands/[id]/campaigns/page.tsx para
-// altas de campaña. "Editar perfil" es, por lo mismo, solo de sesión: no
-// muta MOCK_PROFILES, igual que "Agregar red social" no mutaba MOCK_SOCIAL_ACCOUNTS.
+// Identidad del Hero (nombre/tipo/categoría/logo/color), redes sociales y
+// campañas ya son datos reales. El score digital sigue sin backend
+// (score.service.ts existe pero no tiene controller, ver CLAUDE.md "Sigue
+// faltando por completo") así que se muestra un placeholder honesto en vez
+// de un número inventado.
 export function ClientSection() {
   const router = useRouter();
   const user = useSelector(selectUser);
-  const [profile, setProfile] = useState<MockProfile>(() => getCurrentClientProfile(user?.email));
 
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
-  // CreateCampaignDialog ya crea contra /campaigns real y necesita un brandId
-  // real (UUID) — profile.id de arriba es mock (ids tipo "b1") y el backend
-  // lo rechaza con 400 "brandId must be a UUID". Se resuelve aparte, solo
-  // para esto, sin tocar el resto de la sección (fuera de alcance).
-  const { data: myBrands = [] } = useListMyBrandsQuery();
-  const realBrandId = myBrands[0]?.id;
-  // La lista de campañas SÍ es real ahora (antes mostraba MOCK_CAMPAIGNS y
-  // nunca reflejaba lo creado de verdad) — el resto de la sección (perfil,
-  // redes sociales) se queda mock, fuera de alcance de esta fase.
+  const [createBrandOpen, setCreateBrandOpen] = useState(false);
+  // Un Cliente puede tener varias marcas (ej. Barcel) — useSelectedBrand
+  // recuerda cuál está activa (Redux, persiste al navegar a
+  // /profile/campaigns) en vez de tomar myBrands[0] a ciegas.
+  const { myBrands, selectedBrand: realBrand, setSelectedBrandId } = useSelectedBrand();
+  const realBrandId = realBrand?.id;
+  const { data: categories = [] } = useListCategoriesQuery();
+  const categoryName = categories.find((c) => c.id === realBrand?.categoryId)?.name;
+
   const { data: allCampaigns = [] } = useListCampaignsQuery();
   const campaigns = realBrandId ? allCampaigns.filter((c) => c.brandId === realBrandId) : [];
 
-  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>(() =>
-    getSocialAccountsByProfile(profile.id),
+  // Cuentas sociales reales, sincronizadas desde Ayrshare (ver plan "conectar
+  // marca y cuenta de Instagram reales", Fase D).
+  const { data: socialAccounts = [], isFetching: isLoadingSocialAccounts } = useListSocialAccountsQuery(
+    realBrandId ?? '',
+    { skip: !realBrandId },
   );
-  const [addNetworkOpen, setAddNetworkOpen] = useState(false);
-  const [newNetworkCode, setNewNetworkCode] = useState<SocialNetworkCode | ''>('');
-  const [newHandle, setNewHandle] = useState('');
+  const [syncSocialAccounts, { isLoading: isSyncing }] = useSyncSocialAccountsMutation();
+  const [createConnectUrl] = useCreateConnectUrlMutation();
+  const [disconnectSocialAccount, { isLoading: isDisconnecting }] = useDisconnectSocialAccountMutation();
+  const { showSuccess, showError, showInfo } = useToast();
 
+  async function handleSync() {
+    if (!realBrandId) return;
+    try {
+      await syncSocialAccounts(realBrandId).unwrap();
+      showSuccess('Cuentas sincronizadas con Ayrshare.');
+    } catch {
+      showError('No se pudo sincronizar con Ayrshare.');
+    }
+  }
+
+  // Un solo hook de mutación (createConnectUrl) se dispara desde 2 botones
+  // distintos ("Conectar otra red" arriba y "Reconectar" por card) — su
+  // isLoading es uno solo para los dos, así que el loading por-botón se
+  // trackea aparte con esta key ('top' | id de la cuenta) en vez de usarlo
+  // directo, o ambos botones se prendían a la vez sin importar cuál se clickeó.
+  const [connectingKey, setConnectingKey] = useState<string | null>(null);
+
+  // Ayrshare no avisa cuando el usuario termina de conectar/reconectar en su
+  // pestaña (no hay webhook sin plan Premium + URL pública, ver
+  // syncFromAyrshare) — se detecta "volvió de la pestaña de Ayrshare" al
+  // recuperar el foco de esta ventana y se sincroniza sola una vez, en vez
+  // de dejar que el usuario tenga que acordarse de darle "Sincronizar".
+  const awaitingSyncRef = useRef(false);
+
+  useEffect(() => {
+    function handleFocus() {
+      if (awaitingSyncRef.current && realBrandId) {
+        awaitingSyncRef.current = false;
+        syncSocialAccounts(realBrandId);
+      }
+    }
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [realBrandId, syncSocialAccounts]);
+
+  function openConnectUrl(url: string) {
+    awaitingSyncRef.current = true;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  // El picker de red a conectar lo resuelve Ayrshare mismo dentro de su
+  // propia página (connectUrl) — solo ofrece ahí las redes del catálogo que
+  // la marca todavía no tiene conectadas, así que no hay que duplicar esa
+  // lógica en un diálogo propio: basta con abrir el enlace.
+  async function handleConnectAnotherNetwork() {
+    if (!realBrandId) return;
+    setConnectingKey('top');
+    try {
+      const result = await createConnectUrl({ id: realBrandId }).unwrap();
+      openConnectUrl(result.connectUrl);
+      showInfo('Se abrió una pestaña nueva para conectar en Ayrshare.');
+    } catch {
+      showError('No se pudo generar el enlace de conexión.');
+    } finally {
+      setConnectingKey(null);
+    }
+  }
+
+  // Reconectar una cuenta inactiva: mismo connectUrl de Ayrshare pero
+  // acotado a esa red puntual (allowedSocial: [code]) — la cuenta ya
+  // desconectada de Ayrshare vuelve a aparecer ahí como conectable.
+  async function handleReconnect(account: SocialAccountWithNetwork) {
+    if (!realBrandId) return;
+    setConnectingKey(account.id);
+    try {
+      const result = await createConnectUrl({ id: realBrandId, allowedSocial: [account.socialNetwork.code] }).unwrap();
+      openConnectUrl(result.connectUrl);
+      showInfo('Se abrió una pestaña nueva para reconectar en Ayrshare.');
+    } catch {
+      showError('No se pudo generar el enlace de conexión.');
+    } finally {
+      setConnectingKey(null);
+    }
+  }
+
+  // Desconectar SÍ llama a Ayrshare de verdad (SocialAccountsService.
+  // disconnect) — no borra el registro, lo marca active:false y sigue
+  // viéndose en la lista con el chip "Inactiva".
+  const [disconnectTarget, setDisconnectTarget] = useState<SocialAccountWithNetwork | null>(null);
+
+  async function handleConfirmDisconnect() {
+    if (!realBrandId || !disconnectTarget) return;
+    try {
+      await disconnectSocialAccount({ brandId: realBrandId, id: disconnectTarget.id }).unwrap();
+      showSuccess(`${disconnectTarget.socialNetwork.name} desconectada.`);
+    } catch {
+      showError('No se pudo desconectar — Ayrshare rechazó la solicitud.');
+    } finally {
+      setDisconnectTarget(null);
+    }
+  }
+
+  const [updateBrand, { isLoading: isSavingProfile }] = useUpdateBrandMutation();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [editName, setEditName] = useState(profile.name);
-  const [editCategory, setEditCategory] = useState(profile.categoryId);
-
-  const connectedNetworkIds = socialAccounts.map((a) => a.socialNetworkId);
-  const availableNetworksToAdd = AVAILABLE_SOCIAL_NETWORKS.filter((n) => !connectedNetworkIds.includes(n.id));
-
-  // El modelo real no vincula Campaign↔SocialAccount directamente (ver nota
-  // en CreateCampaignDialog.tsx) — sin ese dato ya no se puede saber si una
-  // cuenta social está en uso por una campaña activa, así que nunca bloquea
-  // (las cuentas sociales siguen siendo mock en esta sección de todas formas).
-  function isSocialAccountInActiveCampaign(_socialAccountId: string): boolean {
-    return false;
-  }
-
-  function handleDisconnect(accountId: string) {
-    if (isSocialAccountInActiveCampaign(accountId)) return;
-    setSocialAccounts((prev) => prev.filter((a) => a.id !== accountId));
-  }
-
-  // Mock: no hay OAuth ni backend — solo agrega la cuenta al estado local.
-  function handleAddNetwork() {
-    if (!newNetworkCode || !newHandle.trim()) return;
-    setSocialAccounts((prev) => [
-      ...prev,
-      { id: `bp-new-${Date.now()}`, brandId: profile.id, socialNetworkId: newNetworkCode, handle: newHandle.trim(), followers: 0, active: true },
-    ]);
-    setNewNetworkCode('');
-    setNewHandle('');
-    setAddNetworkOpen(false);
-  }
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('');
+  const [editProfileType, setEditProfileType] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editLogoUrl, setEditLogoUrl] = useState('');
 
   function openEditProfile() {
-    setEditName(profile.name);
-    setEditCategory(profile.categoryId);
+    if (!realBrand) return;
+    setEditName(realBrand.name);
+    setEditColor(realBrand.primaryColor ?? '');
+    setEditProfileType(realBrand.profileType ?? '');
+    setEditCategoryId(realBrand.categoryId ?? '');
+    setEditLogoUrl(realBrand.logoUrl ?? '');
     setEditProfileOpen(true);
   }
 
-  // Mock: solo de sesión — no hay backend que persista el cambio.
-  function handleEditProfile() {
-    if (!editName.trim() || !editCategory) return;
-    setProfile((prev) => ({ ...prev, name: editName.trim(), categoryId: editCategory }));
-    setEditProfileOpen(false);
+  async function handleEditProfile() {
+    if (!realBrandId || !editName.trim()) return;
+    try {
+      await updateBrand({
+        id: realBrandId,
+        body: {
+          name: editName.trim(),
+          primaryColor: editColor.trim() || undefined,
+          profileType: editProfileType || undefined,
+          categoryId: editCategoryId || undefined,
+          logoUrl: editLogoUrl.trim() || undefined,
+        },
+      }).unwrap();
+      setEditProfileOpen(false);
+      showSuccess('Perfil actualizado.');
+    } catch {
+      showError('No se pudo guardar el perfil.');
+    }
   }
 
-  const initials = getInitials(profile.name).toUpperCase();
+  const displayName = realBrand?.name ?? user?.name ?? user?.email ?? 'Tu perfil';
+  const displayColor = realBrand?.primaryColor ?? '#616161';
+  const initials = getInitials(displayName).toUpperCase();
 
   return (
     <Stack gap={3}>
+      {/* Un Cliente puede tener varias marcas (ej. Barcel) — selector solo
+          visible cuando hay más de una, para no agregar ruido al caso común
+          de una sola marca. */}
+      {myBrands.length > 1 && (
+        <Stack direction="row" gap={1.5} alignItems="center">
+          <Select
+            size="small"
+            value={realBrandId ?? ''}
+            onChange={(e) => setSelectedBrandId(e.target.value as string)}
+            sx={{ minWidth: 220, bgcolor: '#fff' }}
+          >
+            {myBrands.map((b) => (
+              <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+            ))}
+          </Select>
+          <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
+            Nueva marca
+          </Button>
+        </Stack>
+      )}
+
       {/* Hero del perfil — identidad + score + acciones principales */}
       <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, background: 'linear-gradient(135deg, #FFFDF5 0%, #FFFFFF 60%)' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={3}>
           <Stack direction="row" gap={2} alignItems="center">
-            <Avatar sx={{ width: 72, height: 72, bgcolor: profile.color, color: '#fff', fontSize: 26, fontWeight: 700 }}>
+            <Avatar src={realBrand?.logoUrl ?? undefined} sx={{ width: 72, height: 72, bgcolor: displayColor, color: '#fff', fontSize: 26, fontWeight: 700 }}>
               {initials || '—'}
             </Avatar>
             <Box>
-              <Typography variant="h5" fontWeight={700}>{profile.name}</Typography>
-              <Stack direction="row" gap={1} flexWrap="wrap" mt={0.75}>
-                <Chip size="small" label={PROFILE_TYPE_LABELS[profile.profileType as ProfileType] ?? profile.profileType ?? '—'} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
-                <Chip size="small" label={profile.categoryId} variant="outlined" />
-              </Stack>
+              <Typography variant="h5" fontWeight={700}>{displayName}</Typography>
+              {realBrand && (
+                <Stack direction="row" gap={1} flexWrap="wrap" mt={0.75}>
+                  <Chip size="small" label={PROFILE_TYPE_LABELS[realBrand.profileType as ProfileType] ?? realBrand.profileType ?? '—'} sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
+                  {categoryName && <Chip size="small" label={categoryName} variant="outlined" />}
+                </Stack>
+              )}
             </Box>
           </Stack>
-          <Box sx={{ transform: 'scale(0.8)', transformOrigin: { xs: 'left', sm: 'center' } }}>
-            <ScoreGauge score={profile.score.score} classification={profile.score.classification} />
+          {/* Score digital real: falta el endpoint (score.service.ts existe
+              pero sin controller, ver CLAUDE.md) — se muestra un placeholder
+              en vez de inventar un número. */}
+          <Box sx={{ textAlign: 'center', minWidth: 140 }}>
+            <Typography variant="body2" color="text.secondary">Score Digital</Typography>
+            <Typography variant="caption" color="text.secondary">Aún no disponible</Typography>
           </Box>
         </Stack>
 
         <Divider sx={{ my: 2.5 }} />
 
         <Stack direction="row" gap={1.5} flexWrap="wrap">
-          <Button size="small" variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEditProfile}
+          <Button size="small" variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEditProfile} disabled={!realBrand}
             sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
             Editar perfil
           </Button>
@@ -160,50 +290,94 @@ export function ClientSection() {
         </Stack>
       </Paper>
 
-      {/* Redes conectadas — cards */}
+      {/* Sin marca todavía: bloquea redes/campañas (ambos paneles ya
+          deshabilitan sus acciones con !realBrandId) — este bloque es la
+          salida real, no solo un botón deshabilitado sin explicación. */}
+      {myBrands.length === 0 && (
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+          <EmptyState
+            title="Aún no tienes una marca"
+            description="Crea tu marca para conectar redes sociales reales y empezar a coordinar campañas."
+            action={
+              <PrimaryButton startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
+                Crear marca
+              </PrimaryButton>
+            }
+          />
+        </Paper>
+      )}
+
+      {/* Redes conectadas — datos reales, sincronizados desde Ayrshare.
+          "Conectar otra red" abre la página de Ayrshare (ahí mismo se elige
+          cuál del catálogo, ya filtrado a lo que falta conectar). "Sincronizar"
+          trae lo que se haya conectado. "Desconectar" llama a Ayrshare de
+          verdad y marca la cuenta inactiva (no la borra). */}
       <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="subtitle1" fontWeight={700}>Redes conectadas</Typography>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => setAddNetworkOpen(true)}
-            disabled={availableNetworksToAdd.length === 0}
-            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
-          >
-            + Agregar red social
-          </Button>
+          <Stack direction="row" gap={1}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<LinkOutlinedIcon />}
+              onClick={handleConnectAnotherNetwork}
+              disabled={!realBrandId || connectingKey === 'top'}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
+            >
+              {connectingKey === 'top' ? 'Generando enlace…' : 'Conectar otra red'}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<SyncOutlinedIcon />}
+              onClick={handleSync}
+              disabled={!realBrandId || isSyncing}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
+            >
+              {isSyncing ? 'Sincronizando…' : 'Sincronizar'}
+            </Button>
+          </Stack>
         </Stack>
-        {socialAccounts.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">Sin cuentas conectadas todavía.</Typography>
+        {isLoadingSocialAccounts ? (
+          <Typography variant="body2" color="text.secondary">Cargando cuentas conectadas…</Typography>
+        ) : socialAccounts.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            Sin cuentas conectadas todavía. Conéctalas desde el enlace de Ayrshare y luego sincroniza.
+          </Typography>
         ) : (
           <Grid container spacing={2}>
             {socialAccounts.map((a) => {
-              const locked = isSocialAccountInActiveCampaign(a.id);
-              const network = getSocialNetwork(a.socialNetworkId);
-              const netColor = network?.color ?? '#6B6B6B';
+              const netColor = SOCIAL_NETWORK_COLORS[a.socialNetwork.code] ?? '#6B6B6B';
               return (
                 <Grid item xs={12} sm={6} md={4} key={a.id}>
                   <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, height: '100%' }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
-                      <Chip size="small" label={network?.label ?? a.socialNetworkId} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700 }} />
-                      {locked && (
-                        <Tooltip title="En uso por una campaña activa">
-                          <Chip size="small" label="En uso" sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 600 }} />
-                        </Tooltip>
+                      <Chip size="small" label={a.socialNetwork.name} sx={{ bgcolor: `${netColor}18`, color: netColor, fontWeight: 700 }} />
+                      {!a.active && (
+                        <Chip size="small" label="Inactiva" sx={{ bgcolor: '#F5F5F5', color: '#757575', fontWeight: 600 }} />
                       )}
                     </Stack>
-                    <Typography variant="body2" fontWeight={600} noWrap>{a.handle}</Typography>
+                    <Typography variant="body2" fontWeight={600} noWrap>{a.handle ?? '—'}</Typography>
                     <Typography variant="caption" color="text.secondary">{a.followers.toLocaleString()} seguidores</Typography>
-                    <Box mt={1.5}>
-                      <Tooltip title={locked ? 'No se puede desconectar mientras una campaña activa la use' : ''}>
-                        <span>
-                          <Button size="small" disabled={locked} onClick={() => handleDisconnect(a.id)} sx={{ color: locked ? undefined : '#C62828', px: 0 }}>
-                            Desconectar
-                          </Button>
-                        </span>
-                      </Tooltip>
-                    </Box>
+                    {a.active ? (
+                      <Box mt={1.5}>
+                        <Button size="small" disabled={isDisconnecting} onClick={() => setDisconnectTarget(a)} sx={{ color: '#C62828', px: 0 }}>
+                          Desconectar
+                        </Button>
+                      </Box>
+                    ) : (
+                      <Box mt={1.5}>
+                        <Button
+                          size="small"
+                          startIcon={<LinkOutlinedIcon />}
+                          disabled={connectingKey === a.id}
+                          onClick={() => handleReconnect(a)}
+                          sx={{ px: 0 }}
+                        >
+                          {connectingKey === a.id ? 'Generando enlace…' : 'Reconectar'}
+                        </Button>
+                      </Box>
+                    )}
                   </Paper>
                 </Grid>
               );
@@ -248,14 +422,19 @@ export function ClientSection() {
                   direction="row"
                   justifyContent="space-between"
                   alignItems="center"
-                  onClick={() => router.push(`/profile/campaigns/${c.id}`)}
+                  onClick={() => router.push(`/brands/${c.brandId}/campaigns/${c.id}`)}
                   sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
                 >
                   <Box>
                     <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
                     <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
                   </Box>
-                  <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
+                  <Stack direction="row" gap={1} alignItems="center">
+                    {c.cmStatus === 'rechazada' && (
+                      <Chip size="small" label="Rechazada por el CM" sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
+                    )}
+                    <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
+                  </Stack>
                 </Stack>
               );
             })}
@@ -271,45 +450,19 @@ export function ClientSection() {
         <CreateCampaignDialog
           open={createCampaignOpen}
           brandId={realBrandId}
+          brandCategoryId={realBrand?.categoryId}
           onClose={() => setCreateCampaignOpen(false)}
         />
       )}
 
-      <FormDialog
-        open={addNetworkOpen}
-        title="Agregar red social"
-        maxWidth="xs"
-        confirmLabel="Agregar"
-        confirmDisabled={!newNetworkCode || !newHandle.trim()}
-        onClose={() => setAddNetworkOpen(false)}
-        onConfirm={handleAddNetwork}
-      >
-        <LabeledSelect
-          label="Red social"
-          value={newNetworkCode}
-          onChange={(e) => setNewNetworkCode(e.target.value as SocialNetworkCode)}
-          displayEmpty
-        >
-          <MenuItem value="" disabled><em>Selecciona una red</em></MenuItem>
-          {availableNetworksToAdd.map((n) => (
-            <MenuItem key={n.code} value={n.code}>{n.label}</MenuItem>
-          ))}
-        </LabeledSelect>
-        <LabeledField
-          label="Usuario / handle"
-          placeholder="Ej. @tuempresa"
-          value={newHandle}
-          onChange={(e) => setNewHandle(e.target.value)}
-          required
-        />
-      </FormDialog>
+      <CreateBrandDialog open={createBrandOpen} onClose={() => setCreateBrandOpen(false)} />
 
       <FormDialog
         open={editProfileOpen}
         title="Editar perfil"
         maxWidth="xs"
-        confirmLabel="Guardar cambios"
-        confirmDisabled={!editName.trim() || !editCategory}
+        confirmLabel={isSavingProfile ? 'Guardando…' : 'Guardar cambios'}
+        confirmDisabled={!editName.trim() || isSavingProfile}
         onClose={() => setEditProfileOpen(false)}
         onConfirm={handleEditProfile}
       >
@@ -321,17 +474,50 @@ export function ClientSection() {
           required
         />
         <LabeledSelect
-          label="Categoría"
-          value={editCategory}
-          onChange={(e) => setEditCategory(e.target.value as string)}
+          label="Tipo"
+          value={editProfileType}
+          onChange={(e) => setEditProfileType(e.target.value as string)}
           displayEmpty
         >
-          <MenuItem value="" disabled><em>Selecciona una categoría</em></MenuItem>
-          {MOCK_CATEGORIES.map((cat) => (
-            <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+          <MenuItem value=""><em>Sin especificar</em></MenuItem>
+          {BRAND_TYPE_OPTIONS.map((opt) => (
+            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
           ))}
         </LabeledSelect>
+        <LabeledSelect
+          label="Categoría (opcional)"
+          value={editCategoryId}
+          onChange={(e) => setEditCategoryId(e.target.value as string)}
+          displayEmpty
+        >
+          <MenuItem value=""><em>Sin categoría</em></MenuItem>
+          {categories.map((cat) => (
+            <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+          ))}
+        </LabeledSelect>
+        <LabeledField
+          label="Logo — URL (opcional)"
+          placeholder="https://…"
+          value={editLogoUrl}
+          onChange={(e) => setEditLogoUrl(e.target.value)}
+        />
+        <LabeledField
+          label="Color primario (opcional)"
+          placeholder="#E0A800"
+          value={editColor}
+          onChange={(e) => setEditColor(e.target.value)}
+        />
       </FormDialog>
+
+      <ConfirmDialog
+        open={!!disconnectTarget}
+        title="Desconectar red social"
+        description={`¿Seguro que deseas desconectar ${disconnectTarget?.socialNetwork.name} (${disconnectTarget?.handle ?? 'sin usuario'})? Puedes volver a conectarla después desde "Conectar otra red".`}
+        confirmLabel="Desconectar"
+        destructive
+        onConfirm={handleConfirmDisconnect}
+        onCancel={() => setDisconnectTarget(null)}
+      />
     </Stack>
   );
 }

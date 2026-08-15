@@ -27,4 +27,10 @@ export class SocialAccountsController {
   sync(@Param('brandId', ParseUUIDPipe) brandId: string) {
     return this.socialAccounts.syncFromAyrshare(brandId);
   }
+
+  @Post(':id/disconnect')
+  @RequirePermission('marcas', 'editar')
+  disconnect(@Param('brandId', ParseUUIDPipe) brandId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.socialAccounts.disconnect(brandId, id);
+  }
 }

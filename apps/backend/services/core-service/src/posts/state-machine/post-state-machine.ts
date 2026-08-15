@@ -7,7 +7,7 @@ export function validateTransition(from: PostStatus, to: PostStatus, comment?: s
   if (!allowed.includes(to)) {
     throw new UnprocessableEntityException(`Transición inválida: ${from} → ${to}`);
   }
-  if (to === PostStatus.RECHAZADO && !comment?.trim()) {
+  if ((to === PostStatus.RECHAZADO || to === PostStatus.RECHAZADO_CLIENTE) && !comment?.trim()) {
     throw new BadRequestException('El motivo de rechazo es obligatorio');
   }
   if (to === PostStatus.APROBADO && createdBy === userId) {

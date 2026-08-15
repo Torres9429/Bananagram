@@ -68,6 +68,7 @@ export class BrandsService {
           name: dto.name,
           slug: dto.slug,
           profileType: dto.profileType,
+          categoryId: dto.categoryId,
           logoUrl: dto.logoUrl,
           primaryColor: dto.primaryColor,
           ownerId: user.sub,
@@ -111,12 +112,63 @@ export class BrandsService {
           name: dto.name,
           slug: dto.slug,
           profileType: dto.profileType,
+          categoryId: dto.categoryId,
           logoUrl: dto.logoUrl,
           primaryColor: dto.primaryColor,
         },
       }),
     );
     return this.toBrandResponse(updated);
+  }
+
+  // Regenera el connectUrl de Ayrshare para una marca YA existente — a
+  // diferencia de createBrand, que solo lo genera una vez al crear. Sin
+  // allowedSocial explícito, ofrece todo el catálogo activo de redes (así
+  // crece solo cuando el Admin agregue más redes al catálogo).
+  async createConnectUrl(id: string, allowedSocial?: string[]): Promise<{ connectUrl: string }> {
+    const brand = await prisma.brand.findFirst({ where: { id, deletedAt: null } });
+    if (!brand) throw new NotFoundException(`Brand ${id} no existe`);
+    if (!brand.profileKey) {
+      throw new BadRequestException('Esta marca no tiene un perfil de Ayrshare — no se puede generar un enlace de conexión');
+    }
+
+    const networks = allowedSocial?.length
+      ? allowedSocial
+      : (await prisma.socialNetwork.findMany({ where: { deletedAt: null }, select: { code: true } })).map((n) => n.code);
+
+    if (!networks.length) {
+      throw new BadRequestException('No hay redes sociales en el catálogo para conectar');
+    }
+
+    const connectUrl = await this.createAyrshareConnectUrl(brand.profileKey, networks);
+    return { connectUrl };
+  }
+
+  // El perfil de Ayrshare se puede borrar desde el dashboard de Ayrshare sin
+  // que nuestro backend se entere (no hay webhook para esto) — el
+  // profileKey guardado queda huérfano y connect-url/sync empiezan a fallar
+  // contra un perfil que ya no existe del lado de Ayrshare. A diferencia de
+  // createBrand, aquí SÍ se reusa el mismo Brand.id (no se recrea la fila:
+  // rompería la FK de Campaign/Post que ya apuntan a este brandId). Las
+  // SocialAccount viejas quedan huérfanas del perfil anterior — se
+  // soft-deletean (regla de negocio: nunca borrado físico) porque ya no
+  // representan una conexión real; sync() las vuelve a crear tras reconectar.
+  async reprovisionAyrshareProfile(id: string, allowedSocial?: string[]): Promise<{ connectUrl: string }> {
+    const brand = await prisma.brand.findFirst({ where: { id, deletedAt: null } });
+    if (!brand) throw new NotFoundException(`Brand ${id} no existe`);
+
+    const profile = await this.createAyrshareProfile(brand.name);
+    const networks = allowedSocial?.length
+      ? allowedSocial
+      : (await prisma.socialNetwork.findMany({ where: { deletedAt: null }, select: { code: true } })).map((n) => n.code);
+    const connectUrl = await this.createAyrshareConnectUrl(profile.profileKey, networks);
+
+    await prisma.$transaction([
+      prisma.brand.update({ where: { id }, data: { refId: profile.refId, profileKey: profile.profileKey } }),
+      prisma.socialAccount.updateMany({ where: { brandId: id, deletedAt: null }, data: { deletedAt: new Date(), active: false } }),
+    ]);
+
+    return { connectUrl };
   }
 
   async removeBrand(id: string): Promise<BrandResponse> {

@@ -1,5 +1,16 @@
 # Alexa Skill — Asistente Bananagram — Diseño final
 
+> ⚠️ **DESCARTADO — no es el diseño que se está construyendo.** El equipo externo del Lambda ya tiene un
+> contrato real y distinto, con solo 6 funciones: `fetchUserByLinkCode`, `fetchCampaigns`,
+> `fetchContentIdeas`, `fetchSavedIdeas`, `saveIdeaToBackend`, `deleteIdeaFromBackend` — documentado en
+> `docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md`. En particular: **la generación de
+> ideas con IA vive en el backend de Bananagram, no en el Lambda** (`fetchContentIdeas` espera ideas ya
+> generadas de vuelta, no las genera el Lambda llamando a Claude directo como dice la sección 7 de este
+> documento) — esa pieza sigue sin implementarse (pendiente de una API key de Anthropic con facturación
+> activa). El account-linking (LinkCode, no OAuth2 como dice el checklist de la sección 9) y la lista de
+> endpoints de campañas tampoco coinciden con lo real. Este documento queda solo como referencia histórica
+> de una ronda de diseño anterior — no lo uses como fuente de verdad.
+>
 > Este documento **sustituye** a `AlexaSkill-Flujo-Basico.md` y `AlexaSkill-Diseno-Avanzado.md` (ambos retirados — su contenido quedó consolidado e integrado aquí). El diseño original de 14 intents sigue siendo `Bananagram/docs/AlexaSkill_v2.md` (se conserva como origen histórico, no se toca). Este es el diseño **final, ya alineado con el backend real** de Bananagram (`docs/base/modelo2.txt` + `docs/base/service-boundaries.md`) — ya no hay una versión "mock" y una "de verdad" por separado: todo lo descrito aquí es lo que se implementa. El código completo, paso a paso, vive en `json-code/lambda-codigo-por-pasos.md`; los interaction models finales en `json-code/interaction-model-{es-MX,en-US}.json`.
 
 ---

@@ -31,14 +31,20 @@ services:
     build:
       context: .
       dockerfile: apps/backend/services/auth-service/Dockerfile
-    env_file: .env
+    env_file: ./apps/backend/services/auth-service/.env
     environment:
-      # el .env de la raíz trae localhost:5433 (para pnpm dev en el host);
-      # dentro de la red de compose, postgres se resuelve por su nombre de
-      # servicio en el puerto interno 5432 — este override tiene prioridad
-      # sobre env_file para la misma variable.
+      # El .env de auth-service trae localhost:5433 (para pnpm dev en el
+      # host); dentro de la red de compose, postgres se resuelve por su
+      # nombre de servicio en el puerto interno 5432 — este override tiene
+      # prioridad sobre env_file para la misma variable.
       DATABASE_URL_AUTH: postgresql://postgres:postgres@postgres:5432/gestor_redes_auth
       REDIS_URL: redis://redis:6379
+      # El .env de auth-service trae la ruta relativa a su propio cwd para
+      # `pnpm dev` en el host (apps/backend/services/auth-service/../../../../keys/...)
+      # — dentro del contenedor el WORKDIR final es distinto y las llaves se
+      # montan aparte (ver volumes abajo), así que necesita su propio valor.
+      JWT_PRIVATE_KEY_PATH: ./keys/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: ./keys/jwt_public.pem
     volumes:
       # Llave privada RS256 — solo auth-service la necesita, montada en
       # runtime (nunca por COPY en el Dockerfile, para que no quede horneada
@@ -52,7 +58,7 @@ services:
     build:
       context: .
       dockerfile: apps/backend/services/core-service/Dockerfile
-    env_file: .env
+    env_file: ./apps/backend/services/core-service/.env
     environment:
       DATABASE_URL_CORE: postgresql://postgres:postgres@postgres:5432/gestor_redes_core
       REDIS_URL: redis://redis:6379
@@ -65,7 +71,7 @@ services:
     build:
       context: .
       dockerfile: apps/backend/services/alexa-service/Dockerfile
-    env_file: .env
+    env_file: ./apps/backend/services/alexa-service/.env
     environment:
       REDIS_URL: redis://redis:6379
       AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
@@ -77,9 +83,9 @@ services:
     build:
       context: .
       dockerfile: apps/backend/gateway/Dockerfile
-    env_file: .env
+    env_file: ./apps/backend/gateway/.env
     environment:
-      # el .env de la raíz trae localhost:3001/3002 (para pnpm dev en el
+      # El .env del gateway trae localhost:3001/3002 (para pnpm dev en el
       # host); dentro de la red de compose, cada servicio se resuelve por
       # su nombre — mismo patrón que DATABASE_URL_AUTH/CORE.
       AUTH_SERVICE_URL: http://auth-service:3001
@@ -96,7 +102,6 @@ services:
   web-shell:
     profiles: ["full"]
     build: ./apps/frontend/web-shell
-    env_file: .env
     ports: ["3000:3000"]
     depends_on: [api-gateway]
 

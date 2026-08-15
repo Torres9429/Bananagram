@@ -70,7 +70,12 @@ export default function BrandOverviewPage() {
                           <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
                           <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
                         </Box>
-                        <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
+                        <Stack direction="row" gap={1} alignItems="center">
+                          {c.cmStatus === 'rechazada' && (
+                            <Chip size="small" label="Rechazada por el CM" sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
+                          )}
+                          <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
+                        </Stack>
                       </Stack>
                     );
                   })

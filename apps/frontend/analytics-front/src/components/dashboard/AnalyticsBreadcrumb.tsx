@@ -5,7 +5,8 @@ import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { selectCampaign, selectPost } from '../../store/analyticsFilters.slice';
-import { selectAnalyticsFilters, selectSelectedCampaignLabel, selectSelectedNetwork, selectSelectedPostLabel } from '../../store/analytics.selectors';
+import { selectAnalyticsFilters, selectSelectedNetwork, selectSelectedPostLabel } from '../../store/analytics.selectors';
+import { useGetCampaignsMetricsSummaryQuery } from '../../store/api/analytics.api';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 
 /**
@@ -20,8 +21,13 @@ export function AnalyticsBreadcrumb() {
   const dispatch = useDispatch();
   const filters = useSelector(selectAnalyticsFilters);
   const selectedNetwork = useSelector(selectSelectedNetwork);
-  const campaignLabel = useSelector(selectSelectedCampaignLabel);
   const postLabel = useSelector(selectSelectedPostLabel);
+  // Ya cacheada por el resto del dashboard (useFilteredCampaigns/FilterBar) —
+  // antes resolvía el nombre desde MOCK_METRIC_FACTS, que no tiene los ids
+  // reales y mostraba el UUID crudo una vez que el filtro de Campaña quedó
+  // conectado a datos reales.
+  const { data: campaigns = [] } = useGetCampaignsMetricsSummaryQuery();
+  const campaignLabel = filters.campaignId ? (campaigns.find((c) => c.campaignId === filters.campaignId)?.name ?? filters.campaignId) : null;
 
   if (!filters.campaignId && !filters.postId) return null;
 

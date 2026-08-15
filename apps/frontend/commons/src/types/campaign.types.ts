@@ -1,5 +1,10 @@
 export type CampaignStatus = 'active' | 'paused' | 'finished';
 
+// Aceptación del CM (Fase J) — separado de CampaignStatus (ciclo operativo).
+// cmId queda fijo solo una vez 'aceptada'; antes de eso el Cliente puede
+// reasignarlo (ej. si el CM rechaza), lo que resetea esto a 'pendiente'.
+export type CmAssignmentStatus = 'pendiente' | 'aceptada' | 'rechazada';
+
 export interface Campaign {
   id: string;
   brandId: string;
@@ -10,6 +15,9 @@ export interface Campaign {
   startDate?: string | null;
   endDate?: string | null;
   cmId: string; // FK única — "solo un CM por campaña" a nivel BD
+  cmStatus: CmAssignmentStatus;
+  cmRespondedAt?: string | null;
+  cmRejectionReason?: string | null;
   createdBy: string; // FK -> users.id del Cliente que la creó
   // El backend real incluye estas 2 filas puente (solo IDs, sin nombre/avatar
   // anidado — hay que resolverlos cruzando con listEligibleCMs/
@@ -27,6 +35,13 @@ export interface EligibleStaffMember {
   userId: string;
   name: string;
   avatarUrl?: string | null;
+}
+
+// matchScore solo lo trae eligible-community-managers (Fase J, recomendaciones
+// por categoría) — eligible-designers sigue siendo un EligibleStaffMember
+// plano.
+export interface EligibleCm extends EligibleStaffMember {
+  matchScore: number;
 }
 
 // Join sin campo de rol — la membresía en esta tabla ya implica "diseñador".

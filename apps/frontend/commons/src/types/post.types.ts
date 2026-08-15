@@ -5,6 +5,7 @@ export type PostStatus =
   | 'en_revision'
   | 'aprobado'
   | 'rechazado'
+  | 'rechazado_cliente' // Fase O — segundo tramo: el Cliente rechazó, el CM decide el siguiente paso
   | 'programado'
   | 'publicando'
   | 'publicado'

@@ -34,6 +34,11 @@ const nextConfig: NextConfig = {
         { source: '/brands/:path*',    destination: `${ZONES.BRANDS}/brands/:path*` },
         { source: '/my-campaigns',     destination: `${ZONES.BRANDS}/my-campaigns` },
         { source: '/team',             destination: `${ZONES.BRANDS}/team` },
+        // /profile no tenía rewrite — solo era alcanzable entrando directo a
+        // brands-front:3013 (gap ya documentado en sesiones anteriores, se
+        // cierra de paso al agregar /profile/alexa).
+        { source: '/profile',          destination: `${ZONES.BRANDS}/profile` },
+        { source: '/profile/:path*',   destination: `${ZONES.BRANDS}/profile/:path*` },
 
         // posts-front
         { source: '/posts',            destination: `${ZONES.POSTS}/posts` },

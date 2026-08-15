@@ -17,8 +17,8 @@
     "db:generate": "pnpm --filter @repo/auth-service run db:generate && pnpm --filter @repo/core-service run db:generate",
     "db:migrate": "pnpm --filter @repo/auth-service run db:migrate && pnpm --filter @repo/core-service run db:migrate",
     "db:migrate:prod": "pnpm --filter @repo/auth-service run db:migrate:prod && pnpm --filter @repo/core-service run db:migrate:prod",
-    "db:studio:auth": "prisma studio --schema=apps/backend/services/auth-service/prisma/schema.prisma",
-    "db:studio:core": "prisma studio --schema=apps/backend/services/core-service/prisma/schema.prisma"
+    "db:studio:auth": "pnpm --filter @repo/auth-service exec prisma studio",
+    "db:studio:core": "pnpm --filter @repo/core-service exec prisma studio"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

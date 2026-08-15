@@ -43,9 +43,12 @@ const ROLE_PERMISSIONS = {
   community_manager: {
     catalogos: ['ver'],
     marcas: ['ver'],
-    publicaciones: ['ver', 'crear', 'editar'],
+    // 'aprobar'/'rechazar' agregados en la Fase O — el CM es quien revisa el
+    // trabajo del Diseñador en el primer tramo de aprobación (antes lo hacía
+    // el Cliente directo, sin pasar por el CM).
+    publicaciones: ['ver', 'crear', 'editar', 'aprobar', 'rechazar'],
     calendario: ['ver', 'crear', 'editar'],
-    campanas: ['ver', 'crear', 'editar', 'asignar'],
+    campanas: ['ver', 'crear', 'editar', 'asignar', 'aprobar', 'rechazar'],
     metricas: ['ver'],
     score: ['ver'],
     reportes: ['ver'],
@@ -53,16 +56,24 @@ const ROLE_PERMISSIONS = {
   disenador: {
     catalogos: ['ver'],
     marcas: ['ver'],
-    publicaciones: ['ver', 'crear'],
+    // 'editar' agregado en la Fase O — enviar a revisión (submitPostForReview)
+    // y editar su propio borrador/rechazado (updatePost) usan esa acción.
+    publicaciones: ['ver', 'crear', 'editar'],
     calendario: ['ver'],
     campanas: ['ver'],
   },
   cliente: {
     catalogos: ['ver'],
     marcas: ['ver', 'crear', 'editar'],
-    publicaciones: ['ver', 'aprobar', 'rechazar'],
+    // 'editar' agregado en la Fase O — programar/publicar (schedulePost) en
+    // el segundo tramo de aprobación usa esa acción, no solo aprobar/rechazar.
+    publicaciones: ['ver', 'aprobar', 'rechazar', 'editar'],
     calendario: ['ver'],
-    campanas: ['ver', 'crear'],
+    // 'editar' agregado en la Fase L — reasignar CM tras un rechazo usa
+    // PATCH /campaigns/:id (updateCampaign), gateado por campanas:editar;
+    // sin esto el Cliente daba 403 al intentarlo. assertCanManage/
+    // BrandAccessGuard ya limitan esto a sus propias marcas.
+    campanas: ['ver', 'crear', 'editar'],
     metricas: ['ver'],
     score: ['ver'],
     reportes: ['ver', 'exportar'],

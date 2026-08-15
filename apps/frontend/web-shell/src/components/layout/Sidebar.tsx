@@ -7,7 +7,6 @@ import ArticleIcon from '@mui/icons-material/Article';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -38,7 +37,6 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'brands', label: 'Marcas', href: `${BRANDS_FRONT_URL}/brands`, icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
   { key: 'calendar', label: 'Calendario', href: `${BRANDS_FRONT_URL}/profile/calendar`, icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
   { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
-  { key: 'team', label: 'Team', href: `${BRANDS_FRONT_URL}/team`, icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
   { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
 ];
 

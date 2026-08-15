@@ -2,22 +2,73 @@ import { createApi } from '@reduxjs/toolkit/query/react';
 import { createAuthenticatedBaseQuery } from '@repo/ui/state';
 import type { Brand } from '@repo/ui/types';
 
-// Solo lectura, a propósito: esta fase conecta campañas, que necesitan un
-// brandId real para funcionar, pero no reconstruye toda la UI de gestión de
-// Marcas (eso queda fuera de alcance — ver plan de integración).
+// createBrand agregado para conectar marcas/redes sociales reales (ver plan
+// "conectar una marca y una cuenta de Instagram reales") — el resto de la
+// gestión de Marcas (editar, eliminar, listar cuentas conectadas) sigue
+// fuera de alcance, esta fase solo desbloquea crear + obtener el connectUrl
+// de Ayrshare.
+export interface CreateBrandRequest {
+  name: string;
+  slug: string;
+  profileType?: string;
+  categoryId?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  allowedSocial: string[];
+}
+
+// connectUrl solo viene en la respuesta de creación (BrandsService.
+// toBrandResponse lo agrega ahí, nunca en GET) — por eso no vive en el tipo
+// Brand compartido, se extiende puntual solo para este endpoint.
+export interface CreateBrandResponse extends Brand {
+  connectUrl?: string;
+}
+
+export interface UpdateBrandRequest {
+  name?: string;
+  slug?: string;
+  profileType?: string;
+  categoryId?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+}
+
 export const brandsApi = createApi({
   reducerPath: 'brandsApi',
   baseQuery: createAuthenticatedBaseQuery(),
+  tagTypes: ['Brand'],
   endpoints: (builder) => ({
     // GET /brands ya viene filtrado por el backend (dueño, CM/diseñador
     // asignado a alguna campaña de la marca, o Admin ve todas).
     listMyBrands: builder.query<Brand[], void>({
       query: () => 'brands',
+      providesTags: ['Brand'],
     }),
     getBrand: builder.query<Brand, string>({
       query: (id) => `brands/${id}`,
+      providesTags: ['Brand'],
+    }),
+    createBrand: builder.mutation<CreateBrandResponse, CreateBrandRequest>({
+      query: (body) => ({ url: 'brands', method: 'POST', body }),
+      invalidatesTags: ['Brand'],
+    }),
+    updateBrand: builder.mutation<Brand, { id: string; body: UpdateBrandRequest }>({
+      query: ({ id, body }) => ({ url: `brands/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Brand'],
+    }),
+    // Regenera el connectUrl de Ayrshare para una marca ya existente (a
+    // diferencia del connectUrl de createBrand, que solo se ve una vez) —
+    // permite conectar/reconectar redes después de la creación.
+    createConnectUrl: builder.mutation<{ connectUrl: string }, { id: string; allowedSocial?: string[] }>({
+      query: ({ id, allowedSocial }) => ({ url: `brands/${id}/connect-url`, method: 'POST', body: { allowedSocial } }),
     }),
   }),
 });
 
-export const { useListMyBrandsQuery, useGetBrandQuery } = brandsApi;
+export const {
+  useListMyBrandsQuery,
+  useGetBrandQuery,
+  useCreateBrandMutation,
+  useUpdateBrandMutation,
+  useCreateConnectUrlMutation,
+} = brandsApi;

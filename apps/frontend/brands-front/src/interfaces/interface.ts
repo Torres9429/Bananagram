@@ -50,7 +50,7 @@ export interface MockCampaign {
   objective?: string | null;
   description?: string | null;
   createdBy: string; // FK -> users.id del Cliente que creó la campaña (ya NO es "team")
-  cmId: string; // FK única — un solo CM por campaña, ver MOCK_AVAILABLE_CMS/getCampaignCM
+  cmId: string; // FK única — un solo CM por campaña, ver MOCK_AVAILABLE_CMS
 }
 
 // Representa un Diseñador asignado a una campaña (CampaignDesigner join, sin
@@ -169,12 +169,6 @@ export interface StaffProfileSectionProps {
   mockProfile: MockAvailableCM | MockAvailableDesigner | null;
   name: string;
   onNameChange: (name: string) => void;
-}
-
-export interface CampaignTabsProps {
-  brandId: string;
-  campaignId: string;
-  backHref?: string;
 }
 
 export interface ProfileHeaderProps {

@@ -7,5 +7,6 @@ import { IdeasService } from './ideas.service';
   imports: [JwtAuthModule],
   controllers: [IdeasController],
   providers: [IdeasService],
+  exports: [IdeasService],
 })
 export class IdeasModule {}

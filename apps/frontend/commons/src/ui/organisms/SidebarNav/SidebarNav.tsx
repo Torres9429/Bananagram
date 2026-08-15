@@ -40,6 +40,24 @@ export interface SidebarNavItem {
   // "Mis Campañas" también activo en /profile/campaigns/*, aunque su href
   // sea /my-campaigns).
   activeMatchPrefixes?: string[];
+  // Igual que activeMatchPrefixes, pero para sub-rutas con un id dinámico en
+  // medio (ej. /brands/:id/campaigns/*) — un prefijo literal no puede
+  // expresar "cualquier id aquí". Mismo patrón de '*' por segmento que ya usa
+  // topbar-titles.ts (getTopBarTitle), pero matcheando por PREFIJO de
+  // segmentos (no longitud exacta): activa si los primeros N segmentos de la
+  // ruta calzan con el patrón, sin importar cuántos más sigan después.
+  activeMatchSegmentPrefixes?: string[][];
+  // Excluye este ítem de su propio match por prefijo de href/activeMatch
+  // cuando la ruta cae en uno de estos patrones — para sub-rutas que "viven"
+  // bajo este href pero en realidad pertenecen a otro ítem (ej.
+  // /brands/:id/campaigns/* no es "Marcas", es "Mis Campañas"/"Mi perfil").
+  activeMatchExcludeSegmentPrefixes?: string[][];
+}
+
+function segmentsMatch(pathname: string, pattern: string[]): boolean {
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length < pattern.length) return false;
+  return pattern.every((seg, i) => seg === '*' || seg === segments[i]);
 }
 
 interface SidebarNavProps {
@@ -287,13 +305,17 @@ export function SidebarNav({ items, activeHref, onNavigate, header, collapsedHea
         <List sx={{ px: effectiveCollapsed ? 1 : 1.5, pt: 0, flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {items.map((item) => {
             const matchHref = item.activeMatch ?? item.href;
-            const primaryActive = item.exactMatch
-              ? activeHref === matchHref
-              : activeHref === matchHref || activeHref.startsWith(`${matchHref}/`);
+            const excluded = (item.activeMatchExcludeSegmentPrefixes ?? []).some((p) => segmentsMatch(activeHref, p));
+            const primaryActive =
+              !excluded &&
+              (item.exactMatch
+                ? activeHref === matchHref
+                : activeHref === matchHref || activeHref.startsWith(`${matchHref}/`));
             const prefixActive = (item.activeMatchPrefixes ?? []).some(
               (p) => activeHref === p || activeHref.startsWith(`${p}/`),
             );
-            const active = primaryActive || prefixActive;
+            const segmentPrefixActive = (item.activeMatchSegmentPrefixes ?? []).some((p) => segmentsMatch(activeHref, p));
+            const active = primaryActive || prefixActive || segmentPrefixActive;
             const button = (
               <ListItemButton
                 key={item.key}

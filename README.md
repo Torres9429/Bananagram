@@ -43,11 +43,16 @@ síncrono entre servicios (sin mensajería async).
 ## Puesta en marcha
 
 ```bash
-cp .env.example .env      # valores por defecto ya sirven para desarrollo local
+# Cada servicio de backend tiene su propio .env — no hay uno solo en la raíz.
+cp apps/backend/services/auth-service/.env.example apps/backend/services/auth-service/.env
+cp apps/backend/services/core-service/.env.example apps/backend/services/core-service/.env
+cp apps/backend/services/alexa-service/.env.example apps/backend/services/alexa-service/.env
+cp apps/backend/gateway/.env.example apps/backend/gateway/.env
+# los valores por defecto ya sirven para desarrollo local
+
 pnpm install
 pnpm generate-keys        # genera el par RS256 en keys/ (no sobrescribe si ya existe, nunca se commitea)
 docker compose up -d      # levanta Postgres + Adminer + Redis
-set -a && source .env && set +a   # para cargar las variables de entorno antes de migrate y seed
 pnpm db:migrate           # aplica las migraciones (auth-service y core-service)
 pnpm seed                 # carga roles, permisos y usuarios de prueba
 ```
@@ -56,7 +61,7 @@ pnpm seed                 # carga roles, permisos y usuarios de prueba
 > `pnpm seed` imprime al final las cuentas de prueba (mismo email/password que usa el modo mock del
 > frontend), incluida `multi@bananagram.mx` (community_manager + disenador, para probar multi-rol). No
 > siembra catálogos (categorías/especialidades/redes sociales) a propósito — se crean vía API una vez
-> logueado.
+> logueado (ver [Flujo esperado de punta a punta](#flujo-esperado-de-punta-a-punta) abajo).
 
 > [!IMPORTANT]
 > `auth-service` (y solo él) necesita las llaves RSA de `pnpm generate-keys` para firmar tokens —
@@ -64,15 +69,63 @@ pnpm seed                 # carga roles, permisos y usuarios de prueba
 > un `.pem` directo. Si `auth-service` no arranca por no encontrar las llaves, corre `pnpm generate-keys`
 > desde la raíz del repo.
 
-## Correr el proyecto
+> [!IMPORTANT]
+> **Ayrshare es obligatorio, no opcional**, para avanzar más allá de crear una marca: `POST /brands`
+> llama a Ayrshare para crear el perfil + link de conexión, y falla con 500 sin `AYRSHARE_API_KEY`/
+> `AYRSHARE_DOMAIN`/`AYRSHARE_PRIVATE_KEY` configurados (cuenta de prueba gratuita de
+> [ayrshare.com](https://www.ayrshare.com) alcanza). Sin esto, todo el flujo se corta en el paso 3 de
+> abajo.
+>
+> **Cada servicio de backend lee su propio `.env` local** (`apps/backend/{gateway,services/*}/.env`,
+> no hay un `.env` compartido en la raíz) — los 4 servicios usan `ConfigModule.forRoot({ isGlobal: true })`
+> de NestJS, que carga `.env` desde el directorio de trabajo del propio proceso. Si cambias una variable
+> (ej. `SOCIAL_PROVIDER` para probar publicación real, ver el paso 9), edítala en el `.env` del servicio
+> puntual y reinicia ese servicio — cambiarla en otro `.env` no tiene efecto. Ninguno de estos `.env` está
+> versionado — cópialos de su `.env.example` correspondiente la primera vez si no existen todavía (ver
+> [Puesta en marcha](#puesta-en-marcha) arriba).
 
-Nada carga `.env` automáticamente al usar `pnpm dev` — cárgalo en la terminal antes:
+## Compartir datos de prueba entre el equipo
+
+Para que todo el equipo pruebe publicaciones/métricas sobre las mismas marcas, campañas y cuenta de red
+social conectada — en vez de que cada quien recree su propio set de datos siguiendo el
+[flujo de punta a punta](#flujo-esperado-de-punta-a-punta) por separado — se puede exportar/restaurar un
+dump de las 2 bases.
+
+> [!IMPORTANT]
+> Las 2 bases (`gestor_redes_auth`/`gestor_redes_core`) se exportan y restauran **siempre juntas, del mismo
+> momento**: `UserProfile.userId` (core) apunta a `User.id` (auth) sin FK real entre bases (son bases
+> separadas, ver [Arquitectura](#arquitectura)) — restaurar una sin la otra deja campañas/perfiles
+> huérfanos apuntando a usuarios que no existen.
+>
+> Las marcas del dump traen guardado un `profileKey` de Ayrshare — solo sirve si todo el equipo usa la
+> **misma** cuenta de Ayrshare (`AYRSHARE_API_KEY`/`AYRSHARE_DOMAIN`/`AYRSHARE_PRIVATE_KEY` iguales en su
+> `core-service/.env`, los que ya trae `.env.example`). No cambiar esas 3 variables si vas a usar datos
+> compartidos.
+
+**Exportar** (quien tiene los datos que el equipo debe usar, con `docker compose up -d` corriendo):
 
 ```bash
-set -a && source .env && set +a
+docker compose exec -T postgres pg_dump -U postgres --clean --if-exists gestor_redes_auth > auth_dump.sql
+docker compose exec -T postgres pg_dump -U postgres --clean --if-exists gestor_redes_core > core_dump.sql
 ```
 
-Luego, según qué necesites levantar (para no saturar la máquina corriendo todo a la vez):
+Compartir ambos `.sql` por fuera del repo (Slack, Drive, etc. — son datos, no código, y no van versionados).
+
+**Restaurar** (el resto del equipo, con su propio `docker compose up -d` ya levantado):
+
+```bash
+docker compose exec -T postgres psql -U postgres -d gestor_redes_auth < auth_dump.sql
+docker compose exec -T postgres psql -U postgres -d gestor_redes_core < core_dump.sql
+```
+
+`--clean --if-exists` hace que el restore reemplace lo que ya hubiera localmente (dropea antes de
+recrear) — es un reemplazo completo, no una fusión con datos propios existentes.
+
+## Correr el proyecto
+
+Cada servicio carga su propio `.env` solo (`ConfigModule.forRoot()`, ver nota de arriba) — no hace falta
+cargar nada a mano en la terminal antes de `pnpm dev`. Según qué necesites levantar (para no saturar la
+máquina corriendo todo a la vez):
 
 ```bash
 pnpm dev              # todo: backend + frontend completos
@@ -96,6 +149,77 @@ producción de cada servicio):
 ```bash
 docker compose --profile full up -d --build
 ```
+
+## Flujo esperado de punta a punta
+
+Con `pnpm dev` corriendo (backend + frontend) y `pnpm seed` ya aplicado, así se recorre el sistema
+completo por primera vez, en el orden que espera el modelo de negocio (nada de esto está sembrado de
+antemano salvo los usuarios — cada paso depende del anterior).
+
+> [!NOTE]
+> Las URLs de abajo son directas a cada zona (`brands-front:3013`, `posts-front:3014`, etc.), no vía
+> `web-shell:3000` — `web-shell` es el host pensado como único punto de entrada, pero sus rewrites
+> (`apps/frontend/web-shell/next.config.ts`) todavía no cubren `/profile` ni `/my-team`, así que por ahora
+> hay que entrar directo a esas dos. El resto de rutas (`/login`, `/brands/*`, `/my-campaigns`,
+> `/posts/*`, `/catalogs/*`) sí funcionan igual entrando por `localhost:3000`.
+
+Cuentas de prueba (las mismas que imprime `pnpm seed` al final):
+
+| Rol | Email | Password |
+|---|---|---|
+| Administrador | `20233tn102@utez.edu.mx` | `admin123` |
+| Community Manager | `cm@bananagram.mx` | `cm123456` |
+| Diseñador | `disenador@bananagram.mx` | `diseno123` |
+| Cliente | `cliente@bananagram.mx` | `cliente123` |
+| CM + Diseñador (multi-rol) | `multi@bananagram.mx` | `multi12345` |
+
+**1. Administrador — catálogos** (`http://localhost:3010/catalogs`, o `localhost:3000/catalogs/...`)
+Sin esto no hay con qué crear una marca ni una campaña:
+- `/catalogs/social-networks` → agregar al menos **Instagram** (nombre, código, engagement base) —
+  sin ninguna red en el catálogo, Ayrshare no tiene con qué ofrecer conexión.
+- `/catalogs/categories` y `/catalogs/specialties` → al menos una de cada una, las usan marcas/campañas
+  y los perfiles de CM/Diseñador para las recomendaciones de asignación.
+
+**2. Cliente — crear la marca y conectar Instagram real** (`http://localhost:3013`)
+- Login como `cliente@bananagram.mx`, `/brands` → "Nueva marca" (nombre + slug obligatorios, el resto
+  opcional). Esto ya llama a Ayrshare de verdad para crear el perfil — ver el `[!IMPORTANT]` de Ayrshare
+  arriba si falla con 500.
+- Entrar a la marca creada → "Conectar otra red" abre el link real de Ayrshare — conectar una cuenta de
+  Instagram de verdad ahí.
+- Volver a la app y darle "Sincronizar" para traer la cuenta conectada (seguidores, handle, etc.).
+
+**3. Cliente — crear la campaña** (`/brands/[id]/campaigns` o `/profile`)
+Elegir categorías (para las recomendaciones) y un Community Manager — `cm@bananagram.mx` ya existe.
+Queda en estado `pendiente`, notificando al CM.
+
+**4. Community Manager — aceptar la campaña** (`/my-campaigns`, login `cm@bananagram.mx`)
+Sección "Pendientes de tu aprobación" → Aceptar (o Rechazar con motivo, lo que la regresa al Cliente para
+elegir otro CM).
+
+**5. Community Manager — armar equipo** (`/my-team`, y luego dentro de la campaña → "Ver equipo")
+- `/my-team`: agregar a `disenador@bananagram.mx` al equipo general (roster) — un Diseñador tiene que
+  estar aquí antes de poder asignarlo a una campaña puntual.
+- Dentro de la campaña ya aceptada → equipo de la campaña → agregar a ese mismo Diseñador desde el roster.
+
+**6. Diseñador — crear una publicación** (`http://localhost:3014/posts/new`, login `disenador@bananagram.mx`)
+Elegir la campaña (ya debe tener al Diseñador asignado, paso 5), redes, contenido, adjuntar media si se
+quiere. "Guardar borrador" o "Crear y enviar a revisión →" directo.
+
+**7. Community Manager — revisar** (`/posts/approvals` o el detalle del post, login `cm@bananagram.mx`)
+Aprobar (pasa al Cliente) o Rechazar con motivo obligatorio (regresa al Diseñador, que ve el motivo y
+puede corregir y reenviar).
+
+**8. Cliente — aprobación final** (detalle del post, login `cliente@bananagram.mx`)
+Programar una fecha, o "Publicar ahora" (sin fecha — el cron de `PostSchedulerService` corre cada minuto
+y la recoge sola). También puede rechazar con motivo, lo que regresa al CM (quien la edita él mismo y
+reenvía, o la reenvía al Diseñador con una nota opcional propia).
+
+**9. (Opcional) Publicación real contra Ayrshare, no simulada**
+Por defecto `SOCIAL_PROVIDER=mock` (el cron simula la publicación y las métricas, ver
+`decay-simulator.ts`). Para publicar de verdad: parar `core-service`, cambiar `SOCIAL_PROVIDER=ayrshare`
+en **su `.env` local** (`apps/backend/services/core-service/.env`, no el de la raíz — ver nota de arriba),
+reiniciar. Confirmar en el dashboard de Ayrshare que el post llegó, y que `PostMetric.source` queda en
+`'ayrshare'` (no `'simulated'`) en la siguiente corrida del cron de métricas.
 
 ## Estructura
 

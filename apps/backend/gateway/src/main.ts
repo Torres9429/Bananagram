@@ -46,6 +46,7 @@ async function bootstrap() {
 
   const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
   const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
+  const alexaServiceUrl = process.env.ALEXA_SERVICE_URL || 'http://localhost:3004';
 
   // Montados sin path en app.use() a propósito: si se pasa un path como
   // primer argumento (app.use('/api/auth', middleware)), Express recorta
@@ -68,12 +69,28 @@ async function bootstrap() {
   app.use(
     createProxyMiddleware({ pathFilter: '/api/campaigns', target: coreServiceUrl, changeOrigin: true }),
   );
+  // Prefijo propio (no /api/me/*, que ya está tomado por auth-service arriba)
+  // — equipo GENERAL de un CM, vive en core-service (Fase J).
+  app.use(
+    createProxyMiddleware({ pathFilter: '/api/cm-team', target: coreServiceUrl, changeOrigin: true }),
+  );
   app.use(createProxyMiddleware({ pathFilter: '/api/posts', target: coreServiceUrl, changeOrigin: true }));
   app.use(
     createProxyMiddleware({ pathFilter: '/api/reports', target: coreServiceUrl, changeOrigin: true }),
   );
+  // /api/ideas ya NO es core-service — el dominio de ideas se mudó entero a
+  // alexa-service (acceso directo a la misma BD física, ver
+  // docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md Fase 6).
+  // Mismo prefijo de URL para el cliente (web o Lambda), dueño distinto detrás.
+  // No se agrega un proxy /api/alexa: alexa-service expone /campaigns e
+  // /ideas bajo el mismo prefijo 'api' que core-service (ver alexa-service
+  // src/main.ts), y /api/campaigns ya está tomado por core-service arriba —
+  // agregar /api/alexa sin re-mapear las rutas de alexa-service no
+  // apuntaría a nada real. El Lambda llama a alexa-service directo
+  // (puerto 3004, no proxeado hoy) para campañas/métricas; solo /api/ideas
+  // cambia de dueño porque ese prefijo no colisiona con nada más.
   app.use(
-    createProxyMiddleware({ pathFilter: '/api/ideas', target: coreServiceUrl, changeOrigin: true }),
+    createProxyMiddleware({ pathFilter: '/api/ideas', target: alexaServiceUrl, changeOrigin: true }),
   );
 
   await app.listen(4000);

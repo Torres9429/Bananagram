@@ -90,6 +90,7 @@ model Category {
 
   userProfileCategories UserProfileCategory[]
   campaignCategories    CampaignCategory[]
+  brands                Brand[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -140,6 +141,12 @@ model Brand {
   slug        String  @unique
   profileType String?
 
+  // Reusa el mismo catálogo de Category que ya usan Campañas y los perfiles
+  // de CM/Diseñador (moda, entretenimiento, deportes...) — orientativo, no
+  // restrictivo (regla de negocio #8), single-select a propósito.
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
   logoUrl      String?
   primaryColor String?
 
@@ -150,6 +157,11 @@ model Brand {
 
   refId      String? @unique
   profileKey String? @unique
+
+  // Zona horaria por defecto de la marca — falta por completo hoy (§13 de
+  // la auditoría de integración Ayrshare); nullable a propósito, con
+  // fallback a un default de aplicación en código (no forzar backfill).
+  timezone String?
 
   socialAccounts SocialAccount[]
   campaigns      Campaign[]
@@ -176,7 +188,17 @@ model SocialAccount {
   followers Int     @default(0)
   active    Boolean @default(true)
 
+  // Campos nuevos para la integración real con Ayrshare (auditoría §2/§6):
+  // id que Ayrshare/la red asigna a la cuenta conectada (mapear
+  // webhooks/eventos sin depender de `handle`, frágil), cuándo se
+  // desconectó de verdad (distinto de `active: false`, que no dice cuándo
+  // pasó), y última reautenticación (TikTok exige reautorizar cada año).
+  platformAccountId  String?
+  disconnectedAt     DateTime?
+  lastAuthenticatedAt DateTime?
+
   postSocialAccounts PostSocialAccount[]
+  metricSnapshots    SocialAccountMetricSnapshot[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -184,6 +206,34 @@ model SocialAccount {
 
   @@unique([brandId, socialNetworkId])
   @@map("social_accounts")
+}
+
+// Historial de seguidores por cuenta conectada — a diferencia de
+// SocialAccount.followers (un solo número, se pisa en cada sync), esta tabla
+// nunca hace update, solo insert (mismo patrón append-only que PostMetric) —
+// permite graficar crecimiento aunque la marca no tenga ninguna campaña
+// todavía. Poblada por account-metrics-cron.service.ts cada 6h.
+model SocialAccountMetricSnapshot {
+  id              String        @id @default(uuid())
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  followers Int
+  // Métricas de cuenta completa (todas las publicaciones, no una en
+  // particular) confirmadas en vivo contra POST /analytics/social de
+  // Ayrshare — nullable, null = no disponible, nunca 0 de relleno (mismo
+  // criterio que PostMetric). Ayrshare NO expone "visitas al perfil" en
+  // este endpoint — no se agrega ese campo porque no hay de dónde llenarlo.
+  likes    Int?
+  comments Int?
+  shares   Int?
+  views    Int?
+  reach    Int?
+
+  source     String   @default("simulated") // 'ayrshare' | 'simulated'
+  capturedAt DateTime @default(now())
+
+  @@map("social_account_metric_snapshots")
 }
 
 model Campaign {
@@ -200,6 +250,16 @@ model Campaign {
   // El CM vive directo aquí — FK única garantiza "solo un CM por campaña"
   // en BD. FK → auth-service.User.id (sin constraint).
   cmId String
+
+  // Flujo de aceptación (Fase J): cmId queda fijo solo una vez ACEPTADA —
+  // antes de eso el Cliente puede reasignarlo (ej. si el CM rechaza), lo que
+  // resetea este bloque a 'pendiente' de nuevo. Separado de `status`
+  // (active/paused/finished, que es el ciclo de vida operativo) a propósito:
+  // son dos preguntas distintas ("¿el CM confirmó?" vs "¿la campaña está
+  // corriendo?").
+  cmStatus         CmAssignmentStatus @default(pendiente)
+  cmRespondedAt    DateTime?
+  cmRejectionReason String?
 
   designers  CampaignDesigner[]
   categories CampaignCategory[]
@@ -225,6 +285,21 @@ model CampaignDesigner {
   @@map("campaign_designers")
 }
 
+// Equipo GENERAL de un CM (Fase J) — distinto de CampaignDesigner, que es
+// por-campaña. Un Diseñador debe estar aquí antes de poder ser asignado a
+// una campaña puntual de ese mismo CM. Sin soft-delete: quitar del equipo es
+// un DELETE real, igual que ya hace CampaignDesigner (es una relación viva,
+// no un registro con historia que conservar).
+model CmTeamMember {
+  cmUserId       String // FK → auth-service.User.id (sin constraint de BD)
+  designerUserId String // FK → auth-service.User.id (sin constraint de BD)
+
+  createdAt DateTime @default(now())
+
+  @@id([cmUserId, designerUserId])
+  @@map("cm_team_members")
+}
+
 model CampaignCategory {
   campaignId String
   categoryId String
@@ -242,6 +317,14 @@ enum CampaignStatus {
   finished
 }
 
+// Aceptación del CM (Fase J) — separado de CampaignStatus, ver comentario en
+// Campaign.cmStatus.
+enum CmAssignmentStatus {
+  pendiente
+  aceptada
+  rechazada
+}
+
 // Estado único de la publicación: cubre tanto el flujo de aprobación
 // (borrador → en_revision → aprobado/rechazado) como el de publicación
 // multi-red (programado → publicando → publicado/parcial/error/cancelado).
@@ -251,6 +334,7 @@ enum PostStatus {
   en_revision
   aprobado
   rechazado
+  rechazado_cliente
   programado
   publicando
   publicado
@@ -327,6 +411,20 @@ model PostSocialAccount {
   postUrl      String?
   publishedAt  DateTime?
   errorMessage String?
+
+  // Campos nuevos para el pipeline real de publicación/sync (auditoría
+  // §2/§13/§16): estado crudo que reporta Ayrshare (separado del enum
+  // interno, para depurar cuando divergen), clasificación de error (para
+  // saber qué reintentar), contador de reintentos, última vez que se
+  // consultó el estado real a Ayrshare, cuándo se mandó la solicitud y la
+  // fecha que Ayrshare confirma que va a publicar (puede diferir de la
+  // solicitada).
+  providerStatus      String?
+  errorCode           String?
+  retryCount          Int       @default(0)
+  lastSyncedAt        DateTime?
+  submittedAt         DateTime?
+  providerScheduledAt DateTime?
 
   metrics PostMetric[]
 
@@ -425,9 +523,56 @@ model PostMetric {
   reach      Int?
   engagement Float? // tasa calculada: (likes+comments+shares) / reach
 
+  // Campos nuevos (auditoría §2/§7/§8): respuesta cruda del proveedor (vida
+  // corta en varias redes — TikTok expira a los 7 días, X a los 30, así que
+  // conservarla aquí es la única forma de no perderla), quién generó esta
+  // fila ('simulated' | 'ayrshare' — crítico para no mezclar datos falsos
+  // con reales sin marcarlos), y qué denominador se usó para `engagement`
+  // cuando `reach` no está disponible para esa red.
+  raw            Json?
+  source         String  @default("simulated")
+  engagementBase String? // 'reach' | 'views' | 'impressions'
+
   capturedAt DateTime @default(now())
 
   @@map("post_metrics")
+}
+
+// Trazabilidad de cada llamada saliente a un proveedor externo (Ayrshare) —
+// distinto de AuditLog, que audita mutaciones de dominio, no llamadas HTTP a
+// terceros (auditoría §2/§16/§17). Nunca guarda el body completo de la
+// request/response ni la API key — solo metadatos, para poder correlacionar
+// reintentos y detectar duplicados por `requestId`.
+model ProviderRequestLog {
+  id         String   @id @default(uuid())
+  provider   String   @default("ayrshare")
+  operation  String // 'publish' | 'analytics' | 'connectProfile' | ...
+  entityType String // 'post' | 'socialAccount' | 'brand'
+  entityId   String
+  requestId  String? // correlation id, para cruzar con logs
+  httpStatus Int?
+  succeeded  Boolean
+  errorCode  String?
+  durationMs Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("provider_request_logs")
+}
+
+// Registro de cada corrida del cron de sincronización de métricas
+// (auditoría §2/§9/§10) — para saber si el cron corrió, qué tan bien, y
+// cuándo fue la última sincronización exitosa.
+model MetricSyncRun {
+  id             String    @id @default(uuid())
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  itemsProcessed Int       @default(0)
+  itemsFailed    Int       @default(0)
+  status         String // 'running' | 'completed' | 'failed'
+
+  @@map("metric_sync_runs")
 }
 
 // Score = (Consistencia×0.30) + (Engagement×0.40) + (Frecuencia×0.30) — ver

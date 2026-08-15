@@ -1,4 +1,4 @@
-import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsIn, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateBrandDto {
@@ -11,6 +11,10 @@ export class CreateBrandDto {
   @IsOptional()
   @IsIn(['brand', 'profile'])
   profileType?: string;
+
+  // Mismo catálogo de Category que ya usan Campañas y perfiles de
+  // CM/Diseñador (single-select, orientativo — regla de negocio #8).
+  @ApiPropertyOptional() @IsOptional() @IsUUID() categoryId?: string;
 
   @ApiPropertyOptional() @IsOptional() @IsString() logoUrl?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() primaryColor?: string;

@@ -20,6 +20,11 @@ describe('Auth Integration', () => {
     });
 
     const moduleRef = await Test.createTestingModule({ imports: [AuthModule] }).compile();
+    // .compile() NO dispara onModuleInit() — TokenSignerService carga las
+    // llaves RS256 ahí (ver token-signer.service.ts); sin .init(), firmar
+    // cualquier JWT truena con "Key... Received undefined" (no es un
+    // problema de env vars, la llave nunca se llega a leer).
+    await moduleRef.init();
     authService = moduleRef.get(AuthService);
   });
 

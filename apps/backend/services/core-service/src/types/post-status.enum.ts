@@ -3,6 +3,7 @@ export enum PostStatus {
   EN_REVISION = 'en_revision',
   APROBADO = 'aprobado',
   RECHAZADO = 'rechazado',
+  RECHAZADO_CLIENTE = 'rechazado_cliente',
   PROGRAMADO = 'programado',
   PUBLICANDO = 'publicando',
   PUBLICADO = 'publicado',
