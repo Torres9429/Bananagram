@@ -1,6 +1,25 @@
 # Documentación funcional y técnica del frontend — Bananagram
 
-> Generado a partir de lectura directa del código fuente (sin suposiciones) tras completar las Fases 1–4 del rediseño del módulo de Analytics. Refleja el estado real del sistema, incluyendo comportamientos incompletos, mocks no conectados y hallazgos de inconsistencia. Documento vivo — no representa el backend, que aún no existe.
+> ⚠️ **SUPERADO — describe el frontend cuando corría 100% en modo mock (antes de julio-agosto 2026).**
+> Este documento afirma que "no hay backend" (§3.3, línea 105: "todos los formularios de `auth-front`
+> resuelven contra `MOCK_USERS` en memoria") y que `middleware.ts` es un passthrough total — ambas cosas ya
+> son falsas hoy: verificado en el código real, `LoginForm.tsx` (`apps/frontend/auth-front/src/components/`)
+> ya usa `useLoginMutation` (RTK Query) contra el backend real, con refresh automático de token y 2 cookies
+> de sesión reales — ya no queda rastro de `MOCK_USERS` en `auth-front`. `posts-front` también dejó de ser
+> mock: `store/api/posts.api.ts` documenta explícitamente "Fase N — primer slice real de posts-front (antes
+> 100% mock)" y `app/posts/approvals/page.tsx` usa `useApprovePostMutation`/`useRejectPostMutation` reales,
+> no botones sin `onClick` como describe §4.2/§17.3 de este documento. Esto se debe a ~10 commits de
+> conexión real (entre ellos `e6ad8b8` login real, `c22ab1d` posts-front conectado, `d7630a8` campañas
+> reales en brands-front, `d0edc53` catálogos reales en admin-front). Para el estado de conexión actual,
+> pocket por pocket, consulta `.claude/INVENTORY.md` §0. Este documento se conserva como registro histórico
+> de la arquitectura mock original — sigue siendo útil como inventario de pantallas/componentes/rutas, pero
+> no confíes en sus afirmaciones sobre qué está o no conectado al backend sin volver a verificar.
+>
+> Excepción: la observación sobre `Score Digital` (línea 839, "hoy es un valor estático mock; la fórmula y
+> su recálculo periódico deben vivir en backend") sigue siendo relevante — hoy el score sí se calcula en
+> backend (`core-service/src/score/score.service.ts`), pero con una fórmula de 4 factores
+> (Consistencia×0.30 + Engagement×0.40 + Cobertura×0.20 + Frecuencia×0.10), no los 3 documentados en otras
+> partes del proyecto — ver nota en `.claude/CLAUDE.md` sobre la fórmula del score antes de tocarla.
 
 ---
 

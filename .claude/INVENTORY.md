@@ -59,10 +59,12 @@ listado exhaustivo abajo para no tener que asumir nada.
     propio `schema.prisma` de `core-service` (sobre `BrandScore`) sigue describiendo 3 factores y dice que
     `coverage` es "informativa, no pondera" — **falso en el código actual**, que sí la pondera al 20%.
     Confirma con el usuario cuál es la vigente antes de tocar esto.
-- **`apps/backend/commons/`** — la migración a que cada servicio duplique localmente sus guards/decorators
-  ya terminó (confirmado: cero imports relativos a `commons/` desde ningún servicio). Queda como referencia
-  histórica; su copia de `JwtAuthGuard` sigue siendo la vieja versión passport-jwt (activamente engañosa si
-  se lee sin este contexto — ningún servicio real usa passport ya, ver §1.2).
+- **`apps/backend/commons/`** — **ya no está huérfano.** Hasta el 2026-08-15 la migración había sido "cada
+  servicio duplica localmente sus guards/decorators, `commons/` queda de referencia sin importadores" — el
+  `c867e24` (16-ago-2026) revirtió ese criterio: `commons/` se reconstruyó como paquete workspace real
+  (`@repo/backend-commons`) y los 3 servicios lo importan de verdad. Su `JwtAuthGuard` también se reescribió
+  en el proceso: ya no es la vieja versión passport-jwt, ahora verifica RS256 contra el JWKS remoto de
+  `auth-service` vía `jose`, igual que las copias locales que reemplaza. Detalle completo en §1.2.
 
 ### Frontend — la mayoría es real; mock queda en bolsillos específicos, no por zona completa
 
@@ -153,30 +155,56 @@ están en español, idénticos a los del backend, ver §2.1 y §3).
   nombres de servicio de la red de compose, pero **no** override-ea `ALEXA_SERVICE_URL` — dentro de un
   contenedor, `/api/ideas` probablemente falla al no poder resolver `localhost:3004`.
 
-### 1.2 `apps/backend/commons/` — migración terminada, queda como referencia histórica
+### 1.2 `apps/backend/commons/` — paquete workspace real desde el 2026-08-16 (`c867e24`)
 
-Confirmado por grep en todo el repo: **cero** imports relativos a este directorio desde `auth-service`,
-`core-service`, `alexa-service` o el gateway (todos duplican localmente lo que necesitan, `src/guards/`,
-`src/decorators/`, según el servicio). Contenido actual, todo huérfano salvo lo indicado:
+**Histórico (hasta 2026-08-15)**: había quedado huérfano — cero imports relativos desde `auth-service`,
+`core-service`, `alexa-service` o el gateway, todos duplicaban localmente lo que necesitaban
+(`src/guards/`, `src/decorators/`, según el servicio). El `c867e24` ("refactor(backend): revivir commons
+como paquete real @repo/backend-commons", 16-ago-2026) revirtió ese criterio: `commons/` se reconstruyó
+como paquete workspace compilado (`package.json`+`tsconfig.json`, barrel único `src/index.ts` — sin
+subpaths, la resolución de módulos clásica que usa `tsconfig.base.json` de backend no resuelve de forma
+confiable un `exports` map con subpaths). Confirmado por grep: los 3 servicios lo declaran como dependencia
+(`workspace:*`) y lo importan de verdad (`import { X } from '@repo/backend-commons'`) — 3 archivos en
+`alexa-service`, 5 en `auth-service`, 13 en `core-service`. Los 3 `Dockerfile` cambiaron su build de
+`pnpm --filter` a `turbo run build` para que `@repo/backend-commons` compile antes que el servicio que lo
+consume.
 
-- `guards/jwt-auth.guard.ts` — **sigue siendo la versión vieja con passport-jwt** (`extends AuthGuard('jwt')`)
-  — ningún servicio real usa ya passport (todos pasaron a `implements CanActivate` propio + RS256/JWKS vía
-  `jose`, ver §1.3/§1.4/§1.5). Leerlo fuera de este contexto es activamente engañoso.
-- `guards/permission.guard.ts` — lógica idéntica a las copias locales (no está desactualizado en contenido,
-  solo sin uso).
-- `interceptors/audit.interceptor.ts` — `// TODO: escribir en audit_log`, **sigue sin implementarse en
-  ningún lado del sistema**, no solo aquí — nadie construyó un reemplazo.
-- `interceptors/logging.interceptor.ts`, `filters/http-exception.filter.ts` — confirmados sin uso en
-  ninguna parte (ningún `main.ts` los registra globalmente).
-- `circuit-breaker/opossum.factory.ts` — la copia real y en uso vive en `core-service/src/circuit-breaker/`
-  (con un bug real corregido ahí que **no** se replicó aquí, ver §1.4). Esta versión de `commons/` sigue con
-  el `import` default roto (`opossum` es CJS puro).
-- `types/jwt-payload.type.ts`, `types/modules.enum.ts`, `types/actions.enum.ts` — contenido **al día**
-  (coinciden con lo que emite `auth-service`/usa el seed), solo sin importadores reales.
-- `types/post-status.enum.ts` — **desactualizado**, solo 6 valores; `core-service` tiene su propia copia
-  local con los 11 valores reales (ver §1.6).
-- `types/roles.enum.ts`, `decorators/current-user.decorator.ts`, `decorators/require-permission.decorator.ts`
-  — sin cambios, sin uso.
+Qué exporta `src/index.ts` y quién lo usa de verdad:
+
+- `guards/jwt-auth.guard.ts` — **reescrito al revivir el paquete: ya no es la versión passport-jwt**
+  (`extends AuthGuard('jwt')`). Ahora `implements CanActivate` y verifica RS256 contra el JWKS remoto de
+  `auth-service` vía `jose` (`createRemoteJWKSet` + `jwtVerify`), con chequeo de `jti` contra
+  `TokenDenylistService`. **Compartido entre `core-service` y `alexa-service`** (verificadores idénticos,
+  nunca firman). `auth-service` **mantiene su propia copia local** en
+  `src/guards/jwt-auth.guard.ts` (no importa esta) porque es el emisor del JWT, verificación genuinamente
+  distinta (firma con llave privada, no consulta JWKS por HTTP) — no se comparte a propósito, ver §1.3.
+- `guards/token-denylist.service.ts` — de solo lectura (consulta Redis), compartido por el mismo par
+  `core-service`/`alexa-service` que usa `JwtAuthGuard` de aquí.
+- `guards/permission.guard.ts` — **ahora sí se importa** en los 3 servicios (antes: "lógica idéntica a las
+  copias locales, solo sin uso" — las copias locales de `auth-service`/`core-service` se borraron en este
+  commit, ver §1.3/§1.4). Usado por ejemplo en `admin/users.controller.ts`/`admin/roles.controller.ts`
+  (`auth-service`) y `brands.controller.ts`/`campaigns.controller.ts` (`core-service`), entre otros.
+- `decorators/current-user.decorator.ts`, `decorators/require-permission.decorator.ts` — ídem, ahora
+  importados en los 3 servicios en vez de duplicados.
+- `filters/http-exception.filter.ts` — migrado, pero **sigue sin importadores reales**: ningún `main.ts` lo
+  registra como filtro global. Exportado, no usado — mismo estado funcional que antes de la migración,
+  solo que ahora vive en el paquete real en vez de en el directorio huérfano.
+- `interceptors/logging.interceptor.ts` — ídem: migrado a `src/`, **sigue sin uso** en ningún `main.ts`.
+- `interceptors/audit.interceptor.ts` — **no se migró**. El archivo original con el
+  `// TODO: escribir en audit_log` se quedó atrás en `apps/backend/commons/interceptors/audit.interceptor.ts`
+  (fuera de `src/`, no cubierto por el `tsconfig.json` del paquete, no exportado desde `index.ts`) —
+  literalmente huérfano ahora, ni siquiera compila como parte de `@repo/backend-commons`. El TODO en sí
+  sigue sin implementarse en ningún lado del sistema, no solo aquí.
+- `circuit-breaker/opossum.factory.ts` — migrado con el fix de import CommonJS que antes solo tenía la
+  copia local de `core-service` (`import CircuitBreaker = require('opossum')`, porque `opossum` es CJS
+  puro y `import ... from 'opossum'` compila con `tsc --noEmit` pero crashea en runtime). La copia local
+  de `core-service/src/circuit-breaker/` **se borró** en este commit — ya no existe, `AyrshareService`/
+  `NotificationsClient` importan `createCircuitBreaker` de aquí.
+- `types/jwt-payload.type.ts`, `types/modules.enum.ts`, `types/actions.enum.ts`, `types/roles.enum.ts` —
+  contenido al día, ahora con importadores reales además de servir de referencia de tipos.
+- `types/post-status.enum.ts` — **no se migró, se dio de baja** (ya no existe ni siquiera huérfano en el
+  paquete nuevo). `core-service` sigue siendo dueño único de `PostStatus` con sus 11 valores reales, en su
+  propia copia local (ver §1.6) — la vieja versión de 6 valores en `commons/` ya no existe en ningún lado.
 
 ### 1.3 `auth-service` (puerto 3001, paquete `@repo/auth-service`)
 
@@ -206,9 +234,11 @@ PEM). `TokenDenylistService`: Redis primero, Postgres (`RevokedAccessToken`) com
 (durable aunque Redis falle al escribir); en `isRevoked()` cae a Postgres si Redis falla (no falla abierto
 acá, a diferencia del gateway). `TokenModule` es `@Global()`.
 
-`JwtAuthGuard` (`implements CanActivate`, sin passport) + `PermissionGuard` — **`PermissionGuard` SÍ está en
-uso** (contradice versiones previas de este doc): en `admin/users.controller.ts` y
-`admin/roles.controller.ts`.
+`JwtAuthGuard` (`implements CanActivate`, sin passport) — **copia local propia** en
+`src/guards/jwt-auth.guard.ts`, no viene de `@repo/backend-commons` (auth-service es el emisor del JWT,
+verifica con su llave privada directo, no contra un JWKS remoto — ver §1.2). `PermissionGuard` sí viene de
+`@repo/backend-commons` desde el `c867e24` (antes era una copia local propia) — **SÍ está en uso**
+(contradice versiones previas de este doc): en `admin/users.controller.ts` y `admin/roles.controller.ts`.
 
 **`admin/` (módulo nuevo, no documentado antes)**
 
@@ -467,11 +497,14 @@ usado solo por `posts/`.
 **`char-limits/char-limits.map.ts`** — límites por red definidos, **cero importadores en todo el
 repo** (dead code, nunca se conectó a la validación de posts).
 
-**`circuit-breaker/opossum.factory.ts`** — copia local (distinta de la de `commons/`, que sigue con el bug).
-Bug real corregido ("Fase K"): `opossum` es CJS puro, `import CircuitBreaker from 'opossum'` compilaba con
-`tsc --noEmit` pero crasheaba en runtime bajo `nest start --watch` (`opossum_1.default is not a
-constructor`) — arreglado con `import CircuitBreaker = require('opossum')`. Usado por
-`AyrshareService` (3 call sites) y `NotificationsClient` (1 call site).
+**`circuit-breaker/opossum.factory.ts`** — **ya no es una copia local**: desde el `c867e24` (16-ago-2026)
+`core-service` importa `createCircuitBreaker` de `@repo/backend-commons`, la copia local en
+`core-service/src/circuit-breaker/` se borró. Bug real corregido acá primero ("Fase K"), y el que motivó
+llevarlo a `commons/` con el fix incluido: `opossum` es CJS puro, `import CircuitBreaker from 'opossum'`
+compilaba con `tsc --noEmit` pero crasheaba en runtime bajo `nest start --watch` (`opossum_1.default is not
+a constructor`) — arreglado con `import CircuitBreaker = require('opossum')`. Usado por
+`AyrshareService` (3 call sites) y `NotificationsClient` (1 call site). Ver §1.2 para el resto de lo que
+`core-service` ahora importa de `commons/` en vez de duplicar.
 
 **BD propia**: `gestor_redes_core`. Ver §1.6 para el listado completo de modelos.
 

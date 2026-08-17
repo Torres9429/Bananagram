@@ -119,6 +119,11 @@ solo conoce los 6 originales. Faltan: **`publicando`, `parcial`, `error`, `cance
   no existe en ninguna parte del frontend — es el estado _por red_, distinto del estado _del post_. Ver
   §9.3 sobre cuánto de esta dimensión nueva conviene exponer en la UI actual.
 
+> **Nota (2026-08-17)**: se agregó un 11vo valor, `rechazado_cliente` (Fase O — segundo tramo de
+> aprobación del Cliente: el Cliente rechaza y el CM decide el siguiente paso), en una fase posterior a
+> este documento — ver el union type real en `apps/frontend/commons/src/types/post.types.ts`. El resto de
+> esta sección (6 → 10 valores) sigue siendo un registro histórico válido del cambio original.
+
 ### 1.4 🟡 `coverage` en el Score es informativo — NO pondera. La UI de analytics-front lo trata como un 4º factor
 
 `modelo.txt` (líneas 474-475, 484): comentario explícito —

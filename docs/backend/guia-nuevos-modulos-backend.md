@@ -24,7 +24,12 @@ Cliente (Postman/frontend)
   ideas). No hace login — solo *valida* el JWT que `auth-service` ya emitió, con el mismo `JWT_SECRET`.
 - **`alexa-service`**: BFF de la Alexa Skill, sin BD propia, sin tocar en esta fase.
 - Cada servicio es **autocontenido**: su propio `schema.prisma`, su propia infraestructura JWT si la
-  necesita, nada se importa de `commons/` por convención nueva (ver `CLAUDE.md` → "commons").
+  necesita. **Actualizado 2026-08-16 (`c867e24`)**: el criterio de "nada se importa de `commons/`" se
+  revirtió — `commons/` volvió a ser un paquete workspace real (`@repo/backend-commons`) y el código
+  verdaderamente compartido (guards, decorators, filters, circuit breaker, enums) se importa de ahí en vez
+  de duplicarse por servicio. La única excepción sigue siendo código que es *genuinamente distinto* entre
+  servicios por su rol (ver §6: `auth-service` con su `JwtAuthGuard`, porque es el emisor del JWT, no un
+  verificador remoto). Ver `CLAUDE.md` → "commons" para el detalle completo de qué se comparte y qué no.
 
 ## 2. Estructura de un módulo (usa `catalogs/` como plantilla)
 
@@ -115,9 +120,12 @@ contradicción entre los documentos, esto queda como registro del porqué:
 
 - **Lanzar excepciones desde el service es el patrón idiomático de NestJS** (así lo hace la propia
   documentación oficial de Nest) — el controller queda de una línea (`return this.service.algo()`), y el
-  `HttpExceptionFilter` de `commons/filters/` ya formatea cualquier `HttpException` sin importar de dónde
-  se lance. La regla vieja solo tenía sentido si el controller iba a decidir *qué* excepción lanzar según
-  el resultado del service — pero eso es más código, no menos, para el mismo resultado.
+  exception filter por defecto de Nest ya formatea cualquier `HttpException` sin importar de dónde se
+  lance, sin que haga falta registrar nada extra. (`@repo/backend-commons` también exporta un
+  `HttpExceptionFilter` propio desde el `c867e24`, pero ningún `main.ts` lo registra todavía como filtro
+  global — no es lo que formatea las respuestas hoy, es el default de Nest.) La regla vieja solo tenía
+  sentido si el controller iba a decidir *qué* excepción lanzar según el resultado del service — pero eso
+  es más código, no menos, para el mismo resultado.
 - **Repository es opcional, no obligatorio.** `auth-service` tiene `AuthRepository` porque sus queries
   (refresh tokens, permisos agregados por rol) tienen suficiente complejidad para justificar la capa.
   Para CRUD simple como `catalogs` (o cualquier módulo que sea básicamente `findMany`/`create`/`update`
@@ -128,11 +136,20 @@ contradicción entre los documentos, esto queda como registro del porqué:
 
 ## 6. Autenticación (JWT)
 
-Ya existe en `core-service` (no hay que rehacerlo, solo reusarlo):
-- `src/guards/jwt-auth.guard.ts` — `JwtAuthGuard extends AuthGuard('jwt')`.
-- `src/strategies/jwt.strategy.ts` — valida contra `JWT_SECRET` (el mismo que usa `auth-service` para
-  firmar).
-- `src/auth/jwt-auth.module.ts` — módulo mínimo que registra la estrategia.
+**Actualizado 2026-08-16 (`c867e24`)**: esta sección describía un `JwtAuthGuard`/`jwt.strategy.ts` local de
+`core-service` basado en passport y `JWT_SECRET` compartido — ya no es así. El JWT es RS256/JWKS desde
+antes (ADR-0004, ver `CLAUDE.md`), y desde este commit `core-service` y `alexa-service` ya no duplican el
+guard localmente: lo importan de `@repo/backend-commons`, que **sí** es la forma correcta de compartirlo
+ahora (al revés de lo que decía la versión anterior de esta sección).
+
+Ya existe, no hay que rehacerlo, solo reusarlo:
+- `@repo/backend-commons` exporta `JwtAuthGuard` (`implements CanActivate`, verifica RS256 contra el JWKS
+  remoto de `auth-service` vía `jose`, sin passport) + `TokenDenylistService`. `core-service` y
+  `alexa-service` lo importan tal cual — no tienen su propia copia.
+- `src/auth/jwt-auth.module.ts` (local a cada servicio, sí) — módulo `@Global()` mínimo que provee
+  `TokenDenylistService` para que esté disponible en todo módulo que use el guard vía `@UseGuards`, no solo
+  los que importan este módulo explícitamente. Este archivo sigue siendo local porque su rol es de wiring
+  de DI del servicio, no lógica compartible.
 
 Para proteger un módulo nuevo:
 ```ts
@@ -146,14 +163,20 @@ export class TuModulo {}
 ```
 ```ts
 // tu.controller.ts
+import { JwtAuthGuard } from '@repo/backend-commons';
+
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('tu-recurso')
 export class TuController { ... }
 ```
 
-Si algún día un servicio **nuevo** (no `auth-service`/`core-service`) necesita validar JWT, copia estos 3
-archivos tal cual (mismo patrón autocontenido) — no los muevas a `commons/`, esa decisión ya se tomó.
+**Excepción real, no un patrón a copiar sin pensar**: `auth-service` mantiene su propia copia local
+(`src/guards/jwt-auth.guard.ts`), no importa la de `commons/`, porque es el *emisor* del JWT — verifica con
+su llave privada directo, no contra un JWKS remoto (verificación genuinamente distinta, no solo "el mismo
+código duplicado"). Si algún día un servicio **nuevo** necesita validar JWT como verificador remoto
+(el caso común), importa `JwtAuthGuard` de `@repo/backend-commons` como `core-service`/`alexa-service` —
+solo copia el patrón de `auth-service` si ese servicio nuevo también va a *emitir* tokens.
 
 ## 7. Autorización por marca (`BrandAccessGuard`) — y por qué no siempre aplica
 
@@ -189,14 +212,20 @@ sin guard genérico: dueño de la marca del recurso, o CM/rol asignado, o Admini
 
 ## 7bis. `PermissionGuard` — ya no es una decisión abierta
 
-**Actualizado 2026-07-27**: se adoptó. Se **duplicó localmente en cada servicio** (mismo criterio que
-`JwtAuthGuard`/`CurrentUser`, ver §6) en vez de importarse de `commons/guards/permission.guard.ts` —
-`core-service/src/guards/permission.guard.ts`, `auth-service/src/guards/permission.guard.ts`, cada uno
-con su propio `decorators/require-permission.decorator.ts`. El de `commons/` queda como referencia/
-histórico, no se borra, pero ya no es lo que se usa en runtime.
+**Actualizado 2026-07-27, revertido 2026-08-16 (`c867e24`)**: se adoptó primero duplicándose localmente en
+cada servicio (mismo criterio que `JwtAuthGuard`/`CurrentUser` de §6 en su momento) —
+`core-service/src/guards/permission.guard.ts`, `auth-service/src/guards/permission.guard.ts`, cada uno con
+su propio `decorators/require-permission.decorator.ts`. **Ese criterio ya no aplica**: al revivir
+`commons/` como paquete real, `PermissionGuard`/`RequirePermission` se movieron ahí de verdad y las copias
+locales se borraron — los 3 servicios (incluido `alexa-service`, que también lo usa) importan
+`PermissionGuard`/`RequirePermission` de `@repo/backend-commons`. A diferencia de `JwtAuthGuard`,
+`PermissionGuard` no tiene una razón de rol para ser distinto entre servicios (todos leen
+`user.permissions[module]` del mismo payload de JWT), por eso sí se comparte sin excepción.
 
 Patrón para un endpoint nuevo:
 ```ts
+import { JwtAuthGuard, PermissionGuard, RequirePermission } from '@repo/backend-commons';
+
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('tu-recurso')
 export class TuController {

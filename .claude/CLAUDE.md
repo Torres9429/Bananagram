@@ -16,10 +16,11 @@ Stack: Next.js (MFE host, Multi-Zones) + NestJS (microservicios) + PostgreSQL + 
 ## Privilegios dinámicos
 - Decorator: `@RequirePermission('módulo', 'acción')` en controllers de NestJS
 - Guard: `PermissionGuard` lee `user.permissions[module]` del JWT — **desde 2026-07-27 ya está conectado**
-  (antes existía en `commons/guards/permission.guard.ts` sin usarse en ningún endpoint). Cada servicio
-  tiene su propia copia local (`auth-service/src/guards/permission.guard.ts`,
-  `core-service/src/guards/permission.guard.ts`, mismo criterio que `JwtAuthGuard`/`CurrentUser`) — el de
-  `commons/` queda como referencia, no es lo que corre en runtime.
+  (antes existía en `commons/guards/permission.guard.ts` sin usarse en ningún endpoint). **Desde
+  2026-08-16 (`c867e24`) sí es lo que corre en runtime**: `commons/` volvió a ser un paquete workspace real
+  (`@repo/backend-commons`) y los 3 servicios (`auth-service`, `core-service`, `alexa-service`) importan
+  `PermissionGuard`/`RequirePermission` de ahí en vez de duplicarlo localmente — detalle completo en la
+  sección `commons/` bajo Arquitectura → Backend, más abajo.
 - Módulos del catálogo (`commons/types/modules.enum.ts` + `packages/seed/src/index.js`): `marcas`,
   `publicaciones`, `calendario`, `campanas`, `metricas`, `score`, `reportes`, `usuarios`, `privilegios`,
   y `catalogos` (agregado 2026-07-27 — los 3 catálogos no encajaban en ninguno existente).
@@ -186,13 +187,13 @@ pnpm lint                      # turbo run lint
 `apps/backend/`
 - `gateway/` — único punto de entrada HTTP externo (puerto 4000). Usa `http-proxy-middleware` para enrutar a cada servicio; también aplica `CorrelationIdMiddleware` (propaga `X-Request-ID`) a todas las rutas.
 - `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill. **Ideas de contenido (`ContentIdea`) se mudó entera a `alexa-service`** (antes vivía en `core-service`) — `alexa-service` no tiene una base de datos propia que migre, pero **sí tiene su propio `prisma/schema.prisma`** (solo el modelo `ContentIdea`) con acceso directo de lectura/escritura a la misma base física de `core-service` (`gestor_redes_core`), nunca corre `prisma migrate` desde ahí (core-service sigue siendo el dueño de esa migración). Para todo lo demás (campañas, marcas, métricas, score, account-linking) `alexa-service` sí es un BFF puro por HTTP contra `core-service`/`auth-service`. `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **desde 2026-07-23 cada uno con su propio `prisma/schema.prisma` y su propia base de datos** (`gestor_redes_auth`/`gestor_redes_core`, ver `docs/base/modelo2.txt`) — ya no hay schema ni BD compartida entre ellos. Cada uno genera su Prisma Client con `output` propio (`node_modules/.prisma-client`, ver comentario en su `schema.prisma`) para evitar que pnpm resuelva ambos al mismo folder por compartir versión de `@prisma/client`.
-- `commons/` — código compartido importado por **path relativo** (no es un workspace package con alias corto), p.ej. `../../../../../commons/types/post-status.enum`. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases; `auth-service`/`core-service`/`alexa-service` además ya duplican localmente en su propio `src/` sus copias de `JwtAuthGuard`/`CurrentUser`/`PostStatus`/`PermissionGuard`/`RequirePermission` en vez de importarlas de aquí — decisión tomada para que cada servicio sea desplegable solo, ver `feat/catalogos-base`; `PermissionGuard` se sumó a esta lista 2026-07-27):
-  - `guards/` — `JwtAuthGuard`, `PermissionGuard` (quedan como referencia/histórico — cada servicio corre su propia copia local, ver arriba; `BrandAccessGuard` ya no vive aquí — se movió a `core-service/src/guards/`, ver nota de `brandIds` arriba)
-  - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)`
-  - `interceptors/` — `AuditInterceptor` (escribe en `audit_log`), `LoggingInterceptor`
-  - `filters/` — `HttpExceptionFilter`
-  - `circuit-breaker/` — factory de `opossum` para llamadas REST entre servicios (ADR-0003, sin mensajería async)
-  - `types/` — enums compartidos (`PostStatus`, `Roles`, `Modules`, `Actions`) y `JwtPayload`
+- `commons/` — **desde el 2026-08-16 (`c867e24`), de nuevo un paquete workspace real** (`@repo/backend-commons`, `package.json`+`tsconfig.json`+`dist/`, un único barrel `src/index.ts` sin subpaths — la resolución clásica de módulos que usa `tsconfig.base.json` de backend no resuelve de forma confiable un `exports` map con subpaths). Antes de esa fecha había quedado huérfano (nada lo importaba; ver histórico más abajo) — hoy `auth-service`, `core-service` y `alexa-service` lo declaran como dependencia y lo importan de verdad (`import { X } from '@repo/backend-commons'`), ya no por path relativo. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases, 2026-07-23):
+  - `guards/` — `JwtAuthGuard` (reescrito al revivir el paquete: ya **no** usa passport-jwt, verifica RS256 contra el JWKS remoto de `auth-service` vía `jose`) + `TokenDenylistService`, compartidos entre `core-service` y `alexa-service` (verificadores idénticos, sin firmar nunca); `auth-service` mantiene su propia copia local (`src/guards/jwt-auth.guard.ts`) porque es el emisor del JWT, no un verificador remoto — esa no se comparte. `PermissionGuard` sí se comparte entre los 3 servicios (antes se duplicaba localmente en cada uno, criterio abandonado con este commit). `BrandAccessGuard` sigue sin vivir aquí — sigue en `core-service/src/guards/`, ver nota de `brandIds` arriba.
+  - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)` — compartidos entre los 3 servicios
+  - `interceptors/` — `LoggingInterceptor` (exportado, pero sin importadores reales todavía — ningún `main.ts` lo registra global). `AuditInterceptor` (el TODO histórico de escribir en `audit_log`) **no** se migró al revivir el paquete — ese TODO sigue sin implementarse en ninguna parte del sistema.
+  - `filters/` — `HttpExceptionFilter` (exportado, mismo caso que `LoggingInterceptor`: sin registrar globalmente todavía)
+  - `circuit-breaker/` — factory de `opossum` para llamadas REST entre servicios (ADR-0003, sin mensajería async); esta versión ya trae el fix de import CommonJS (`import CircuitBreaker = require('opossum')`, `opossum` es CJS puro) que antes solo tenía la copia local de `core-service` — usado por `AyrshareService`/`NotificationsClient`
+  - `types/` — enums compartidos (`Roles`, `Modules`, `Actions`) y `JwtPayload`. `PostStatus` **no** se migró — `core-service` mantiene su propia copia local con los 11 valores reales (la vieja versión de `commons/` solo tenía 6, desactualizada)
 
 Convenciones (`.agents/backend.md`, `agents/conventions.md`):
 - Un módulo por dominio dentro de cada microservicio; controllers solo coordinan (request → service → response), la lógica vive en services, Prisma se accede vía repositories.
@@ -215,7 +216,7 @@ Convenciones (`.agents/backend.md`, `agents/conventions.md`):
 `apps/frontend/`
 - `web-shell/` — host: maneja sesión, sidebar/menú dinámico (construido desde `GET /me/permissions`), y **enrutamiento vía `rewrites()`** en `next.config.ts` que delega rutas a cada microfrontend por proxy HTTP (no iframes, no federation). P.ej. `/posts/*` → `postsFront`, `/brands/*` → `brandsFront`, `/users` → `adminFront`, `/login` → `authFront`, `/metrics` → `analyticsFront`.
 - `{admin,analytics,auth,brands,posts}-front/` — zonas independientes, cada una un app Next.js standalone con su propio puerto; **no importan código entre sí**, solo consumen `@repo/ui` (paquete workspace en `apps/frontend/commons`).
-- `commons/` (paquete `@repo/ui`, workspace real con subpath exports) — a diferencia de `commons` del backend, este SÍ se importa como paquete: `@repo/ui`, `@repo/ui/ui`, `@repo/ui/theme`, `@repo/ui/state`, `@repo/ui/types`, `@repo/ui/config`, `@repo/ui/utils`.
+- `commons/` (paquete `@repo/ui`, workspace real con subpath exports reales: `@repo/ui`, `@repo/ui/ui`, `@repo/ui/theme`, `@repo/ui/state`, `@repo/ui/types`, `@repo/ui/config`, `@repo/ui/utils`) — a diferencia de `commons/` del backend, que expone un único barrel sin subpaths (ver arriba), este sí los usa.
   - `config/zone-urls.ts` — única fuente de verdad de `API_BASE_URL` y las URLs de cada zona (`ZONE_URLS`); no repetir estos fallbacks en cada app.
   - `hooks/usePermissions.ts`, `useSession.ts`, `useSessionBootstrap.ts`, `useNotifications.ts`
   - `state/auth.slice.ts` — Redux slice de sesión/permisos, consumido vía `react-redux`

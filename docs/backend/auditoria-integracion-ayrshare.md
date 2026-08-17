@@ -6,17 +6,27 @@
 > explícitamente *"complejidad operativa fuera del alcance del hackathon"* — este documento respeta esa
 > restricción y evita recomendar infraestructura que el proyecto no necesita todavía (colas, vistas
 > materializadas, cifrado a nivel de vault, etc.), señalándolo explícitamente donde aplica.
+>
+> **Actualizado parcialmente el 2026-08-17**: casi todo lo que esta auditoría recomendaba como bloqueante
+> (cron sin registrar, `PostSchedulerService` ignorando la máquina de estados, `brands/` inexistente,
+> media sin módulo, gateway proxeando solo 3 prefijos, `PermissionGuard` sin uso, tests placeholder) ya se
+> implementó — verificado leyendo el código real de `apps/backend/services/core-service` en esa fecha, no
+> solo este documento. Marcado inline abajo con "✅ RESUELTO". El pipeline real de Ayrshare (publish +
+> métricas) ya se verificó en vivo, publicando de verdad en Instagram — ver
+> `docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md`, sección "Fase P1", para el detalle de
+> los 5 bugs reales encontrados y arreglados en ese trabajo. No se reescribió el documento completo a
+> propósito: sigue teniendo valor como registro del análisis que llevó a esa implementación.
 
 ## Veredicto ejecutivo
 
 | Pregunta | Respuesta corta |
 |---|---|
 | ¿El modelo de datos soporta multi-red? | **Sí, ya está bien diseñado** — `PostSocialAccount` ya es la entidad intermedia Post↔Red que la integración necesita. No hay que inventarla. |
-| ¿El código runtime respeta ese diseño? | **No.** `PostSchedulerService` (cron, cada minuto) publica marcando `Post.status = publicado` directo, sin tocar `PostSocialAccount`, sin llamar a ninguna red. El schema está listo; el código que lo usa, no. |
-| ¿Los crons de métricas/publicación corren hoy? | **No corren en absoluto.** Ni `MetricsCronService` ni `PostSchedulerService` están registrados en ningún `@Module` — no hay `ScheduleModule.forRoot()` en `app.module.ts` de `core-service`. Son código muerto, no simulación activa. |
-| ¿Falta algún módulo bloqueante? | **`brands`** — no existe ni como carpeta. Es prerequisito duro para todo lo demás (ya lo habíamos identificado en conversación previa). |
+| ¿El código runtime respeta ese diseño? | **No.** `PostSchedulerService` (cron, cada minuto) publica marcando `Post.status = publicado` directo, sin tocar `PostSocialAccount`, sin llamar a ninguna red. El schema está listo; el código que lo usa, no. **✅ RESUELTO (verificado 2026-08-17)** — ver §4/§10. |
+| ¿Los crons de métricas/publicación corren hoy? | **No corren en absoluto.** Ni `MetricsCronService` ni `PostSchedulerService` están registrados en ningún `@Module` — no hay `ScheduleModule.forRoot()` en `app.module.ts` de `core-service`. Son código muerto, no simulación activa. **✅ RESUELTO (verificado 2026-08-17)** — ver §10. |
+| ¿Falta algún módulo bloqueante? | **`brands`** — no existe ni como carpeta. Es prerequisito duro para todo lo demás (ya lo habíamos identificado en conversación previa). **✅ RESUELTO (verificado 2026-08-17)** — `core-service/src/brands/` con CRUD completo e integración Ayrshare real (`connectUrl`, `profileKey`), ver `bananagram-backend.postman_collection.json`. |
 | ¿Hace falta una tabla nueva grande (snapshots, colas, etc.)? | **No todavía.** Con el volumen esperado de un hackathon/MVP, agregación dinámica desde `PostMetric` alcanza. Se detalla cuándo sí valdría la pena. |
-| ¿Qué es obligatorio antes de tocar Ayrshare? | `brands` real + `posts` real (controller/service sobre la máquina de estados ya escrita) + registrar los cron en un módulo real. Sin esto, no hay dónde enganchar la llamada a Ayrshare. |
+| ¿Qué es obligatorio antes de tocar Ayrshare? | `brands` real + `posts` real (controller/service sobre la máquina de estados ya escrita) + registrar los cron en un módulo real. Sin esto, no hay dónde enganchar la llamada a Ayrshare. **✅ RESUELTO (verificado 2026-08-17)** — los 3 prerequisitos ya existen. |
 
 ---
 
@@ -196,6 +206,17 @@ existe justo para el caso "2 de 3 redes publicaron bien").
 Esto se calcula, no se persiste como fuente de verdad aparte — es una función pura sobre
 `post.socialAccounts.map(sa => sa.status)`, ejecutada cada vez que se actualiza un `PostSocialAccount`.
 
+**✅ RESUELTO (verificado 2026-08-17).** `PostSchedulerService` se reescribió por completo
+(`scheduler/post-scheduler.service.ts`) siguiendo exactamente los 5 pasos de arriba: transiciona a
+`publicando` vía `validateTransition` (`transitionTo`), llama al provider una sola vez para todas las
+redes, hace `upsert` de `PostSocialAccount` por resultado, y calcula el estado agregado con
+`post-aggregate-status.util.ts::computeAggregateStatus` — la función pura descrita arriba, ya
+implementada. Ya no es un cron con sondeo cada minuto: cada post arma su propio `setTimeout` vía
+`SchedulerRegistry` al programarse, con `onModuleInit()` re-armando los timers al arrancar (cubre
+reinicios). También arregla un caso no contemplado en esta auditoría: si `provider.publish()` lanza
+después de transicionar a `publicando`, el post ya no queda trabado ahí para siempre
+(`markStuckPublishingAsError`).
+
 ---
 
 ## 5. Cliente HTTP y comunicación con Ayrshare
@@ -356,6 +377,20 @@ multi-red — no por estar mal escrita, sino porque fue diseñada cuando todo er
 `baseEngagementRate` por red y nunca se topó con `reach = null`. Hay que tocarla antes de conectar
 Ayrshare, no después.
 
+**✅ RESUELTO (verificado 2026-08-17)** — todas las políticas propuestas en esta sección ya están
+implementadas, no solo parcialmente:
+- `core-service/src/integrations/ayrshare/engagement.util.ts` calcula `engagementBase` como `'reach'` si
+  `reach !== null`, si no `'views'` si existe, si no `null` — y devuelve `engagement: null` (nunca `0`)
+  cuando no hay ningún denominador disponible, exactamente la política pedida.
+- `score.service.ts::calculate()` ya no promedia todas las capturas históricas de todas las redes juntas:
+  `getLatestEngagement()` usa `SELECT DISTINCT ON` para tomar solo la última captura por
+  `PostSocialAccount` (resuelve también el hallazgo de §9), excluye explícitamente los `null` del promedio
+  (`withEngagement.filter(...)`, nunca los trata como 0), y el engagement ya viene calculado por red desde
+  `PostMetric` — nunca se suman numeradores de redes con denominador distinto antes de dividir.
+- `PostMetric.engagementBase`/`raw`/`source` (propuestos en §2) también existen: los mappers por red
+  (`integrations/ayrshare/mappers/{instagram,facebook,tiktok,x}.mapper.ts`) devuelven el shape normalizado
+  descrito en §7.
+
 ---
 
 ## 9. Históricos y capturas de métricas
@@ -399,6 +434,14 @@ ejecutan hoy**, ni en dev ni en producción — no es que estén simulando datos
 completamente inertes. Todo lo que se ha hablado en esta conversación sobre "el cron que simula métricas
 cada 6 horas" describe código que existe pero no corre.
 
+**✅ RESUELTO (verificado 2026-08-17).** `app.module.ts` de `core-service` ya importa `ScheduleModule.forRoot()`
+(comentario en el propio archivo: necesario para `MetricsCronService`/`AccountMetricsCronService` con
+`@Cron`, y para `SchedulerRegistry` que usa `PostSchedulerService`) más un `CronModule` propio
+(`cron/cron.module.ts`) que registra `MetricsCronService` y `AccountMetricsCronService`.
+`PostSchedulerService` ya no usa `@Cron` en absoluto — se reescribió por evento (ver §4), así que la
+pregunta de "¿corre el cron de publicación?" cambió de raíz: no hay cron de publicación que registrar,
+hay timers por post.
+
 **Qué hacer con `decay-simulator.ts`**: no eliminar — aislarlo detrás de un flag/estrategia (ver §19,
 `MockSocialProvider` vs `AyrshareProvider`) para seguir generando datos de demo sin gastar el trial de
 Ayrshare. Debe dejar de ser lo único que exista, pero sigue siendo útil.
@@ -426,13 +469,18 @@ dos aplica hoy.
 **Qué sí falta, concreto**:
 1. Registrar `MetricsCronService` y `PostSchedulerService` en un módulo real (`CronModule` o
    directo en `AppModule`) — sin esto nada de lo demás importa.
+   **✅ RESUELTO (verificado 2026-08-17)** — `CronModule` importado en `app.module.ts`; `PostSchedulerService`
+   ya no es un cron (ver arriba), vive en `SchedulerModule`, también importado.
 2. Agregar `ScheduleModule.forRoot()` en `AppModule`.
+   **✅ RESUELTO (verificado 2026-08-17)** — presente en `core-service/src/app.module.ts`.
 3. Reintentar solo los `PostSocialAccount`/`SocialAccount` que fallaron en la corrida anterior, no
    reprocesar todo — usar `retryCount`/`lastSyncedAt` (§2) como filtro.
 4. Registrar cada corrida en `MetricSyncRun` (§2/§9).
 5. Un fallo en un item **no debe** detener el `for` completo — ya está bien encapsulado hoy porque el
    loop no tiene `try/catch` individual (`metrics-cron.service.ts:19-26`): si un item truena, tira todo el
    resto del batch. Hay que envolver cada iteración en su propio `try/catch` y seguir con el resto.
+   Puntos 3-4-5: sin confirmar como resueltos al 2026-08-17 — no se auditó `metrics-cron.service.ts` línea
+   por línea en esta ronda, requiere revisión propia si se retoma este trabajo.
 
 ---
 
@@ -476,6 +524,13 @@ publicar una imagen/video, primero tiene que existir el módulo de `media` compl
 almacenamiento, generación de URL pública) — **esto es otro prerequisito no mencionado hasta ahora en la
 conversación**, del mismo tipo que `brands`.
 
+**✅ RESUELTO (verificado 2026-08-17).** `core-service/src/cloudinary/` (`cloudinary.module.ts`,
+`cloudinary.service.ts`) sube archivos reales, y `posts.controller.ts` expone `POST posts/:id/media`
+(`FilesInterceptor`, hasta 20 archivos, `memoryStorage()`) y `DELETE posts/:id/media/:mediaId`. El
+scheduler (`post-scheduler.service.ts`) ya toma `post.media.map(pm => pm.media.url)` y se los pasa al
+provider al publicar — el flujo completo (subir → adjuntar a un post → publicar con Ayrshare) está
+conectado de punta a punta, no solo el módulo de subida en aislado.
+
 **Punto crítico para Ayrshare específicamente**: Ayrshare requiere URLs **públicamente accesibles** (no
 requieren auth) para poder descargar el media y publicarlo — si el almacenamiento elegido más adelante usa
 URLs firmadas con expiración corta (común en S3/Cloudinary por seguridad), hay que asegurar que la URL
@@ -517,6 +572,14 @@ funcionaría hoy sin cambios** si se aplicara a algún controller. El problema n
 faltante, es que **nadie lo usa todavía** — ni un solo controller en el proyecto tiene
 `@UseGuards(PermissionGuard)` ni `@RequirePermission(...)`.
 
+**✅ RESUELTO (verificado 2026-08-17).** `PermissionGuard`/`@RequirePermission` ya se usan en todos los
+controllers protegidos de `core-service` (`brands`, `posts`, `campaigns`, `catalogs` ×3, `reports`,
+`score`, `cm-team`, `social-accounts`) y de `auth-service` (`admin/users`, `admin/roles`) y `alexa-service`
+(`campaigns`, `ideas`) — dejó de vivir solo en `commons/` sin consumidor: cada servicio corre su propia
+copia local (`{auth,core}-service/src/guards/permission.guard.ts`), mismo criterio que `JwtAuthGuard`. Se
+agregó el módulo `catalogos` al enum de módulos (no existía cuando se escribió esta auditoría) porque los
+3 catálogos no encajaban en ninguno de los existentes.
+
 **Módulos/acciones de RBAC existentes** (`commons/types/modules.enum.ts` y `actions.enum.ts`):
 - Módulos: `marcas, publicaciones, calendario, campanas, metricas, score, reportes, usuarios,
   privilegios`.
@@ -538,6 +601,15 @@ decisión de producto:
 todavía** (confirmado en `CLAUDE.md` y por búsqueda directa). Debe aplicarse en el controller de `posts`
 y `brands` en cuanto existan, junto con `JwtAuthGuard` y `PermissionGuard`.
 
+**✅ RESUELTO en `brands` (verificado 2026-08-17)** — `BrandAccessGuard` aplicado en `brands/:id`
+(`GET`/`PATCH`/`DELETE`). **Parcial en `posts`**: `posts.controller.ts` sí valida pertenencia, pero no vía
+`BrandAccessGuard` directo (mismo motivo que ya bloqueaba a `campaigns` en `.claude/CLAUDE.md`: el `:id`
+de la ruta de posts no es un `brandId`) — la pertenencia se resuelve a mano dentro de `PostsService`,
+mismo patrón que `CampaignsService.assertCanManage`. `Score` (`score.controller.ts`) usa un criterio
+propio y más estricto (`assertIsBrandOwnerOrAdmin`) en vez de `BrandAccessGuard`, a propósito (ver
+comentario en ese archivo: `BrandAccessGuard` también deja pasar a CM/Diseñador, y el score de marca debe
+ser exclusivo del dueño/Administrador).
+
 **Riesgo de SSRF**: si en algún punto el sistema acepta una URL de imagen/video del usuario y el backend
 la descarga/procesa (en vez de solo reenviar la URL a Ayrshare), hay que validar que no apunte a
 `localhost`/IPs internas/metadata de la nube. Si el flujo es "el usuario sube el archivo, nosotros lo
@@ -556,6 +628,16 @@ la UI.
 Gateway actual (`gateway/src/main.ts`) solo proxea 3 prefijos: `/api/auth`, `/api/me`, `/api/catalogs`.
 Ninguno de `brands`/`campaigns`/`posts`/`metrics`/`reports` está expuesto todavía — coherente con que
 ninguno de esos módulos tiene controller real.
+
+**✅ RESUELTO (verificado 2026-08-17).** `gateway/src/main.ts` ya proxea 10 prefijos, uno por línea con
+`pathFilter` (el mismo patrón sugerido abajo, sin tocar nada más del gateway): `/api/auth`, `/api/me`,
+`/api/admin` → `AUTH_SERVICE_URL`; `/api/catalogs`, `/api/brands`, `/api/campaigns`, `/api/cm-team`,
+`/api/posts`, `/api/reports` → `CORE_SERVICE_URL`; `/api/ideas` → `ALEXA_SERVICE_URL` (no `CORE_SERVICE_URL`
+— el dominio de ideas se mudó entero a `alexa-service`, ver `.claude/CLAUDE.md`). `/metrics` vive dentro
+de `/api/campaigns/:id/metrics[-history]` y `/api/brands/:id/score[-history]`, no como prefijo propio —
+coherente con que ya tienen controller real (ver §8/hallazgos de este documento marcados arriba). Sin
+confirmar en vivo: el override de `docker-compose.yml` para `api-gateway` no incluye `ALEXA_SERVICE_URL`,
+así que `/api/ideas` probablemente no resuelve dentro del perfil `full` containerizado.
 
 **Al construirlos, agregar una línea de proxy por prefijo** (patrón ya establecido, una línea, sin tocar
 nada más del gateway):
@@ -576,6 +658,12 @@ usa, confirmado: los controllers de esos 3 módulos están vacíos, `@Controller
 CampaignsController {}` sin un solo método). Cuando se escriban los DTOs reales de `posts`, deben soportar
 desde el día 1: selección de redes (`socialAccountIds: string[]`), contenido opcionalmente distinto por
 red (si se decide en §3), y fecha de programación con `timezone` explícito (§13).
+
+**✅ RESUELTO (verificado 2026-08-17)** — `posts/dto/` ya tiene `create-post.dto.ts`, `update-post.dto.ts`,
+`schedule-post.dto.ts`, `reject-post.dto.ts`, `forward-to-designer.dto.ts`, todos conectados a
+`posts.controller.ts` (ya no huérfanos). No se verificó campo por campo si soportan contenido distinto por
+red o `timezone` explícito (§13) — la propuesta de `Post.content` único vs. override por
+`PostSocialAccount` seguía marcada como "decisión de producto pendiente" en §3, sin confirmar si se tomó.
 
 ---
 
@@ -638,6 +726,16 @@ real ejecutándose hoy en el proyecto, ni de `auth` (que sí está terminado) ni
 relevante porque cualquier plan de pruebas para Ayrshare empieza literalmente desde cero, sin un ejemplo
 real existente que copiar dentro del repo — solo el helper (`auth.helper.ts`, si genera JWTs de prueba
 correctamente, y `db.helper.ts`, que sí limpia tablas reales de ambas bases) están listos para usarse.
+
+**✅ RESUELTO para `apps/backend/test/` (verificado 2026-08-17), ⚠️ sigue sin resolver para `apps/e2e/`.**
+`apps/backend/test/` ya es un paquete real (`@repo/backend-integration-tests`, `jest`+`ts-jest`, agregado
+2026-07-27 — antes no tenía ni `package.json`) con 6 specs con aserciones reales contra Postgres:
+`auth.integration.spec.ts`, `posts-flow.spec.ts`, `post-aggregate-status.spec.ts`,
+`campaigns-flow.spec.ts`, `campaign-metrics-flow.spec.ts`, `link-code-flow.spec.ts` — ninguno usa ya el
+patrón `expect(true).toBe(true)` (confirmado por búsqueda, 0 resultados en `apps/backend`). Se corren con
+`pnpm --filter @repo/backend-integration-tests test` (necesita `docker compose up -d postgres`).
+`apps/e2e/src/full-flow.e2e.spec.ts` **sigue siendo placeholder** — 1 solo `it(...)`, con
+`TODO`/`expect(true)` — no se tocó.
 
 **Propuesta de pruebas por capa**:
 | Tipo | Qué cubre | Con mocks o real |
@@ -705,20 +803,25 @@ alguien debe confirmarlo directo con soporte de Ayrshare o la doc de su cuenta y
 
 Lista concreta de lo detectado en esta auditoría (no especulativo, todo verificado leyendo el archivo):
 
-| Hallazgo | Archivo | Severidad |
-|---|---|---|
-| `MetricsCronService` y `PostSchedulerService` no están registrados en ningún módulo — nunca corren | `core-service/src/app.module.ts` | **Alta** — hay que arreglarlo para que cualquier cosa de métricas/publicación funcione, con o sin Ayrshare |
-| `PostSchedulerService.publishScheduledPosts()` ignora la máquina de estados y el modelo multi-red — solo cambia `Post.status` | `core-service/src/scheduler/post-scheduler.service.ts:10-22` | **Alta** — hay que reescribirlo, no parchearlo |
-| `campaigns`, `reports`, `ideas` son controllers/services literalmente vacíos (sin un solo método) | `core-service/src/{campaigns,reports,ideas}/*.controller.ts` | Media — ya sabido, confirmado con lectura directa |
-| `posts` no tiene controller/service/module — solo la máquina de estados | `core-service/src/posts/` | **Alta** — bloqueante para publicar nada real |
-| `brands` no existe ni como carpeta | `core-service/src/` | **Alta** — ya identificado en conversación previa, confirmado de nuevo |
-| `media` no tiene ningún módulo/servicio (solo modelo Prisma) | `core-service/src/` (carpeta inexistente) | Media — bloqueante para publicar contenido con imagen/video, no mencionado antes en esta conversación |
-| `PermissionGuard` y `BrandAccessGuard` existen y funcionan pero no están aplicados en ningún controller | `commons/guards/permission.guard.ts`, `core-service/src/guards/brand-access.guard.ts` | Media |
-| Todos los tests existentes son placeholders (`expect(true).toBe(true)`) | `apps/backend/test/*.spec.ts`, `apps/e2e/src/*.e2e.spec.ts` | Media |
-| El seed (`packages/seed/src/index.js`) solo carga RBAC + usuarios + `UserProfile` — no hay `Brand`/`SocialAccount`/`Campaign`/`Post` de prueba | `packages/seed/src/index.js` | Baja-media — hace falta ampliarlo para poder probar el flujo completo sin crear todo a mano |
-| `score.service.ts` promedia `engagement` de todas las redes sin normalizar el denominador | `core-service/src/score/score.service.ts:26-32` | Alta (una vez con datos reales) |
-| Gateway solo proxea `auth`, `me`, `catalogs` | `gateway/src/main.ts` | Esperado, no es un bug — falta agregar rutas conforme se construyan módulos |
-| DTOs de `campaigns`/`reports`/`ideas` existen como archivos pero están huérfanos (ningún controller los usa) | `core-service/src/{campaigns,reports,ideas}/dto/*.ts` | Baja — confirma que son stubs de andamiaje, no trabajo a medio hacer perdido |
+> **Nota 2026-08-17**: columna `Estado` agregada — la mayoría de estos hallazgos ya se resolvieron (ver el
+> detalle con archivo/línea real en las secciones §4/§10/§12/§14/§15/§18 arriba, marcadas ✅ RESUELTO). Se
+> deja la tabla original sin reescribir sus columnas de "Hallazgo"/"Severidad" — siguen describiendo el
+> estado de cuando se escribió esta auditoría.
+
+| Hallazgo | Archivo | Severidad | Estado 2026-08-17 |
+|---|---|---|---|
+| `MetricsCronService` y `PostSchedulerService` no están registrados en ningún módulo — nunca corren | `core-service/src/app.module.ts` | **Alta** — hay que arreglarlo para que cualquier cosa de métricas/publicación funcione, con o sin Ayrshare | ✅ RESUELTO — §10 |
+| `PostSchedulerService.publishScheduledPosts()` ignora la máquina de estados y el modelo multi-red — solo cambia `Post.status` | `core-service/src/scheduler/post-scheduler.service.ts:10-22` | **Alta** — hay que reescribirlo, no parchearlo | ✅ RESUELTO — §4 |
+| `campaigns`, `reports`, `ideas` son controllers/services literalmente vacíos (sin un solo método) | `core-service/src/{campaigns,reports,ideas}/*.controller.ts` | Media — ya sabido, confirmado con lectura directa | ✅ RESUELTO (ya desde 2026-07-27, ver `01-estado-actual-y-analisis-catalogos-base.md` §0) |
+| `posts` no tiene controller/service/module — solo la máquina de estados | `core-service/src/posts/` | **Alta** — bloqueante para publicar nada real | ✅ RESUELTO — 14 endpoints reales, ver `posts.controller.ts` |
+| `brands` no existe ni como carpeta | `core-service/src/` | **Alta** — ya identificado en conversación previa, confirmado de nuevo | ✅ RESUELTO — ver veredicto ejecutivo arriba |
+| `media` no tiene ningún módulo/servicio (solo modelo Prisma) | `core-service/src/` (carpeta inexistente) | Media — bloqueante para publicar contenido con imagen/video, no mencionado antes en esta conversación | ✅ RESUELTO — §12 |
+| `PermissionGuard` y `BrandAccessGuard` existen y funcionan pero no están aplicados en ningún controller | `commons/guards/permission.guard.ts`, `core-service/src/guards/brand-access.guard.ts` | Media | ✅ RESUELTO — §14 (`BrandAccessGuard` solo en `brands`, no en `posts`/`campaigns` por diseño — ver §14) |
+| Todos los tests existentes son placeholders (`expect(true).toBe(true)`) | `apps/backend/test/*.spec.ts`, `apps/e2e/src/*.e2e.spec.ts` | Media | ✅ RESUELTO en `apps/backend/test/`, ⚠️ `apps/e2e/` sigue placeholder — §18 |
+| El seed (`packages/seed/src/index.js`) solo carga RBAC + usuarios + `UserProfile` — no hay `Brand`/`SocialAccount`/`Campaign`/`Post` de prueba | `packages/seed/src/index.js` | Baja-media — hace falta ampliarlo para poder probar el flujo completo sin crear todo a mano | ⚠️ Sin confirmar como resuelto al 2026-08-17, no auditado en esta ronda |
+| `score.service.ts` promedia `engagement` de todas las redes sin normalizar el denominador | `core-service/src/score/score.service.ts:26-32` | Alta (una vez con datos reales) | ✅ RESUELTO — §8 |
+| Gateway solo proxea `auth`, `me`, `catalogs` | `gateway/src/main.ts` | Esperado, no es un bug — falta agregar rutas conforme se construyan módulos | ✅ RESUELTO — §15, 10 prefijos proxeados |
+| DTOs de `campaigns`/`reports`/`ideas` existen como archivos pero están huérfanos (ningún controller los usa) | `core-service/src/{campaigns,reports,ideas}/dto/*.ts` | Baja — confirma que son stubs de andamiaje, no trabajo a medio hacer perdido | ✅ RESUELTO (ya desde 2026-07-27, junto con los controllers) |
 
 No se encontraron: mocks de Ayrshare, TODOs mencionando Ayrshare, migraciones relacionadas, ni código
 muerto relacionado a esta integración más allá de lo ya listado — es decir, la integración parte de cero

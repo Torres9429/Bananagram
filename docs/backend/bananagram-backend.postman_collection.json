@@ -2,7 +2,7 @@
   "info": {
     "name": "Bananagram - Backend (auth-service + core-service catalogos)",
     "_postman_id": "b4n4n4gr4m-0000-0000-0000-000000000001",
-    "description": "Colección para probar en local auth-service (3001) y core-service (3002). El login guarda accessToken/refreshToken en variables de colección automáticamente (ver script de test en 'Login'). Auth Bearer configurado a nivel de colección (usa {{accessToken}}) — cualquier request nueva que agregues hereda el token automáticamente sin que tengas que poner el header a mano; solo Login, Register y Refresh lo desactivan explícitamente (auth: noauth) porque no los necesitan. Actualizada 2026-07-27 con los módulos construidos en esa ronda: brands, campaigns (+ designers), reports, ideas, admin (users/roles/permisos) y register/password-reset de auth-service. Actualizada de nuevo 2026-08-01 con 'Complete profile' (PATCH /me/profile) y los selectores eligible-community-managers/eligible-designers de campaigns, y otra vez ese mismo día con notas sobre las validaciones de roleName (Create campaign/Assign designer), el bloqueo de reasignar cmId (Update campaign) y el squash de migraciones + fix de roleName en el seed (ver .claude/INVENTORY.md, nota 2026-08-01).",
+    "description": "Colección para probar en local auth-service (3001), core-service (3002) y alexa-service (3004). El login guarda accessToken/refreshToken en variables de colección automáticamente (ver script de test en 'Login'). Auth Bearer configurado a nivel de colección (usa {{accessToken}}) — cualquier request nueva que agregues hereda el token automáticamente sin que tengas que poner el header a mano; solo Login, Register y Refresh lo desactivan explícitamente (auth: noauth) porque no los necesitan. Actualizada 2026-07-27 con los módulos construidos en esa ronda: brands, campaigns (+ designers), reports, ideas, admin (users/roles/permisos) y register/password-reset de auth-service. Actualizada de nuevo 2026-08-01 con 'Complete profile' (PATCH /me/profile) y los selectores eligible-community-managers/eligible-designers de campaigns, y otra vez ese mismo día con notas sobre las validaciones de roleName (Create campaign/Assign designer), el bloqueo de reasignar cmId (Update campaign) y el squash de migraciones + fix de roleName en el seed (ver .claude/INVENTORY.md, nota 2026-08-01). Actualizada de nuevo 2026-08-17: 'ideas' se movió de coreBaseUrl a alexaBaseUrl (el dominio completo se mudó a alexa-service, ver .claude/CLAUDE.md) y se agregaron las carpetas posts, score, métricas de campañas (metrics/metrics-history/metrics-summary/refresh), cm-team, notifications y auth/link-code — todas construidas después del 2026-08-01 y ausentes hasta ahora de esta colección.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -12,6 +12,7 @@
   "variable": [
     { "key": "authBaseUrl", "value": "http://localhost:3001/api" },
     { "key": "coreBaseUrl", "value": "http://localhost:3002/api" },
+    { "key": "alexaBaseUrl", "value": "http://localhost:3004/api", "description": "alexa-service — ideas vive aquí (se mudó entero desde core-service), no en coreBaseUrl. Ver .claude/CLAUDE.md, sección de gateway: /api/ideas/* -> ALEXA_SERVICE_URL." },
     { "key": "adminEmail", "value": "20233tn102@utez.edu.mx" },
     { "key": "adminPassword", "value": "admin123" },
     { "key": "accessToken", "value": "" },
@@ -28,7 +29,11 @@
     { "key": "designerUserId", "value": "", "description": "userId de un Diseñador ya existente (ver admin/users) — CampaignDesigner no crea usuarios, solo vincula uno ya dado de alta." },
     { "key": "cmUserId", "value": "", "description": "userId de un Community Manager ya existente — Campaign.cmId lo requiere al crear." },
     { "key": "reportId", "value": "" },
-    { "key": "ideaId", "value": "" }
+    { "key": "ideaId", "value": "" },
+    { "key": "postId", "value": "" },
+    { "key": "mediaId", "value": "", "description": "id devuelto por 'Upload media' (posts) — úsalo en 'Remove media'." },
+    { "key": "notificationId", "value": "" },
+    { "key": "linkCode", "value": "", "description": "code devuelto por 'Create link-code' (auth-service) — lo canjea el Lambda de Alexa vía 'Redeem link-code', sin JWT." }
   ],
   "item": [
     {
@@ -175,6 +180,69 @@
             "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"ChangeMe123!\"\n}" },
             "url": { "raw": "{{authBaseUrl}}/auth/password-reset/confirm", "host": ["{{authBaseUrl}}"], "path": ["auth", "password-reset", "confirm"] },
             "description": "Consume el token (single-use) y revoca todas las sesiones activas del usuario (refresh tokens)."
+          }
+        },
+        {
+          "name": "Create link-code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.code) { pm.collectionVariables.set('linkCode', body.code); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{authBaseUrl}}/auth/link-code", "host": ["{{authBaseUrl}}"], "path": ["auth", "link-code"] },
+            "description": "Hereda el Bearer {{accessToken}} de la colección. Genera el código de vinculación de la cuenta web con la Alexa Skill (fetchUserByLinkCode, ver docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md) — el usuario lo dicta por voz, el Lambda lo canjea con 'Redeem link-code'."
+          }
+        },
+        {
+          "name": "Redeem link-code",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"{{linkCode}}\"\n}" },
+            "url": { "raw": "{{authBaseUrl}}/auth/link-code/redeem", "host": ["{{authBaseUrl}}"], "path": ["auth", "link-code", "redeem"] },
+            "description": "Público a propósito (auth: noauth, sin JWT) — lo llama el Lambda de Alexa, que todavía no tiene token en este punto del flujo. Canjea el code por la identidad del usuario vinculado."
+          }
+        }
+      ]
+    },
+    {
+      "name": "auth-service - notifications",
+      "item": [
+        {
+          "name": "List my notifications",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{authBaseUrl}}/me/notifications", "host": ["{{authBaseUrl}}"], "path": ["me", "notifications"] }
+          }
+        },
+        {
+          "name": "Mark notification as read",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{authBaseUrl}}/me/notifications/{{notificationId}}/read",
+              "host": ["{{authBaseUrl}}"],
+              "path": ["me", "notifications", "{{notificationId}}", "read"]
+            }
+          }
+        },
+        {
+          "name": "Stream notifications (SSE)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "text/event-stream" }],
+            "url": { "raw": "{{authBaseUrl}}/me/notifications/stream", "host": ["{{authBaseUrl}}"], "path": ["me", "notifications", "stream"] },
+            "description": "Conexión larga (Server-Sent Events), no un request/response normal — Postman no reproduce bien un stream infinito (se queda 'cargando' hasta que canceles manualmente), se agrega solo como referencia del endpoint real. Push instantáneo con ping cada 20s para mantener viva la conexión a través de proxies. Para probarlo de verdad: curl -N -H \"Authorization: Bearer {{accessToken}}\" {{authBaseUrl}}/me/notifications/stream"
           }
         }
       ]
@@ -585,6 +653,45 @@
           }
         },
         {
+          "name": "Metrics summary (todas mis campañas)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/campaigns/metrics-summary", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "metrics-summary"] },
+            "description": "Una llamada por cliente en vez de N GET /:id/metrics — resuelve el mismo shape de 'Get campaign metrics' pero para todas las campañas visibles del usuario a la vez."
+          }
+        },
+        {
+          "name": "Get campaign metrics",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}/metrics", "host": ["{{coreBaseUrl}}"], "path": ["campaigns", "{{campaignId}}", "metrics"] },
+            "description": "summary (posts/reach/interactions) + byNetwork (engagementRate por red, null si no hay denominador disponible) + topPost. Mismo criterio de pertenencia que campaigns (assertCanView)."
+          }
+        },
+        {
+          "name": "Get campaign metrics history",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}/metrics-history",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["campaigns", "{{campaignId}}", "metrics-history"]
+            }
+          }
+        },
+        {
+          "name": "Refresh campaign metrics",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{coreBaseUrl}}/campaigns/{{campaignId}}/metrics/refresh",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["campaigns", "{{campaignId}}", "metrics", "refresh"]
+            },
+            "description": "Dispara MetricsCronService.generateMetrics manualmente para esta campaña (ignoreRecentWindow: true — salta la ventana de 5h anti-duplicados del cron normal)."
+          }
+        },
+        {
           "name": "List eligible community managers",
           "request": {
             "method": "GET",
@@ -677,6 +784,40 @@
       ]
     },
     {
+      "name": "core-service - cm-team",
+      "item": [
+        {
+          "name": "List my team",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/cm-team", "host": ["{{coreBaseUrl}}"], "path": ["cm-team"] },
+            "description": "Equipo GENERAL de un CM (Fase J) — distinto de CampaignDesigner, que es por-campaña. Requiere permiso campanas:asignar (solo community_manager en el seed)."
+          }
+        },
+        {
+          "name": "Add team member",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"designerUserId\": \"{{designerUserId}}\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/cm-team", "host": ["{{coreBaseUrl}}"], "path": ["cm-team"] },
+            "description": "designerUserId debe tener UserProfile.roleName='disenador' (assertUserHasRole) — un Diseñador debe estar en este roster general antes de que CampaignsService.assignDesigner lo deje staffear una campaña puntual de este mismo CM."
+          }
+        },
+        {
+          "name": "Remove team member",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{coreBaseUrl}}/cm-team/{{designerUserId}}",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["cm-team", "{{designerUserId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "core-service - reports",
       "item": [
         {
@@ -718,19 +859,20 @@
       ]
     },
     {
-      "name": "core-service - ideas",
+      "name": "alexa-service - ideas",
+      "description": "OJO: hasta 2026-08-17 esta carpeta apuntaba mal a {{coreBaseUrl}} — el dominio de ideas se mudó entero a alexa-service (BFF sobre core-service, acceso directo a ContentIdea en la BD física de core-service vía su propio prisma/schema.prisma). El gateway ya enruta /api/ideas/* -> ALEXA_SERVICE_URL, no a core-service. Corregido para usar {{alexaBaseUrl}} (puerto 3004).",
       "item": [
         {
           "name": "List ideas by campaign",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{coreBaseUrl}}/ideas?campaignId={{campaignId}}",
-              "host": ["{{coreBaseUrl}}"],
+              "raw": "{{alexaBaseUrl}}/ideas?campaignId={{campaignId}}",
+              "host": ["{{alexaBaseUrl}}"],
               "path": ["ideas"],
               "query": [{ "key": "campaignId", "value": "{{campaignId}}" }]
             },
-            "description": "No está anidado bajo /campaigns/:campaignId/ideas — es una ruta plana con campaignId como query param."
+            "description": "No está anidado bajo /campaigns/:campaignId/ideas — es una ruta plana con campaignId como query param. Requiere campanas:ver + pertenencia real a la campaña (IdeasService.assertCampaignAccess), verificado por alexa-service reenviando el mismo Bearer a core-service."
           }
         },
         {
@@ -752,17 +894,17 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"campaignId\": \"{{campaignId}}\",\n  \"text\": \"Idea de prueba capturada desde el panel web\"\n}"
+              "raw": "{\n  \"campaignId\": \"{{campaignId}}\",\n  \"text\": \"Idea de prueba capturada desde el panel web\",\n  \"source\": \"propia\"\n}"
             },
-            "url": { "raw": "{{coreBaseUrl}}/ideas", "host": ["{{coreBaseUrl}}"], "path": ["ideas"] },
-            "description": "source por default 'propia' (una idea creada por HTTP viene del panel web, no de la Alexa Skill). Requiere pertenecer a la campaña (dueño de la marca, CM o Diseñador asignado), verificado en IdeasService, no solo por el permiso campanas:crear."
+            "url": { "raw": "{{alexaBaseUrl}}/ideas", "host": ["{{alexaBaseUrl}}"], "path": ["ideas"] },
+            "description": "source: 'sugerida' (generada por la skill y guardada tal cual) | 'propia' (dictada libremente) — ambas vienen siempre de la skill según el contrato real de las 6 funciones del Lambda (ver docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md); se deja aquí también para probar el flujo desde Postman. Requiere permiso campanas:crear."
           }
         },
         {
           "name": "Get idea by id",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{coreBaseUrl}}/ideas/{{ideaId}}", "host": ["{{coreBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
+            "url": { "raw": "{{alexaBaseUrl}}/ideas/{{ideaId}}", "host": ["{{alexaBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
           }
         },
         {
@@ -771,14 +913,243 @@
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"text\": \"Idea de prueba (editada)\"\n}" },
-            "url": { "raw": "{{coreBaseUrl}}/ideas/{{ideaId}}", "host": ["{{coreBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
+            "url": { "raw": "{{alexaBaseUrl}}/ideas/{{ideaId}}", "host": ["{{alexaBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
           }
         },
         {
           "name": "Delete idea (soft delete)",
           "request": {
             "method": "DELETE",
-            "url": { "raw": "{{coreBaseUrl}}/ideas/{{ideaId}}", "host": ["{{coreBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
+            "url": { "raw": "{{alexaBaseUrl}}/ideas/{{ideaId}}", "host": ["{{alexaBaseUrl}}"], "path": ["ideas", "{{ideaId}}"] }
+          }
+        },
+        {
+          "name": "Delete idea by title",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{alexaBaseUrl}}/ideas?campaignId={{campaignId}}&title=Idea de prueba capturada desde el panel web",
+              "host": ["{{alexaBaseUrl}}"],
+              "path": ["ideas"],
+              "query": [
+                { "key": "campaignId", "value": "{{campaignId}}" },
+                { "key": "title", "value": "Idea de prueba capturada desde el panel web" }
+              ]
+            },
+            "description": "deleteIdeaFromBackend del Lambda real borra por título (contrato de voz: el usuario no sabe el id), no por id — convive con DELETE /ideas/:id, no lo reemplaza."
+          }
+        }
+      ]
+    },
+    {
+      "name": "core-service - posts",
+      "item": [
+        {
+          "name": "List posts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{coreBaseUrl}}/posts?campaignId={{campaignId}}",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["posts"],
+              "query": [
+                { "key": "campaignId", "value": "{{campaignId}}" },
+                { "key": "brandId", "value": "", "disabled": true },
+                { "key": "status", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Filtros opcionales: campaignId, brandId, status (uno de los 10 valores de PostStatus). Requiere permiso publicaciones:ver."
+          }
+        },
+        {
+          "name": "Create post",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.id) { pm.collectionVariables.set('postId', body.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brandId\": \"{{brandId}}\",\n  \"campaignId\": \"{{campaignId}}\",\n  \"socialNetworkIds\": [\"{{socialNetworkId}}\"],\n  \"content\": \"Contenido de prueba capturado desde Postman\",\n  \"instructions\": \"Instrucciones opcionales para el diseñador\"\n}"
+            },
+            "url": { "raw": "{{coreBaseUrl}}/posts", "host": ["{{coreBaseUrl}}"], "path": ["posts"] },
+            "description": "Nace en borrador. socialNetworkIds son ids de SocialNetwork (catálogo), no de SocialAccount — el fan-out real a PostSocialAccount se resuelve al publicar. Requiere permiso publicaciones:crear."
+          }
+        },
+        {
+          "name": "Get post by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}"] }
+          }
+        },
+        {
+          "name": "Update post",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"Contenido de prueba (editado)\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}"] },
+            "description": "Solo content/instructions — el resto de campos (redes, fecha) tiene sus propios endpoints (schedule) o no se puede editar tras crear."
+          }
+        },
+        {
+          "name": "Submit for review",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{coreBaseUrl}}/posts/{{postId}}/submit-for-review",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["posts", "{{postId}}", "submit-for-review"]
+            },
+            "description": "borrador -> en_revision. El creador de la publicación no puede aprobarla después (validado en approve/reject, no solo en frontend)."
+          }
+        },
+        {
+          "name": "Approve post",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}/approve", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}", "approve"] },
+            "description": "en_revision -> aprobado. 403 si quien aprueba es el mismo creador del post (auto-aprobación bloqueada)."
+          }
+        },
+        {
+          "name": "Reject post",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"comment\": \"Motivo del rechazo (obligatorio)\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}/reject", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}", "reject"] },
+            "description": "en_revision -> borrador. comment es obligatorio (400 sin motivo) — regla de negocio #4."
+          }
+        },
+        {
+          "name": "Client reject post",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"comment\": \"Motivo del rechazo del cliente (obligatorio)\"\n}" },
+            "url": {
+              "raw": "{{coreBaseUrl}}/posts/{{postId}}/client-reject",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["posts", "{{postId}}", "client-reject"]
+            },
+            "description": "Rechazo del Cliente en una etapa distinta al rechazo del aprobador interno — mismo requisito de comentario obligatorio."
+          }
+        },
+        {
+          "name": "Forward to designer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"comment\": \"Comentario opcional del CM al reenviar\"\n}" },
+            "url": {
+              "raw": "{{coreBaseUrl}}/posts/{{postId}}/forward-to-designer",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["posts", "{{postId}}", "forward-to-designer"]
+            },
+            "description": "comment es opcional — el motivo del Cliente (si aplica) siempre llega por separado, este campo solo se agrega encima."
+          }
+        },
+        {
+          "name": "Schedule post",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"scheduledAt\": \"2026-09-01T15:00:00.000Z\"\n}" },
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}/schedule", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}", "schedule"] },
+            "description": "aprobado -> programado. scheduledAt es opcional en el body si el post ya traía scheduledAt desde 'Create post' (obligatorio en el service si nunca se puso). Arma un timer real (post-scheduler.service.ts) que publica exactamente a esa hora, sin sondeo."
+          }
+        },
+        {
+          "name": "Cancel post",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}/cancel", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}", "cancel"] },
+            "description": "programado -> cancelado. Cancela también el timer de publicación en memoria si seguía vivo."
+          }
+        },
+        {
+          "name": "Upload media",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const media = Array.isArray(body) ? body[0] : body;",
+                  "if (media && media.id) { pm.collectionVariables.set('mediaId', media.id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "files", "type": "file", "src": [] }]
+            },
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}/media", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}", "media"] },
+            "description": "multipart/form-data, campo 'files' (hasta 20 archivos). Sube a Cloudinary (core-service/src/cloudinary/) y crea Media/PostMedia. En Postman: selecciona uno o más archivos reales en el campo 'files' antes de enviar."
+          }
+        },
+        {
+          "name": "Remove media",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{coreBaseUrl}}/posts/{{postId}}/media/{{mediaId}}",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["posts", "{{postId}}", "media", "{{mediaId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete post (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{coreBaseUrl}}/posts/{{postId}}", "host": ["{{coreBaseUrl}}"], "path": ["posts", "{{postId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "core-service - score",
+      "item": [
+        {
+          "name": "Get brand score",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{coreBaseUrl}}/brands/{{brandId}}/score", "host": ["{{coreBaseUrl}}"], "path": ["brands", "{{brandId}}", "score"] },
+            "description": "Fórmula real de 4 factores: consistency×0.30 + engagement×0.40 + coverage×0.20 + frequency×0.10 (score.service.ts) — distinta de la de 3 factores documentada en otros lugares, sin confirmar cuál es la vigente. Solo dueño de la marca o Administrador (más estricto que BrandAccessGuard: CM/Diseñador reciben 403). Si hay un snapshot de menos de 5h, lo devuelve tal cual; si no, calcula uno nuevo."
+          }
+        },
+        {
+          "name": "Get brand score history",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{coreBaseUrl}}/brands/{{brandId}}/score-history?from=2026-07-01&to=2026-08-17",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["brands", "{{brandId}}", "score-history"],
+              "query": [
+                { "key": "from", "value": "2026-07-01" },
+                { "key": "to", "value": "2026-08-17" }
+              ]
+            },
+            "description": "from/to opcionales (ISO date). Mismo criterio de acceso que 'Get brand score'."
           }
         }
       ]

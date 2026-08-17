@@ -1,5 +1,16 @@
 # Implementación — Alineación del frontend a `modelo.txt`
 
+> ℹ️ **CONTEXTO HISTÓRICO — registra el estado del 19-jul-2026, antes de commitear.** Este documento deja
+> constancia explícita (línea 7-8) de que "no se hizo ningún commit; todos los cambios quedaron en el
+> working tree para revisión". Desde entonces ese trabajo sí se commiteó y el frontend avanzó mucho más en
+> conexión real al backend (~10 commits: login real, posts-front, campañas en brands-front, catálogos en
+> admin-front, entre otros) — ver `.claude/INVENTORY.md` §0 para el estado de conexión actual, pocket por
+> pocket. Su observación sobre los formularios de auth sin cablear sigue siendo válida **hoy** (verificado
+> 2026-08-17): `ResetPasswordForm.tsx` y `ForgotPasswordForm.tsx` todavía traen el comentario explícito
+> "Diseño sin backend: no se consume ninguna API todavía", y `RegisterForm.tsx` sigue resolviendo contra
+> `MOCK_CATEGORIES`/`MOCK_SPECIALTIES`/etc. — de los formularios de `auth-front`, solo `LoginForm` quedó
+> conectado al backend real.
+
 Este documento registra **qué se implementó** a partir del análisis y las decisiones de producto
 documentadas en [`docs/frontend-db-alignment.md`](./frontend-db-alignment.md). 
 

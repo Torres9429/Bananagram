@@ -10,6 +10,12 @@
 > `ideas` como stubs vacíos, el gateway sin proxear nada, y `PermissionGuard`/`BrandAccessGuard` sin
 > aplicar a ningún endpoint. Todo eso se construyó en esta ronda — ver §0 abajo. Se deja §1 intacta
 > (sigue siendo verdad) y se reescribió §2/§4 para reflejar lo que sigue pendiente ahora.
+>
+> **Actualizado parcialmente el 2026-08-17**: varios de los pendientes que §2 listaba como abiertos ya se
+> resolvieron desde el 2026-07-27 — verificado leyendo el código real de `apps/backend/services/
+> {core,auth}-service` en esa fecha, no solo este documento. Quedan marcados inline abajo con
+> "✅ RESUELTO". No se reescribió §2 completa a propósito: sigue teniendo valor como registro de qué
+> faltaba en ese momento.
 
 ## 0. Actualización 2026-07-27 — resto de `core-service` + admin de `auth-service`
 
@@ -196,23 +202,52 @@ aplicar) ya está hecho — ver §0. Lo que sigue de verdad pendiente:
   (`PostSocialAccount`), ni biblioteca de medios (`Media`/`PostMedia`) conectada a nada. La máquina de
   estados en sí (`posts/state-machine/`) ya soporta los 10 valores de `PostStatus` y está probada
   (`apps/backend/test/posts-flow.spec.ts`) — lo que falta es la capa HTTP + Prisma alrededor.
+  **✅ RESUELTO (verificado 2026-08-17).** `apps/backend/services/core-service/src/posts/posts.controller.ts`
+  tiene 14 endpoints reales (list, get, create, submit-for-review, approve, reject, client-reject,
+  forward-to-designer, update, schedule, cancel, upload-media, remove-media, delete), todos detrás de
+  `JwtAuthGuard`+`PermissionGuard`. El fan-out multi-red y la biblioteca de medios también quedaron
+  conectados: `posts/:id/media` sube archivos vía `core-service/src/cloudinary/`. El scheduler dejó de ser
+  el sondeo (`@Cron`) que describía la auditoría de Ayrshare — se reescribió por evento
+  (`scheduler/post-scheduler.service.ts`, `setTimeout`/`SchedulerRegistry`, re-arma timers en
+  `onModuleInit`), sí llama `validateTransition`, sí crea/actualiza `PostSocialAccount` por red y calcula
+  el estado agregado del post (`post-aggregate-status.util.ts`).
 - **Métricas y Score sin exponer por HTTP.** `score.service.ts` y `cron/metrics-cron.service.ts` existen
   como lógica pero no hay ningún controller que los sirva — nadie puede consultar el score de una marca
   todavía. La fórmula real (4 factores con `coverage`) sigue sin confirmarse contra la documentada en
   `CLAUDE.md` (3 factores) — confirmar con el usuario antes de tocar el cálculo o de exponerlo.
+  **✅ RESUELTO (verificado 2026-08-17)** en cuanto a exposición HTTP: `GET brands/:id/score`,
+  `GET brands/:id/score-history` (`score/score.controller.ts`) y `GET campaigns/:id/metrics[-history]` +
+  `POST campaigns/:id/metrics/refresh` (`campaigns/campaigns.controller.ts`) ya existen, con guard
+  adicional propio (`assertIsBrandOwnerOrAdmin`, más estricto que `BrandAccessGuard`: solo dueño de marca
+  o Administrador). La fórmula de 4 factores (`consistency×0.30 + engagement×0.40 + coverage×0.20 +
+  frequency×0.10`, `score.service.ts:101`) sigue siendo la que corre — la discrepancia contra el `CLAUDE.md`
+  de 3 factores sigue sin resolverse, no se tocó el cálculo.
 - **Notificaciones**: el modelo `Notification` existe en `auth-service` pero no hay service/controller, ni
   el endpoint interno que `core-service` debería llamar al rechazar un post o asignar una campaña
   (mencionado como pendiente en el propio `modelo2.txt`).
+  **✅ RESUELTO (verificado 2026-08-17).** `auth-service/src/notifications/` completo:
+  `notifications.controller.ts` (`GET`, `PATCH :id/read`, `GET stream` — SSE en vivo),
+  `internal-notifications.controller.ts` (`POST`, sin `JwtAuthGuard`, tráfico servicio-a-servicio) y
+  `notifications-stream.service.ts`.
 - **`alexa-service`** ya tiene infraestructura JWT (ver §0) pero sus controllers de `campaigns`/`ideas`
   siguen siendo stubs — falta la lógica real de traducir intents de voz a llamadas HTTP contra
   `core-service`/`auth-service` (con el circuit breaker de `commons/circuit-breaker/opossum.factory.ts`,
   que existe pero nadie usa todavía, ni siquiera el fetch best-effort de `auth-service` hacia
   `core-service` en `register()`).
+  **✅ RESUELTO en cuanto a `campaigns`/`ideas` (verificado 2026-08-17, PR #23 / commit `8db80c9`).**
+  `alexa-service/src/campaigns/campaigns.service.ts` y `src/ideas/ideas.service.ts` ya son BFF real por
+  HTTP contra `core-service` (no stubs) — `fetchCampaigns` compone campaña + métricas + score (con `null`
+  degradado en 403, no error) + cuentas sociales para el shape que espera el Lambda real. Sigue sin
+  confirmarse el uso del circuit breaker de `opossum.factory.ts` en estas llamadas.
 - **`AuditInterceptor`/`LoggingInterceptor`** (`commons/interceptors/`) no están registrados como
   interceptor global en ningún servicio, pese a que `audit_log` es una tabla inmutable pensada
   exactamente para esto.
 - **Frontend**: sigue 100% en modo mock, cero consumo de cualquier endpoint real (ni siquiera los que ya
   existían antes de esta ronda). Fuera de alcance a propósito, no se tocó.
+  **✅ PARCIALMENTE RESUELTO (verificado 2026-08-17, ver `.claude/CLAUDE.md`).** El frontend ya no corre
+  100% en modo mock: login, publicaciones (flujo de aprobación completo), campañas, y la mayoría de
+  brands/analytics/métricas ya consumen el backend real. Sigue mock en bolsillos puntuales — detalle en
+  `.claude/INVENTORY.md` §0.
 - `.claude/INVENTORY.md` §2 (Frontend) sigue con fecha 2026-07-19, salvo un parche puntual 2026-08-01 en
   `auth-front` (`RegisterForm`/`ActivateForm`, ver §0bis) — el resto de la sección no se tocó.
 
@@ -237,6 +272,13 @@ aplicar) ya está hecho — ver §0. Lo que sigue de verdad pendiente:
    para probarse, hay que crearlos a mano vía `POST /api/catalogs/*` (ahora requiere login).
    
 ## 4. Siguiente paso sugerido — actualizado 2026-07-27
+
+> **✅ Nota 2026-08-17**: los 4 puntos de esta lista ya se completaron (ver marcas ✅ RESUELTO en §2) —
+> `posts/`, notificaciones y métricas/Score tienen su capa HTTP real, y `alexa-service` dejó de ser stub
+> en `campaigns`/`ideas`. Se deja la lista original sin reescribir, como registro de la prioridad que se
+> siguió en su momento. Lo que sigue pendiente de verdad (generación de ideas con IA, generación real de
+> reportes, y los bolsillos de frontend que aún son mock) está documentado en `.claude/CLAUDE.md` y
+> `.claude/INVENTORY.md` §0, no en este archivo.
 
 `campaigns/`, `reports/`, `ideas/` (y `brands/`, que no estaba en el plan original) ya están construidos —
 ver §0. En orden de prioridad para lo que sigue:

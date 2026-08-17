@@ -1,4 +1,32 @@
 // ════════════════════════════════════════════════════════════════════════
+// ⚠ AVISO DE DESACTUALIZACIÓN (agregado 2026-08-17)
+// ════════════════════════════════════════════════════════════════════════
+//
+// Última sincronización real conocida de este archivo contra el schema
+// implementado: commit ee3a9df (2026-08-06). Desde entonces el schema real
+// avanzó 3 commits más, hasta 0221e42 (2026-08-14), y este archivo NO se
+// actualizó — quedó desactualizado respecto al modelo realmente implementado.
+//
+// La fuente viva hoy (2026-08-17) es:
+//   - `.claude/INVENTORY.md` §1.6 — sí está al día.
+//   - Los `schema.prisma` reales de cada servicio:
+//     `apps/backend/services/auth-service/prisma/schema.prisma`
+//     `apps/backend/services/core-service/prisma/schema.prisma`
+//     `apps/backend/services/alexa-service/prisma/schema.prisma` (solo
+//     ContentIdea, acceso directo a la BD de core-service, sin migrar desde
+//     ahí — ver comentario en ese archivo y `docs/base/service-boundaries.md`).
+//
+// Este archivo NO se reescribió por completo para no arriesgar
+// inconsistencias — se corrigieron puntualmente el enum PostStatus y
+// Media.uploadedBy (marcados inline donde aparecen abajo), y se agregó al
+// final la sección "## Cambios desde 2026-08-06 no reflejados arriba" con
+// el detalle completo de lo que falta: modelos enteros nuevos
+// (AccountLinkCode, SocialAccountMetricSnapshot, CmTeamMember,
+// ProviderRequestLog, MetricSyncRun) y campos nuevos en modelos existentes.
+// Consulta esa sección antes de asumir que lo que ves arriba es el modelo
+// completo vigente.
+//
+// ════════════════════════════════════════════════════════════════════════
 // modelo2.txt — modelo.txt separado por microservicio
 // ════════════════════════════════════════════════════════════════════════
 //
@@ -276,6 +304,10 @@ model AuditLog {
 // (identidad: ownerId, cmId, createdBy, changedBy, uploadedBy,
 // requestedBy, ContentIdea.createdBy → User). Category, Specialty y
 // SocialNetwork ya son catálogos locales de core-service.
+// NOTA 2026-08-17: `Media.uploadedBy` fue removido del schema real después
+// de 2026-08-06 — ya no es una de estas FKs cruzadas. Se deja mencionado
+// aquí sin editar más a fondo porque este párrafo es prosa de contexto, no
+// el schema en sí (la corrección real está en el modelo `Media` más abajo).
 //
 // Nota histórica: antes había que decidir si Campaign vivía en
 // brands-service o content-service (ver docs/architecture.md vs.
@@ -544,6 +576,9 @@ enum PostStatus {
   en_revision
   aprobado
   rechazado
+  rechazado_cliente // agregado después de 2026-08-06 (11vo valor, no 10) —
+  // segundo tramo de aprobación del Cliente, ver schema real de core-service
+  // y sección "Cambios desde 2026-08-06" al final de este archivo.
   programado
   publicando
   publicado
@@ -647,7 +682,10 @@ model Media {
   brandId String
   brand   Brand  @relation(fields: [brandId], references: [id])
 
-  uploadedBy String // FK → auth-service.User.id (CM o Diseñador; sin constraint)
+  // REMOVIDO del schema real de core-service después de 2026-08-06 (ya no
+  // existe la columna) — se deja esta línea comentada como nota histórica,
+  // no como campo vigente. Ver sección "Cambios desde 2026-08-06" al final.
+  // uploadedBy String // FK → auth-service.User.id (CM o Diseñador; sin constraint)
 
   fileName     String
   originalName String
@@ -807,3 +845,84 @@ model AuditLog {
 
   @@map("audit_log")
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// ## Cambios desde 2026-08-06 no reflejados arriba
+// ════════════════════════════════════════════════════════════════════════
+//
+// Agregado 2026-08-17. Todo lo listado aquí SÍ existe en los `schema.prisma`
+// reales de cada servicio (verificado contra el código, no copiado a
+// ciegas) pero NO está reflejado en el cuerpo de este archivo arriba, salvo
+// las 2 correcciones puntuales ya marcadas inline (enum PostStatus,
+// Media.uploadedBy). Ver también `.claude/INVENTORY.md` §1.6.
+//
+// ── Modelos enteros que faltan por completo ────────────────────────────
+//
+// auth-service:
+//   - `AccountLinkCode` — código de vinculación de cuenta para el
+//     account-linking de la Alexa Skill (id, userId → User, code @unique,
+//     expiresAt, usedAt, createdAt). Ver
+//     apps/backend/services/auth-service/prisma/schema.prisma.
+//
+// core-service:
+//   - `SocialAccountMetricSnapshot` — historial append-only de seguidores/
+//     métricas por SocialAccount conectada (followers, likes/comments/
+//     shares/views/reach nullable, source 'ayrshare'|'simulated',
+//     capturedAt). Poblado cada 6h por account-metrics-cron.service.ts.
+//   - `CmTeamMember` — equipo GENERAL de un CM (cmUserId, designerUserId),
+//     distinto de CampaignDesigner (que es por-campaña); sin soft-delete.
+//   - `ProviderRequestLog` — trazabilidad de cada llamada saliente a
+//     Ayrshare (provider, operation, entityType, entityId, requestId,
+//     httpStatus, succeeded, errorCode, durationMs) — no confundir con
+//     AuditLog, que audita mutaciones de dominio, no llamadas HTTP externas.
+//   - `MetricSyncRun` — registro de cada corrida del cron de sincronización
+//     de métricas (startedAt, finishedAt, itemsProcessed, itemsFailed,
+//     status).
+//
+// ── Campos nuevos en modelos existentes ────────────────────────────────
+//
+// core-service:
+//   - `Brand`: `refId String? @unique`, `profileKey String? @unique`,
+//     `timezone String?` (nullable, con fallback a default de aplicación,
+//     sin backfill forzado).
+//   - `SocialAccount`: `platformAccountId String?`, `disconnectedAt
+//     DateTime?`, `lastAuthenticatedAt DateTime?` (integración real con
+//     Ayrshare — id que asigna la red, cuándo se desconectó de verdad,
+//     última reautenticación).
+//   - `Campaign`: `cmStatus CmAssignmentStatus @default(pendiente)`,
+//     `cmRespondedAt DateTime?`, `cmRejectionReason String?` — flujo de
+//     aceptación del CM (Fase J), más el enum nuevo:
+//       enum CmAssignmentStatus { pendiente aceptada rechazada }
+//   - `PostSocialAccount`: `providerStatus String?`, `errorCode String?`,
+//     `retryCount Int @default(0)`, `lastSyncedAt DateTime?`, `submittedAt
+//     DateTime?`, `providerScheduledAt DateTime?` — pipeline real de
+//     publicación/sync contra Ayrshare.
+//   - `PostMetric`: `raw Json?`, `source String @default("simulated")`,
+//     `engagementBase String?` ('reach'|'views'|'impressions') — respuesta
+//     cruda del proveedor, origen del dato, y qué denominador se usó para
+//     `engagement` cuando `reach` no está disponible.
+//
+// ── Enum corregido inline arriba ───────────────────────────────────────
+//
+//   - `PostStatus` tiene 11 valores, no 10: se agregó `rechazado_cliente`
+//     (segundo tramo de aprobación del Cliente) después de 2026-08-06.
+//
+// ── Campo removido, marcado inline arriba ──────────────────────────────
+//
+//   - `Media.uploadedBy` ya no existe en el schema real de core-service —
+//     se comentó (no se borró la línea) en el modelo `Media` de este
+//     archivo, con nota histórica.
+//
+// ── Nota aparte, no listada como "diferencia" porque ya está documentada
+//    en docs/base/service-boundaries.md ────────────────────────────────
+//
+// `ContentIdea` (arriba, dentro de la sección core-service) sigue siendo
+// correcto tal cual está: `core-service` sigue siendo el dueño de la
+// migración de esa tabla. Lo que cambió (2026-08-14, no listado como
+// diferencia de campos porque no es un campo) es quién más tiene acceso:
+// `alexa-service` ahora también lee/escribe `ContentIdea` directo contra la
+// misma base física (`gestor_redes_core`) vía su propio
+// `prisma/schema.prisma` (solo ese modelo, sin `prisma migrate` desde ahí),
+// en vez de consumirlo por HTTP contra `core-service` como decía la versión
+// vieja de `docs/base/service-boundaries.md`. Detalle completo en ese
+// documento, secciones 1 y 4.2.
