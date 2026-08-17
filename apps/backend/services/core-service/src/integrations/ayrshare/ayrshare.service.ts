@@ -50,6 +50,10 @@ type AyrsharePublishResponse = {
 // likeCount/commentsCount/shareCount/viewsCount/reachCount son acumulados de
 // toda la cuenta (todas las publicaciones), no de un post. No hay
 // "profileVisitsCount" en este endpoint — Ayrshare no lo expone aquí.
+// audienceGenderAge/audienceCountry confirmados contra la doc oficial +
+// una llamada real (con `quarters` en el body, sin eso Ayrshare ni intenta
+// calcularlos) — en esta cuenta salieron ausentes porque Instagram exige
+// ≥100 interacciones en 30 días para liberarlos, no por el shape del código.
 type AyrshareAccountAnalyticsResponse = Record<
   string,
   {
@@ -61,6 +65,8 @@ type AyrshareAccountAnalyticsResponse = Record<
       shareCount?: number;
       viewsCount?: number;
       reachCount?: number;
+      audienceGenderAge?: Record<string, number>;
+      audienceCountry?: Record<string, number>;
     };
   } | undefined
 >;
@@ -245,7 +251,12 @@ export class AyrshareService implements SocialProvider {
             'Profile-Key': profileKey,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ platforms: [networkCode] }),
+          // quarters: sin esto Ayrshare ni intenta calcular
+          // audienceGenderAge/audienceCountry (confirmado en vivo — la
+          // llamada sin quarters devuelve exactamente los mismos campos que
+          // con él si la cuenta no califica, pero SIN quarters nunca los
+          // devolvería aunque calificara).
+          body: JSON.stringify({ platforms: [networkCode], quarters: 1 }),
         }),
       );
       response = (await breaker.fire()) as Response;
@@ -258,7 +269,7 @@ export class AyrshareService implements SocialProvider {
         succeeded: false,
         durationMs: Date.now() - startedAt,
       });
-      return { followers: null, likes: null, comments: null, shares: null, views: null, reach: null, source: 'ayrshare' };
+      return { followers: null, likes: null, comments: null, shares: null, views: null, reach: null, audienceGenderAge: null, audienceCountry: null, source: 'ayrshare' };
     }
 
     const payload = (await response.json().catch(() => ({}))) as AyrshareAccountAnalyticsResponse;
@@ -273,11 +284,15 @@ export class AyrshareService implements SocialProvider {
     });
 
     if (!response.ok) {
-      return { followers: null, likes: null, comments: null, shares: null, views: null, reach: null, source: 'ayrshare' };
+      return { followers: null, likes: null, comments: null, shares: null, views: null, reach: null, audienceGenderAge: null, audienceCountry: null, source: 'ayrshare' };
     }
 
     const analytics = payload[networkCode]?.analytics;
     const toNullableNumber = (value: number | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+    // Objeto vacío se normaliza a null también — mismo criterio "0/{} no es
+    // lo mismo que no disponible" del resto del sistema.
+    const toNullableRecord = (value: Record<string, number> | undefined) =>
+      value && Object.keys(value).length > 0 ? value : null;
 
     return {
       followers: toNullableNumber(analytics?.followersCount ?? analytics?.followers),
@@ -286,6 +301,8 @@ export class AyrshareService implements SocialProvider {
       shares: toNullableNumber(analytics?.shareCount),
       views: toNullableNumber(analytics?.viewsCount),
       reach: toNullableNumber(analytics?.reachCount),
+      audienceGenderAge: toNullableRecord(analytics?.audienceGenderAge),
+      audienceCountry: toNullableRecord(analytics?.audienceCountry),
       source: 'ayrshare',
     };
   }

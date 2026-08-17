@@ -71,6 +71,11 @@ export class MockSocialProvider implements SocialProvider {
       shares: Math.round(followers * 0.005),
       views: Math.round(followers * 0.6),
       reach: Math.round(followers * 0.5),
+      // Sin simular — inventar una distribución de edad/género/país
+      // plausible no aporta nada real y el modo simulado ya deja claro que
+      // es de prueba; null aquí es honesto igual que en el proveedor real.
+      audienceGenderAge: null,
+      audienceCountry: null,
       source: 'simulated',
     };
   }

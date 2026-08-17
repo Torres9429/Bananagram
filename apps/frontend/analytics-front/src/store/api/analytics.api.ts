@@ -16,6 +16,12 @@ export interface CampaignNetworkMetrics {
   reach: number;
   interactions: number;
   engagementRate: number | null;
+  // Nunca normalizados en BD (auditoría §7 — inconsistentes entre redes,
+  // solo Instagram expone saves de forma clara) — leídos de PostMetric.raw
+  // por request. null = esta red no lo expone, no "vale 0".
+  saves: number | null;
+  profileVisits: number | null;
+  follows: number | null;
 }
 
 export interface CampaignTopPost {
@@ -23,6 +29,16 @@ export interface CampaignTopPost {
   network: string;
   date: string | null;
   engagementRate: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  views: number;
+  reach: number;
+}
+
+export interface ContentTypeCount {
+  type: 'imagen' | 'video' | 'carrusel' | 'sin_media';
+  count: number;
 }
 
 export interface CampaignMetricsSummary {
@@ -43,6 +59,10 @@ export interface CampaignMetricsSummary {
   };
   byNetwork: CampaignNetworkMetrics[];
   topPost: CampaignTopPost | null;
+  // Top 5 de la campaña por engagementRate — topPost (arriba) sigue siendo
+  // solo el mejor, para no romper CampaignComparison.
+  topPosts: CampaignTopPost[];
+  contentTypeBreakdown: ContentTypeCount[];
   dataStatus: {
     lastSyncedAt: string | null;
     partial: boolean;
@@ -90,6 +110,11 @@ export interface BrandMetricsHistoryPoint {
   shares: number | null;
   views: number | null;
   reach: number | null;
+  // Demografía — confirmado en vivo (shape real: {"F.25-34": 15, ...} /
+  // {"US": 161, ...}). null en cuentas con <100 interacciones en 30 días
+  // (requisito de Instagram, no de este código).
+  audienceGenderAge: Record<string, number> | null;
+  audienceCountry: Record<string, number> | null;
   source: string;
   socialAccount: { socialNetwork: { code: string; name: string } };
 }
@@ -120,6 +145,29 @@ export interface CampaignMetricsHistory {
   campaignId: string;
   series: CampaignHistoryDay[];
   heatmap: CampaignHeatmapBucket[];
+}
+
+export interface PostNetworkMetrics {
+  networkCode: string;
+  networkName: string;
+  status: string;
+  hasMetrics: boolean;
+  likes: number;
+  comments: number;
+  shares: number;
+  views: number;
+  reach: number;
+  interactions: number;
+  engagementRate: number | null;
+}
+
+export interface PostMetricsDetail {
+  postId: string;
+  campaignId: string;
+  content: string;
+  status: string;
+  publishedAt: string | null;
+  byNetwork: PostNetworkMetrics[];
 }
 
 function withRange(path: string, range?: DateRangeParams): string {
@@ -171,6 +219,9 @@ export const analyticsApi = createApi({
       query: ({ campaignId, range }) => withRange(`campaigns/${campaignId}/metrics-history`, range),
       providesTags: ['CampaignMetricsHistory'],
     }),
+    getPostMetrics: builder.query<PostMetricsDetail, { campaignId: string; postId: string }>({
+      query: ({ campaignId, postId }) => `campaigns/${campaignId}/posts/${postId}/metrics`,
+    }),
   }),
 });
 
@@ -182,4 +233,5 @@ export const {
   useGetBrandMetricsHistoryQuery,
   useGetBrandScoreHistoryQuery,
   useGetCampaignMetricsHistoryQuery,
+  useGetPostMetricsQuery,
 } = analyticsApi;

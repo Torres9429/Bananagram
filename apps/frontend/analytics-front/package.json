@@ -18,7 +18,9 @@
     "@reduxjs/toolkit": "^2.0.0",
     "react-redux": "^9.0.0",
     "@repo/ui": "workspace:*",
-    "recharts": "^2.0.0"
+    "recharts": "^2.0.0",
+    "html-to-image": "^1.11.11",
+    "jspdf": "^2.5.2"
   },
   "devDependencies": {
     "typescript": "^5",

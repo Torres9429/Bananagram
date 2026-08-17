@@ -230,6 +230,13 @@ model SocialAccountMetricSnapshot {
   views    Int?
   reach    Int?
 
+  // Demografía de audiencia — confirmado en vivo (esta sesión) que el shape
+  // real es { "F.25-34": 15, ... } y { "US": 161, ... }. Sigue null en
+  // cuentas nuevas: Instagram exige ≥100 interacciones en 30 días para
+  // liberarlo, condición de la plataforma, no de este código.
+  audienceGenderAge Json?
+  audienceCountry   Json?
+
   source     String   @default("simulated") // 'ayrshare' | 'simulated'
   capturedAt DateTime @default(now())
 

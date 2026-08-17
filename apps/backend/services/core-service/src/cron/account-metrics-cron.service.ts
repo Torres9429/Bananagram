@@ -64,6 +64,8 @@ export class AccountMetricsCronService {
             shares: metrics.shares,
             views: metrics.views,
             reach: metrics.reach,
+            audienceGenderAge: metrics.audienceGenderAge ?? undefined,
+            audienceCountry: metrics.audienceCountry ?? undefined,
             source: metrics.source,
           },
         });

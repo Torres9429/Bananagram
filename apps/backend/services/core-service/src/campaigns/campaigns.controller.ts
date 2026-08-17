@@ -93,6 +93,21 @@ export class CampaignsController {
     return this.campaignMetrics.getMetricsHistory(id, from ? new Date(from) : undefined, to ? new Date(to) : undefined);
   }
 
+  // Detalle de métricas de UNA publicación puntual de esta campaña — mismo
+  // criterio de pertenencia que /metrics (assertCanView sobre la campaña
+  // dueña, no un guard aparte sobre el post).
+  @Get(':id/posts/:postId/metrics')
+  @RequirePermission('metricas', 'ver')
+  async getPostMetrics(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @CurrentUser() user: Claims,
+  ) {
+    await this.campaigns.getCampaign(id);
+    await this.campaigns.assertCanView(id, user);
+    return this.campaignMetrics.getPostMetrics(postId);
+  }
+
   // Atajo para no esperar el cron automático de cada 6h (MetricsCronService)
   // al probar/verificar una publicación real recién hecha — acota el
   // refresh a esta campaña e ignora la ventana de "ya sincronizado
