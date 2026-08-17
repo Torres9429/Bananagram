@@ -8,7 +8,7 @@ import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
 import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
 import { RedeemLinkCodeDto } from './dto/redeem-link-code.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { CurrentUser } from '@repo/backend-commons';
 
 @ApiTags('auth')
 @Controller('auth')

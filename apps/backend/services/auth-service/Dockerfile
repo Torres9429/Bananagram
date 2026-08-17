@@ -18,9 +18,12 @@ COPY packages ./packages
 RUN pnpm install --frozen-lockfile
 
 # ---- build: prebuild hook runs `prisma generate` for this service's own
-# schema (apps/backend/services/auth-service/prisma/schema.prisma) before compiling ----
+# schema (apps/backend/services/auth-service/prisma/schema.prisma) before
+# compiling. Via turbo (not plain `pnpm --filter`) so @repo/backend-commons
+# builds first — turbo.json's "build": {"dependsOn": ["^build"]} resolves
+# that from the workspace dependency graph, plain pnpm --filter doesn't. ----
 FROM deps AS builder
-RUN pnpm --filter @repo/auth-service run build
+RUN pnpm exec turbo run build --filter=@repo/auth-service
 
 # ---- runtime: copy the whole built workspace (symlinked node_modules included) ----
 FROM node:20-alpine AS runtime

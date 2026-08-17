@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import { RequirePermission } from '../decorators/require-permission.decorator';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { PermissionGuard } from '../guards/permission.guard';
+import { CurrentUser } from '@repo/backend-commons';
+import { RequirePermission } from '@repo/backend-commons';
+import { JwtAuthGuard } from '@repo/backend-commons';
+import { PermissionGuard } from '@repo/backend-commons';
 import { CreatePostDto } from './dto/create-post.dto';
 import { RejectPostDto } from './dto/reject-post.dto';
 import { SchedulePostDto } from './dto/schedule-post.dto';

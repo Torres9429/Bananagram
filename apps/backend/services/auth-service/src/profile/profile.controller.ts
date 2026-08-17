@@ -1,7 +1,7 @@
 import { Body, Controller, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { CurrentUser } from '@repo/backend-commons';
 import { ProfileService } from './profile.service';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 

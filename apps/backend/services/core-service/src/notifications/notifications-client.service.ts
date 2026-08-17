@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createCircuitBreaker } from '../circuit-breaker/opossum.factory';
+import { createCircuitBreaker } from '@repo/backend-commons';
 
 // Primera llamada saliente de core-service hacia auth-service (hasta la
 // Fase J solo existía la dirección contraria, auth→core para

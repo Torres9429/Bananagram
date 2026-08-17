@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { TokenDenylistService } from '../guards/token-denylist.service';
+import { TokenDenylistService } from '@repo/backend-commons';
 
 // @Global(): JwtAuthGuard se usa vía @UseGuards(JwtAuthGuard) en controllers
 // de módulos que no siempre importan este módulo (p.ej. InternalModule) —

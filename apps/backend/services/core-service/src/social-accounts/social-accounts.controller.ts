@@ -1,9 +1,9 @@
 import { Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { PermissionGuard } from '../guards/permission.guard';
+import { JwtAuthGuard } from '@repo/backend-commons';
+import { PermissionGuard } from '@repo/backend-commons';
 import { BrandAccessGuard } from '../guards/brand-access.guard';
-import { RequirePermission } from '../decorators/require-permission.decorator';
+import { RequirePermission } from '@repo/backend-commons';
 import { SocialAccountsService } from './social-accounts.service';
 
 // BrandAccessGuard lee request.params.brandId || request.params.id — con

@@ -1,9 +1,9 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { PermissionGuard } from '../guards/permission.guard';
-import { RequirePermission } from '../decorators/require-permission.decorator';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { JwtAuthGuard } from '@repo/backend-commons';
+import { PermissionGuard } from '@repo/backend-commons';
+import { RequirePermission } from '@repo/backend-commons';
+import { CurrentUser } from '@repo/backend-commons';
 import { ScoreService } from './score.service';
 
 type Claims = { sub: string; roles: string[] };

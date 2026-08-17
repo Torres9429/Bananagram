@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { PermissionGuard } from '../guards/permission.guard';
-import { RequirePermission } from '../decorators/require-permission.decorator';
+import { JwtAuthGuard } from '@repo/backend-commons';
+import { PermissionGuard } from '@repo/backend-commons';
+import { RequirePermission } from '@repo/backend-commons';
 import { CatalogsService } from './catalogs.service';
 import { CreateSpecialtyDto } from './dto/create-specialty.dto';
 import { UpdateSpecialtyDto } from './dto/update-specialty.dto';

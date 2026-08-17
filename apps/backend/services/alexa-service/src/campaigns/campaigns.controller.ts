@@ -1,6 +1,6 @@
 import { Controller, Get, Headers, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@repo/backend-commons';
 import { CampaignsService } from './campaigns.service';
 
 // BFF de solo lectura sobre core-service (Fase 6 del plan) — sin
