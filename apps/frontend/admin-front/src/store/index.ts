@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { authReducer, authApi, catalogsApi, notificationsApi } from '@repo/ui/state';
+import { adminApi } from './api/admin.api';
 
 // notificationsApi: TopBar (con NotificationBell) se monta en AppShell de
 // esta zona — sin esta pieza, useNotifications() truena en runtime
@@ -10,6 +11,8 @@ export const store = configureStore({
     [authApi.reducerPath]: authApi.reducer,
     [catalogsApi.reducerPath]: catalogsApi.reducer,
     [notificationsApi.reducerPath]: notificationsApi.reducer,
+    [adminApi.reducerPath]: adminApi.reducer,
   },
-  middleware: (gDM) => gDM().concat(authApi.middleware, catalogsApi.middleware, notificationsApi.middleware),
+  middleware: (gDM) =>
+    gDM().concat(authApi.middleware, catalogsApi.middleware, notificationsApi.middleware, adminApi.middleware),
 });
