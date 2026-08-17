@@ -486,6 +486,7 @@ export class PostsService {
     return prisma.post.findMany({
       where,
       include: {
+        campaign: { select: { name: true } },
         socialNetworks: { include: { socialNetwork: true } },
         media: { include: { media: true }, orderBy: { order: 'asc' } },
       },
@@ -663,13 +664,20 @@ export class PostsService {
         uploadedFiles.push(await this.cloudinary.uploadFile(file));
       }
 
+      // Bug real (encontrado en vivo con datos reales, ver contentTypeBreakdown
+      // de analytics-front): index + 1 se calculaba solo contra el lote que se
+      // está subiendo en ESTE momento, sin contar los adjuntos que el post ya
+      // tenía de subidas anteriores — dos subidas distintas al mismo post
+      // terminaban ambas con order 1. Se calcula el offset real primero.
+      const existingMediaCount = await prisma.postMedia.count({ where: { postId } });
+
       return await prisma.$transaction(async (tx) => {
         const updatedPost = await tx.post.update({
           where: { id: postId },
           data: {
             media: {
               create: uploadedFiles.map((uploadedFile, index) => ({
-                order: index + 1,
+                order: existingMediaCount + index + 1,
                 media: {
                   create: {
                     brandId: post.brandId,
