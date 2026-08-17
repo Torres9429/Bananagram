@@ -44,6 +44,15 @@ export interface AccountMetrics {
   shares: number | null;
   views: number | null;
   reach: number | null;
+  // Demografía de audiencia — confirmado en vivo contra Ayrshare real que el
+  // shape es { "F.25-34": 15, "M.18-24": 11 } (género.rango unidos por
+  // punto) y { "US": 161 } por país. Requiere mandar `quarters` en el
+  // request (si no, Ayrshare ni siquiera intenta calcularlo) y, del lado de
+  // Instagram, al menos 100 interacciones en los últimos 30 días — por eso
+  // sigue null en cuentas nuevas/de prueba, no es un bug, es una condición
+  // real de la plataforma. Object vacío también se normaliza a null.
+  audienceGenderAge: Record<string, number> | null;
+  audienceCountry: Record<string, number> | null;
   source: string; // 'ayrshare' | 'simulated'
 }
 
