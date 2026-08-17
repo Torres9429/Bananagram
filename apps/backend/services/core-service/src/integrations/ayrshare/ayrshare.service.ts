@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { createCircuitBreaker } from '../../circuit-breaker/opossum.factory';
+import { createCircuitBreaker } from '@repo/backend-commons';
 import { prisma } from '../../prisma/client';
 import { getAyrshareConfig, getAyrshareErrorMessage } from '../../brands/ayrshare.util';
 import { computeEngagement } from './engagement.util';

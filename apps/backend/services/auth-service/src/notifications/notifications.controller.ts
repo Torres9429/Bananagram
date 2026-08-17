@@ -2,7 +2,7 @@ import { Controller, Get, Param, Patch, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { CurrentUser } from '@repo/backend-commons';
 import { NotificationsService } from './notifications.service';
 import { NotificationsStreamService } from './notifications-stream.service';
 

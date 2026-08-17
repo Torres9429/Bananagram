@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { PermissionGuard } from '../guards/permission.guard';
-import { RequirePermission } from '../decorators/require-permission.decorator';
+import { PermissionGuard } from '@repo/backend-commons';
+import { RequirePermission } from '@repo/backend-commons';
 import { AdminRolesService } from './admin-roles.service';
 import { UpdateRolePermissionDto } from './dto/update-role-permission.dto';
 

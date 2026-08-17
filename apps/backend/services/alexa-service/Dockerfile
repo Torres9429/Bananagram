@@ -15,10 +15,13 @@ COPY apps ./apps
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile
 
-# ---- build: generate Prisma Client against the shared schema, then compile ----
+# ---- build: generate Prisma Client against the shared schema, then compile.
+# Via turbo (not plain `pnpm --filter`) so @repo/backend-commons builds
+# first — turbo.json's "build": {"dependsOn": ["^build"]} resolves that from
+# the workspace dependency graph, plain pnpm --filter doesn't. ----
 FROM deps AS builder
 RUN pnpm db:generate
-RUN pnpm --filter @repo/alexa-service run build
+RUN pnpm exec turbo run build --filter=@repo/alexa-service
 
 # ---- runtime: copy the whole built workspace (symlinked node_modules included) ----
 FROM node:20-alpine AS runtime

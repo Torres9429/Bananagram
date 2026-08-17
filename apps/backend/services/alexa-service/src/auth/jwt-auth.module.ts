@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { TokenDenylistService } from '../guards/token-denylist.service';
+import { TokenDenylistService } from '@repo/backend-commons';
 
 // @Global(): mismo motivo que core-service/src/auth/jwt-auth.module.ts —
 // sin passport, TokenDenylistService debe estar disponible en todo módulo
