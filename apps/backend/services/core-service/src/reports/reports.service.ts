@@ -27,8 +27,23 @@ export class ReportsService {
     });
   }
 
-  async getReport(id: string): Promise<any> {
-    const report = await prisma.report.findUnique({ where: { id } });
+  // Mismo criterio de ownership que listReports — sin esto, cualquier usuario
+  // con el permiso genérico reportes:ver podía leer el reporte de cualquier
+  // marca ajena conociendo o adivinando el id (IDOR).
+  async getReport(id: string, user: CurrentUser): Promise<any> {
+    const report = user.roles.includes('administrador')
+      ? await prisma.report.findUnique({ where: { id } })
+      : await prisma.report.findFirst({
+          where: {
+            id,
+            brand: {
+              OR: [
+                { ownerId: user.sub },
+                { campaigns: { some: { OR: [{ cmId: user.sub }, { designers: { some: { userId: user.sub } } }] } } },
+              ],
+            },
+          },
+        });
     if (!report) throw new NotFoundException(`Report ${id} no existe`);
     return report;
   }

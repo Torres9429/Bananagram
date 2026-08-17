@@ -20,7 +20,7 @@ import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast } from '@repo/ui/ui';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser, useListCategoriesQuery } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
@@ -64,6 +64,7 @@ const SOCIAL_NETWORK_COLORS: Record<string, string> = {
 export function ClientSection() {
   const router = useRouter();
   const user = useSelector(selectUser);
+  const { can } = usePermissions();
 
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [createBrandOpen, setCreateBrandOpen] = useState(false);
@@ -225,24 +226,33 @@ export function ClientSection() {
 
   return (
     <Stack gap={3}>
-      {/* Un Cliente puede tener varias marcas (ej. Barcel) — selector solo
-          visible cuando hay más de una, para no agregar ruido al caso común
-          de una sola marca. */}
-      {myBrands.length > 1 && (
+      {/* Un Cliente puede tener varias marcas (ej. Barcel) — el selector solo
+          se muestra cuando ya hay más de una (no agrega ruido con una sola),
+          pero el botón "Nueva marca" debe verse desde la primera marca: era
+          el único punto de entrada para crear la SEGUNDA, y antes vivía
+          dentro de este mismo bloque condicionado a length > 1 — con
+          exactamente 1 marca (el caso común) nadie podía llegar a la
+          segunda. Gateado por permiso, igual que el resto de acciones
+          protegidas del sistema. */}
+      {myBrands.length > 0 && (
         <Stack direction="row" gap={1.5} alignItems="center">
-          <Select
-            size="small"
-            value={realBrandId ?? ''}
-            onChange={(e) => setSelectedBrandId(e.target.value as string)}
-            sx={{ minWidth: 220, bgcolor: '#fff' }}
-          >
-            {myBrands.map((b) => (
-              <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
-            ))}
-          </Select>
-          <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
-            Nueva marca
-          </Button>
+          {myBrands.length > 1 && (
+            <Select
+              size="small"
+              value={realBrandId ?? ''}
+              onChange={(e) => setSelectedBrandId(e.target.value as string)}
+              sx={{ minWidth: 220, bgcolor: '#fff' }}
+            >
+              {myBrands.map((b) => (
+                <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+              ))}
+            </Select>
+          )}
+          {can('marcas', 'crear') && (
+            <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
+              Nueva marca
+            </Button>
+          )}
         </Stack>
       )}
 
