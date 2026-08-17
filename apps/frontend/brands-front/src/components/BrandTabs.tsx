@@ -12,7 +12,6 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 const SECTIONS = [
   { suffix: '', label: 'Resumen' },
   { suffix: '/campaigns', label: 'Campañas' },
-  { suffix: '/calendar', label: 'Calendario' },
   { suffix: '/metrics', label: 'Métricas' },
   { suffix: '/score', label: 'Score' },
   { suffix: '/reports', label: 'Reportes' },
