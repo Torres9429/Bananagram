@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../node_modules/.prisma-client';
 import { prisma } from '../prisma/client';
+import { userHasBrandRelation } from '../guards/brand-relation.util';
 
 type LatestEngagement = { postSocialAccountId: string; engagement: number | null };
 type CurrentUser = { sub: string; roles: string[] };
@@ -9,18 +10,20 @@ const SCORE_SYNC_WINDOW_HOURS = 5; // mismo criterio que los crons de métricas 
 
 @Injectable()
 export class ScoreService {
-  // Score y crecimiento de cuenta son información de negocio del dueño de
-  // la marca — a diferencia de BrandAccessGuard (que deja pasar también a
-  // CM/Diseñador de cualquier campaña de la marca, pensado para "ver el
-  // detalle de la marca"), aquí el criterio es más estricto a propósito
-  // (decisión confirmada con el usuario): solo dueño de marca o
-  // Administrador, nunca CM ni Diseñador.
+  // La autoridad de SI puede ver el score es el permiso RBAC (`score:ver`,
+  // ya validado por PermissionGuard) — no un chequeo de rol. Esto decide
+  // SOBRE QUÉ marca: mismo criterio de relación real que BrandAccessGuard/
+  // assertCanView (dueño, o CM/Diseñador de alguna campaña de esa marca).
+  // Decisión de producto confirmada 2026-08-17 (antes exigía ser
+  // exactamente el dueño, dejando `score:ver` sin efecto para CM/Diseñador
+  // aunque el permiso estuviera concedido — bug real ya confirmado en el
+  // seed, que sí le da `score:ver` a community_manager).
   async assertIsBrandOwnerOrAdmin(brandId: string, user: CurrentUser): Promise<void> {
     if (user.roles.includes('administrador')) return;
     const brand = await prisma.brand.findFirst({ where: { id: brandId, deletedAt: null }, select: { ownerId: true } });
     if (!brand) throw new NotFoundException(`Brand ${brandId} no existe`);
-    if (brand.ownerId !== user.sub) {
-      throw new ForbiddenException('Solo el dueño de la marca puede ver su score y crecimiento de cuenta');
+    if (!(await userHasBrandRelation(brandId, brand.ownerId, user.sub))) {
+      throw new ForbiddenException('No tienes relación con esta marca — no puedes ver su score');
     }
   }
 

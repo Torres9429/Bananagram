@@ -86,6 +86,10 @@ export const adminApi = createApi({
       query: () => 'admin/roles',
       providesTags: ['AdminRole'],
     }),
+    createRole: builder.mutation<AdminRole, { name: string }>({
+      query: (body) => ({ url: 'admin/roles', method: 'POST', body }),
+      invalidatesTags: ['AdminRole'],
+    }),
     listModules: builder.query<AdminModule[], void>({
       query: () => 'admin/modules',
     }),
@@ -117,6 +121,7 @@ export const {
   useAssignRoleMutation,
   useUnassignRoleMutation,
   useListRolesQuery,
+  useCreateRoleMutation,
   useListModulesQuery,
   useListActionsQuery,
   useUpdateRolePermissionMutation,

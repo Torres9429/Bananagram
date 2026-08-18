@@ -4,6 +4,7 @@ import { useState } from 'react';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import { FormDialog, LabeledField, LabeledSelect, useToast } from '@repo/ui/ui';
+import { formatRoleName } from '@repo/ui/utils';
 import { useCreateUserMutation } from '../store/api/admin.api';
 import { useListRolesQuery } from '../store/api/admin.api';
 
@@ -72,7 +73,7 @@ export function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
       />
       <LabeledSelect label="Rol" value={roleName} onChange={(e) => setRoleName(e.target.value as string)}>
         {roles.map((r) => (
-          <MenuItem key={r.id} value={r.name}>{r.name}</MenuItem>
+          <MenuItem key={r.id} value={r.name}>{formatRoleName(r.name)}</MenuItem>
         ))}
       </LabeledSelect>
       <Typography variant="caption" color="text.secondary">

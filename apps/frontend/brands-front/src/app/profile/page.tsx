@@ -1,14 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import MicOutlinedIcon from '@mui/icons-material/MicOutlined';
+import { usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
+import { formatRoleName } from '@repo/ui/utils';
 import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { ClientSection } from '../../components/profile/ClientSection';
 import { StaffProfileSection } from '../../components/profile/StaffProfileSection';
@@ -16,8 +14,10 @@ import { MOCK_AVAILABLE_CMS, MOCK_AVAILABLE_DESIGNERS, PROFILE_TYPE_LABELS, getC
 import type { ProfileType } from '../../interfaces/interface';
 
 // En mock, el perfil del usuario activo se obtiene buscando en los arrays
-// de CMs o Diseñadores disponibles, según su rol.
-// En producción: GET /users/me → datos propios del backend.
+// de CMs o Diseñadores disponibles, según su rol — placeholder pendiente de
+// GET /users/me real (gap preexistente, ajeno a esta tarea de permisos). Un
+// rol futuro sin perfil mock propio cae al mock de Diseñador por defecto:
+// cosmético nada más, sin impacto de seguridad/funcionalidad real.
 function findMockStaffProfile(role: string) {
   if (role === 'community_manager') {
     return MOCK_AVAILABLE_CMS.find((u) => u.id === 'u1') ?? null; // Ana García es la CM demo
@@ -25,29 +25,24 @@ function findMockStaffProfile(role: string) {
   return MOCK_AVAILABLE_DESIGNERS.find((u) => u.id === 'u3') ?? null; // Elías Bailón como Diseñador demo
 }
 
-const STAFF_ROLE_LABELS: Record<string, string> = {
-  community_manager: 'Community Manager',
-  disenador: 'Diseñador',
-};
-
 // ProfilePage — Perfil único (§A.6 del análisis de dominio): una sola página,
 // un Header común, y el contenido varía por sección según quién la visita.
-// "type" en el switch no es el ProfileType del Cliente (brand/company/
-// organization/creator/personal — esos 4 primeros comparten siempre la misma
-// ClientSection, nunca se bifurcan entre sí) sino el rol de quien visita la
-// ruta, que es lo único que distingue "perfil de negocio" (Cliente) de
-// "perfil de habilidades" (CM/Diseñador).
+// Antes decidía por switch(role) hardcodeado ('cliente' vs
+// 'community_manager'/'disenador'/default→pantalla en blanco) — ahora decide
+// por el permiso real que separa ambas identidades: quien puede
+// crear/editar marcas "es dueño de marca" (ClientSection), cualquier otro
+// cae en el perfil de habilidades genérico (StaffProfileSection) en vez de
+// quedar en blanco. Así un rol nuevo (ej. "solo_lectura") creado desde
+// /admin-front/roles funciona sin tocar este archivo.
 export default function ProfilePage() {
-  const router = useRouter();
   const user = useSelector(selectUser);
-  const canUseAlexaSkill = (user?.roles ?? []).some((r) => r === 'cliente' || r === 'disenador');
-  // Esta página asume un solo rol "de negocio" activo por sesión (mismo
-  // supuesto que ya tenía antes de multi-rol) — con varios roles reales toma
-  // el primero. No es parte del alcance de esta fase (login/catálogos/
-  // campañas), solo se ajusta el tipo para que siga compilando.
+  const { can } = usePermissions();
+  const hasProfileAccess = can('marcas', 'crear') || can('marcas', 'editar');
+  // Solo para elegir el perfil mock/label de "no es dueño de marca" — no
+  // determina si ve ClientSection o StaffProfileSection (eso ya es
+  // hasProfileAccess). Con varios roles reales toma el primero.
   const role = user?.roles?.[0] ?? '';
-  const isStaff = role === 'community_manager' || role === 'disenador';
-  const mockStaffProfile = isStaff ? findMockStaffProfile(role) : null;
+  const mockStaffProfile = !hasProfileAccess ? findMockStaffProfile(role) : null;
 
   // Vive en ProfilePage (no dentro de StaffProfileSection) porque el Header
   // común también lo necesita para reflejar el nombre mientras se edita —
@@ -57,32 +52,20 @@ export default function ProfilePage() {
 
   // Mientras la sesión de Redux aún no hidrata (useSessionBootstrap corre en
   // un useEffect, tras el primer render), `user` es null un instante — sin
-  // este guard, `role` caía a '' y el Header se alcanzaba a pintar con
-  // headerName vacío ("Sin nombre") antes de la re-render correcta. Va
+  // este guard, `can()` siempre da false y el Header se alcanzaba a pintar
+  // con headerName vacío ("Sin nombre") antes de la re-render correcta. Va
   // DESPUÉS de todos los hooks (Rules of Hooks) — solo bloquea el render.
   if (!user) return null;
 
   const clientProfile = getCurrentClientProfile(user?.email);
-  const headerName = role === 'cliente' ? clientProfile.name : name;
-  const headerSubtitle = role === 'cliente'
+  const headerName = hasProfileAccess ? clientProfile.name : name;
+  const headerSubtitle = hasProfileAccess
     ? (PROFILE_TYPE_LABELS[clientProfile.profileType as ProfileType] ?? clientProfile.profileType ?? '')
-    : (STAFF_ROLE_LABELS[role] ?? '');
-
-  function renderSection() {
-    switch (role) {
-      case 'cliente':
-        return <ClientSection />;
-      case 'community_manager':
-      case 'disenador':
-        return <StaffProfileSection mockProfile={mockStaffProfile} name={name} onNameChange={setName} />;
-      default:
-        return null;
-    }
-  }
+    : (role ? formatRoleName(role) : '');
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%', p: 3 }}>
-      {role !== 'cliente' && (
+      {!hasProfileAccess && (
         <>
           <Typography variant="h5" fontWeight={700} mb={1}>Mi perfil</Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
@@ -92,23 +75,14 @@ export default function ProfilePage() {
         </>
       )}
 
-      {canUseAlexaSkill && (
-        <Stack direction="row" justifyContent="flex-end" mb={2}>
-          <Button
-            variant="outlined"
-            startIcon={<MicOutlinedIcon />}
-            onClick={() => router.push('/profile/alexa')}
-            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
-          >
-            Alexa Skill
-          </Button>
-        </Stack>
+      {/* Dueño de marca: ClientSection renderiza su propio hero (avatar, tipo,
+          categoría, score, acciones) — más rico que el ProfileHeader genérico
+          compartido con el resto de roles, así que no se duplica aquí. */}
+      {hasProfileAccess ? (
+        <ClientSection />
+      ) : (
+        <StaffProfileSection mockProfile={mockStaffProfile} name={name} onNameChange={setName} />
       )}
-
-      {/* Cliente: ClientSection renderiza su propio hero (avatar, tipo, categoría,
-          score, acciones) — más rico que el ProfileHeader genérico compartido con
-          CM/Diseñador, así que no se duplica aquí. */}
-      {renderSection()}
     </Box>
   );
 }

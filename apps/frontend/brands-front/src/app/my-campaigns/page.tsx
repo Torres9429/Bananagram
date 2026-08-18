@@ -9,9 +9,13 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
-import { EmptyState, FormDialog, LabeledField, PrimaryButton, useToast } from '@repo/ui/ui';
+import MenuItem from '@mui/material/MenuItem';
+import Alert from '@mui/material/Alert';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { useListCampaignsQuery, useAcceptCampaignMutation, useRejectCampaignMutation } from '../../store/api/campaigns.api';
+import { useListMyBrandsQuery } from '../../store/api/brands.api';
+import { CreateCampaignDialog } from '../../components/CreateCampaignDialog';
 import { CAMPAIGN_STATUS_LABEL } from '../../lib/mock-data';
 
 // Reescrita a datos reales (Fase J) — antes usaba getMyCampaigns() (mock).
@@ -20,15 +24,48 @@ import { CAMPAIGN_STATUS_LABEL } from '../../lib/mock-data';
 export default function MyCampaignsPage() {
   const router = useRouter();
   const user = useSelector(selectUser);
-  const role = user?.roles?.[0] ?? '';
-  const isCm = role === 'community_manager';
+  const { can } = usePermissions();
 
   const { data: campaigns = [] } = useListCampaignsQuery();
   const [acceptCampaign, { isLoading: isAccepting }] = useAcceptCampaignMutation();
   const [rejectCampaign, { isLoading: isRejecting }] = useRejectCampaignMutation();
   const { showSuccess, showError } = useToast();
 
-  const pendingCampaigns = isCm ? campaigns.filter((c) => c.cmId === user?.id && c.cmStatus === 'pendiente') : [];
+  // Crear campaña (2026-08-17): campanas:crear es la única autoridad para
+  // mostrar el botón — a diferencia del perfil de Cliente (que ya tiene una
+  // marca "activa" de contexto), esta pantalla es cross-marca por diseño,
+  // así que primero hay que elegir SOBRE QUÉ marca. GET /brands ya filtra
+  // server-side a marcas con las que el usuario tiene relación real (dueño,
+  // o CM/Diseñador de alguna campaña de esa marca) — mismo criterio que el
+  // backend vuelve a validar en CampaignsService.createCampaign, así que la
+  // lista de opciones aquí ya es exactamente el universo válido, sin
+  // necesitar isCliente/isCm/isDesigner para decidir nada.
+  const canCreateCampaign = can('campanas', 'crear');
+  const { data: myBrands = [] } = useListMyBrandsQuery(undefined, { skip: !canCreateCampaign });
+  const [pickBrandOpen, setPickBrandOpen] = useState(false);
+  const [pickedBrandId, setPickedBrandId] = useState('');
+  const [createBrandId, setCreateBrandId] = useState<string | null>(null);
+
+  // El selector de marca siempre se muestra primero, sin importar cuántas
+  // marcas relacionadas tenga el usuario (0, 1 o varias) — comportamiento
+  // homologado, no depende de un atajo por cantidad.
+  function openCreateCampaign() {
+    setPickedBrandId('');
+    setPickBrandOpen(true);
+  }
+
+  function confirmBrandPick() {
+    if (!pickedBrandId) return;
+    setCreateBrandId(pickedBrandId);
+    setPickBrandOpen(false);
+  }
+
+  // c.cmId === user?.id ya acota esto a "campañas donde YO soy el CM
+  // asignado" — no depende de rol, depende de a quién asignó el Cliente
+  // (mismo criterio real que usa el backend). Antes se gateaba también por
+  // isCm (rol), redundante y potencialmente incorrecto si los privilegios
+  // de un usuario no calzan 1:1 con su rol primario.
+  const pendingCampaigns = campaigns.filter((c) => c.cmId === user?.id && c.cmStatus === 'pendiente');
   const activeCampaigns = campaigns.filter((c) => !pendingCampaigns.some((p) => p.id === c.id));
 
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
@@ -62,12 +99,21 @@ export default function MyCampaignsPage() {
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%', p: 3 }}>
-      <Typography variant="h5" fontWeight={700} mb={1}>Mis campañas</Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Campañas en las que participas, de todas las marcas asignadas.
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={3} flexWrap="wrap" gap={2}>
+        <Box>
+          <Typography variant="h5" fontWeight={700} mb={1}>Mis campañas</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Campañas en las que participas, de todas las marcas asignadas.
+          </Typography>
+        </Box>
+        {canCreateCampaign && (
+          <PrimaryButton onClick={openCreateCampaign}>
+            + Crear campaña
+          </PrimaryButton>
+        )}
+      </Stack>
 
-      {isCm && pendingCampaigns.length > 0 && (
+      {pendingCampaigns.length > 0 && (
         <Box mb={4}>
           <Typography variant="subtitle1" fontWeight={700} mb={1.5}>Pendientes de tu aprobación</Typography>
           <Stack gap={1.5}>
@@ -82,12 +128,16 @@ export default function MyCampaignsPage() {
                     </Typography>
                   </Box>
                   <Stack direction="row" gap={1}>
-                    <Button size="small" color="error" variant="outlined" disabled={isRejecting} onClick={() => openReject(c.id)}>
-                      Rechazar
-                    </Button>
-                    <PrimaryButton size="small" disabled={isAccepting} onClick={() => handleAccept(c.id)}>
-                      Aceptar
-                    </PrimaryButton>
+                    {can('campanas', 'rechazar') && (
+                      <Button size="small" color="error" variant="outlined" disabled={isRejecting} onClick={() => openReject(c.id)}>
+                        Rechazar
+                      </Button>
+                    )}
+                    {can('campanas', 'aprobar') && (
+                      <PrimaryButton size="small" disabled={isAccepting} onClick={() => handleAccept(c.id)}>
+                        Aceptar
+                      </PrimaryButton>
+                    )}
                   </Stack>
                 </Stack>
               </Paper>
@@ -97,7 +147,7 @@ export default function MyCampaignsPage() {
       )}
 
       <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
-        {isCm && pendingCampaigns.length > 0 ? 'Resto de campañas' : 'Campañas'}
+        {pendingCampaigns.length > 0 ? 'Resto de campañas' : 'Campañas'}
       </Typography>
       {activeCampaigns.length === 0 ? (
         <EmptyState
@@ -153,6 +203,35 @@ export default function MyCampaignsPage() {
           rows={2}
         />
       </FormDialog>
+
+      <FormDialog
+        open={pickBrandOpen}
+        title="¿Para qué marca?"
+        maxWidth="xs"
+        confirmLabel="Continuar"
+        confirmDisabled={!pickedBrandId}
+        onClose={() => setPickBrandOpen(false)}
+        onConfirm={confirmBrandPick}
+      >
+        {myBrands.length === 0 ? (
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            No tienes ninguna marca con la que estés relacionado todavía — no hay sobre qué crear una
+            campaña. Pídele a un Cliente o Administrador que te asigne a una campaña o marca primero.
+          </Alert>
+        ) : (
+          <LabeledSelect label="Marca" value={pickedBrandId} onChange={(e) => setPickedBrandId(e.target.value as string)}>
+            {myBrands.map((b) => (
+              <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+            ))}
+          </LabeledSelect>
+        )}
+      </FormDialog>
+
+      <CreateCampaignDialog
+        open={!!createBrandId}
+        brandId={createBrandId ?? ''}
+        onClose={() => setCreateBrandId(null)}
+      />
     </Box>
   );
 }

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { prisma } from '../prisma/client';
 import { CampaignStatus, CmAssignmentStatus } from '../../node_modules/.prisma-client';
 import { NotificationsClient } from '../notifications/notifications-client.service';
+import { userHasBrandRelation } from '../guards/brand-relation.util';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 
@@ -72,17 +73,22 @@ export class CampaignsService {
     if (!campaign) throw new ForbiddenException('No tienes acceso a esta campaña');
   }
 
-  // Regla de negocio: el Cliente crea la campaña para una marca suya y
-  // elige un único CM (cmId). Se valida aquí, no solo con el permiso de
-  // módulo — `campanas:crear` en el seed también lo tiene community_manager
-  // (para poder operar campañas existentes), pero crear una campaña nueva
-  // sigue siendo un acto del dueño de la marca (o de un Administrador).
+  // La autoridad de SI puede crear campañas es el permiso RBAC
+  // (`campanas:crear`, ya validado por PermissionGuard antes de llegar
+  // aquí) — no un chequeo de rol. Lo que sigue determina SOBRE QUÉ marca:
+  // el usuario debe tener alguna relación real con ella (dueño, o CM/
+  // Diseñador de alguna campaña ya existente de esa marca), igual que
+  // BrandAccessGuard/assertCanView — preserva el aislamiento multi-tenant
+  // sin exigir ser exactamente el dueño. Decisión de producto confirmada
+  // 2026-08-17: antes esto exigía brand.ownerId===user.sub exacto, lo que
+  // dejaba `campanas:crear` sin efecto para cualquier rol que no fuera
+  // Cliente/Admin aunque el permiso estuviera concedido.
   async createCampaign(dto: CreateCampaignDto, user: CurrentUser): Promise<any> {
     const brand = await prisma.brand.findFirst({ where: { id: dto.brandId, deletedAt: null } });
     if (!brand) throw new BadRequestException('La marca especificada no existe o fue eliminada');
 
-    if (!user.roles.includes('administrador') && brand.ownerId !== user.sub) {
-      throw new ForbiddenException('Solo el dueño de la marca puede crear campañas para ella');
+    if (!user.roles.includes('administrador') && !(await userHasBrandRelation(dto.brandId, brand.ownerId, user.sub))) {
+      throw new ForbiddenException('No tienes relación con esta marca — no puedes crear campañas para ella');
     }
 
     await this.assertUserHasRole(dto.cmId, 'cm', 'El usuario seleccionado no corresponde a un Community Manager');
