@@ -11,7 +11,7 @@ import { EmptyState } from '@repo/ui/ui';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useDateRangeParams } from './useDateRangeParams';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useActiveBrandId } from './useActiveBrandId';
 
 // Datos reales — mismo endpoint que ya usa AccountGrowthOverview
 // (SocialAccountMetricSnapshot, poblado cada 6h por el cron), pero recortado
@@ -22,8 +22,7 @@ import { useFilteredCampaigns } from './useFilteredCampaigns';
 // Retención de video se deja como estado vacío honesto: Ayrshare/los
 // mappers de este proyecto no capturan ese campo para ninguna red hoy.
 export function AudienceOverview() {
-  const campaigns = useFilteredCampaigns();
-  const brandId = campaigns[0]?.brandId;
+  const brandId = useActiveBrandId();
   const range = useDateRangeParams();
   const { data: history = [] } = useGetBrandMetricsHistoryQuery(brandId ? { brandId, range } : ({} as never), { skip: !brandId });
 

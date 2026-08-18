@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Tabs from '@mui/material/Tabs';
@@ -35,10 +35,10 @@ import { ContentTypeBreakdown } from '../../components/dashboard/ContentTypeBrea
 import { AudienceGenderAgeChart } from '../../components/dashboard/AudienceGenderAgeChart';
 import { AudienceGenderPie } from '../../components/dashboard/AudienceGenderPie';
 import { AudienceCountryChart } from '../../components/dashboard/AudienceCountryChart';
-import { useGetBrandSocialAccountsQuery } from '../../store/api/analytics.api';
+import { useGetBrandSocialAccountsQuery, useRefreshBrandMetricsMutation, useRefreshCampaignMetricsMutation } from '../../store/api/analytics.api';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectSelectedNetwork } from '../../store/analytics.selectors';
-import { useFilteredCampaigns } from '../../components/dashboard/useFilteredCampaigns';
+import { useActiveBrandId } from '../../components/dashboard/useActiveBrandId';
 import type { TabValue } from '../../interfaces/interface';
 
 const ALL_NETWORK_TABS: { value: TabValue; label: string }[] = [
@@ -91,15 +91,38 @@ export default function MetricsPage() {
 
   // Solo mostrar pestañas de redes que el usuario tiene realmente
   // conectadas — antes las 6 aparecían siempre, aunque no hubiera ninguna
-  // cuenta vinculada para esa red.
-  const campaigns = useFilteredCampaigns();
-  const brandId = campaigns[0]?.brandId;
+  // cuenta vinculada para esa red. brandId ya NO depende de que existan
+  // campañas (useActiveBrandId) — una marca recién conectada, sin ninguna
+  // campaña todavía, ahora sí muestra sus pestañas de red reales.
+  const brandId = useActiveBrandId();
   const { data: socialAccounts = [] } = useGetBrandSocialAccountsQuery(brandId ?? '', { skip: !brandId });
   const connectedCodes = new Set(socialAccounts.filter((account) => account.active).map((account) => account.socialNetwork.code));
   const TABS = [
     { value: 'general' as TabValue, label: 'General' },
     ...ALL_NETWORK_TABS.filter((tab) => connectedCodes.has(tab.value)),
   ];
+
+  // Refresh al entrar a Métricas (2026-08-17) — una vez por montaje (o por
+  // cambio real de marca/campaña seleccionada), nunca polling. Muestra el
+  // cache existente de inmediato (no bloquea la pantalla); dispara la
+  // llamada real a Ayrshare en segundo plano y, al terminar, los widgets se
+  // refrescan solos vía invalidatesTags. Máximo 2 llamadas a Ayrshare por
+  // entrada: cuenta social completa (siempre, si hay brandId) + la campaña
+  // actualmente seleccionada (solo si el usuario ya entró al detalle de
+  // una) — nunca una por cada campaña filtrada, para no arriesgar rate
+  // limits de Ayrshare (decisión explícita, ver reporte de la auditoría).
+  const [refreshBrandMetrics] = useRefreshBrandMetricsMutation();
+  const [refreshCampaignMetrics] = useRefreshCampaignMetricsMutation();
+
+  useEffect(() => {
+    if (!brandId) return;
+    refreshBrandMetrics(brandId);
+  }, [brandId, refreshBrandMetrics]);
+
+  useEffect(() => {
+    if (!filters.campaignId) return;
+    refreshCampaignMetrics(filters.campaignId);
+  }, [filters.campaignId, refreshCampaignMetrics]);
 
   // Mientras la sesión aún no hidrata desde la cookie, `can()` siempre da
   // false (permissions arranca en {}) — sin este guard se veía un flash de
@@ -136,7 +159,7 @@ export default function MetricsPage() {
         {/* Captura exactamente lo renderizado en contentRef — nunca recalcula
             ni pide configuración aparte, el PDF coincide con lo que ya se ve
             filtrado en pantalla. */}
-        {can('reportes', 'exportar') && (
+        {can('metricas', 'exportar') && (
           <Tooltip title="Descargar como PDF lo que estás viendo">
             <span>
               <Button

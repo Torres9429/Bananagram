@@ -6,13 +6,12 @@ import Typography from '@mui/material/Typography';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { EmptyState } from '@repo/ui/ui';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useActiveBrandId } from './useActiveBrandId';
 
 // Datos reales — confirmado en vivo, shape { "US": 161, ... } (código de
 // país, no nombre completo — Ayrshare no lo traduce). Top 8 países.
 export function AudienceCountryChart() {
-  const campaigns = useFilteredCampaigns();
-  const brandId = campaigns[0]?.brandId;
+  const brandId = useActiveBrandId();
   const { data: history = [] } = useGetBrandMetricsHistoryQuery(brandId ? { brandId } : ({} as never), { skip: !brandId });
 
   const data = useMemo(() => {

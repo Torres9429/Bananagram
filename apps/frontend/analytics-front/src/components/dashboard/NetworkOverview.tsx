@@ -16,6 +16,7 @@ import type { SocialNetworkCode } from '../../lib/analytics/types';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
 import { useNetworkCodesFilter } from './useNetworkCodesFilter';
 import { useLatestFollowers } from './useLatestFollowers';
+import { useActiveBrandId } from './useActiveBrandId';
 
 /**
  * Resumen de rendimiento — de la red seleccionada, o agregado de todas
@@ -29,16 +30,28 @@ import { useLatestFollowers } from './useLatestFollowers';
 export function NetworkOverview({ networkCode }: { networkCode: SocialNetworkCode | null }) {
   const campaigns = useFilteredCampaigns();
   const networkCodes = useNetworkCodesFilter();
-  const brandId = campaigns[0]?.brandId;
+  const brandId = useActiveBrandId();
   const latestFollowers = useLatestFollowers(brandId);
   const display = networkCode ? NETWORK_DISPLAY[networkCode] : { label: 'General', color: '#E0A800' };
 
+  // hasCampaignData: reach/interacciones/publicaciones salen de
+  // PostMetric (vía sumMetrics), que depende de Campaign→Post — sin
+  // campañas no se consultó nada, es "sin dato", no "0 real" (auditoría de
+  // métricas 2026-08-17). Seguidores es independiente (viene de
+  // SocialAccountMetricSnapshot vía useLatestFollowers), así que no se
+  // condiciona a hasCampaignData.
+  const hasCampaignData = campaigns.length > 0;
   const metrics = sumMetrics(campaigns, networkCode, networkCodes);
+
+  // followers: null cuando no hay snapshot todavía para esa red (o
+  // ninguna de las filtradas en "General") — nunca se rellena con 0.
   const followers = networkCode
-    ? (latestFollowers[networkCode] ?? 0)
-    : Object.entries(latestFollowers)
-        .filter(([code]) => !networkCodes || networkCodes.includes(code))
-        .reduce((sum, [, value]) => sum + value, 0);
+    ? (latestFollowers[networkCode] ?? null)
+    : (() => {
+        const known = Object.entries(latestFollowers)
+          .filter(([code, value]) => (!networkCodes || networkCodes.includes(code)) && value !== null) as [string, number][];
+        return known.length > 0 ? known.reduce((sum, [, value]) => sum + value, 0) : null;
+      })();
 
   return (
     <Box mb={3}>
@@ -48,19 +61,19 @@ export function NetworkOverview({ networkCode }: { networkCode: SocialNetworkCod
       </Stack>
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard icon={<VisibilityOutlinedIcon />} label="Alcance" value={metrics.reach} />
+          <MetricCard icon={<VisibilityOutlinedIcon />} label="Alcance" value={hasCampaignData ? metrics.reach : null} />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard icon={<TrendingUpOutlinedIcon />} label="Engagement rate" value={metrics.engagementRate ?? 0} unit="%" />
+          <MetricCard icon={<TrendingUpOutlinedIcon />} label="Engagement rate" value={hasCampaignData ? metrics.engagementRate : null} unit="%" />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard icon={<FavoriteBorderOutlinedIcon />} label="Interacciones" value={metrics.interactions} />
+          <MetricCard icon={<FavoriteBorderOutlinedIcon />} label="Interacciones" value={hasCampaignData ? metrics.interactions : null} />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
           <MetricCard icon={<GroupsOutlinedIcon />} label="Seguidores actuales" value={followers} />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <MetricCard icon={<ArticleOutlinedIcon />} label="Publicaciones" value={metrics.posts} />
+          <MetricCard icon={<ArticleOutlinedIcon />} label="Publicaciones" value={hasCampaignData ? metrics.posts : null} />
         </Grid>
       </Grid>
     </Box>

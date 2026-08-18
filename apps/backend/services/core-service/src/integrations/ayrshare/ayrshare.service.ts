@@ -5,6 +5,7 @@ import { prisma } from '../../prisma/client';
 import { getAyrshareConfig, getAyrshareErrorMessage } from '../../brands/ayrshare.util';
 import { computeEngagement } from './engagement.util';
 import { getMapperForNetwork } from './mappers/mapper.registry';
+import { getAccountMapperForNetwork } from './mappers/account-metrics-mapper.registry';
 import {
   AccountMetrics,
   AnalyticsContext,
@@ -46,25 +47,24 @@ type AyrsharePublishResponse = {
 
 // Forma confirmada en vivo (ya usada por social-accounts.service.ts): los
 // datos vienen anidados en payload[code].analytics, no en la raíz.
-// Forma real confirmada en vivo (Fase Q3) contra POST /analytics/social —
-// likeCount/commentsCount/shareCount/viewsCount/reachCount son acumulados de
-// toda la cuenta (todas las publicaciones), no de un post. No hay
-// "profileVisitsCount" en este endpoint — Ayrshare no lo expone aquí.
-// audienceGenderAge/audienceCountry confirmados contra la doc oficial +
-// una llamada real (con `quarters` en el body, sin eso Ayrshare ni intenta
-// calcularlos) — en esta cuenta salieron ausentes porque Instagram exige
-// ≥100 interacciones en 30 días para liberarlos, no por el shape del código.
+// IMPORTANTE (verificado en vivo 2026-08-17 contra las 3 redes conectadas):
+// el shape REAL de `analytics` es distinto por red — Instagram usa
+// followersCount/likeCount/commentsCount/shareCount/viewsCount/reachCount,
+// pero TikTok usa followerCount (sin 's')/likeCountTotal/commentCountTotal/
+// shareCountTotal/viewCountTotal y NO expone reach de cuenta; Facebook solo
+// expone followersCount, el resto no tiene equivalente limpio. Por eso
+// `analytics` se tipa como `Record<string, unknown>` genérico — el mapeo a
+// campos concretos vive en account-metrics-mapper.registry.ts (uno por red),
+// no aquí. audienceGenderAge/audienceCountry confirmados contra la doc
+// oficial + una llamada real (con `quarters` en el body, sin eso Ayrshare ni
+// intenta calcularlos) — en Instagram salieron ausentes porque exige ≥100
+// interacciones en 30 días para liberarlos; en TikTok vienen en un shape de
+// array (audienceAges/audienceCountries), no como Record — no mapeado
+// todavía, queda pendiente como hallazgo aparte.
 type AyrshareAccountAnalyticsResponse = Record<
   string,
   {
-    analytics?: {
-      followersCount?: number;
-      followers?: number;
-      likeCount?: number;
-      commentsCount?: number;
-      shareCount?: number;
-      viewsCount?: number;
-      reachCount?: number;
+    analytics?: Record<string, unknown> & {
       audienceGenderAge?: Record<string, number>;
       audienceCountry?: Record<string, number>;
     };
@@ -288,21 +288,22 @@ export class AyrshareService implements SocialProvider {
     }
 
     const analytics = payload[networkCode]?.analytics;
-    const toNullableNumber = (value: number | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
     // Objeto vacío se normaliza a null también — mismo criterio "0/{} no es
     // lo mismo que no disponible" del resto del sistema.
     const toNullableRecord = (value: Record<string, number> | undefined) =>
       value && Object.keys(value).length > 0 ? value : null;
 
+    if (!analytics) {
+      return { followers: null, likes: null, comments: null, shares: null, views: null, reach: null, audienceGenderAge: null, audienceCountry: null, source: 'ayrshare' };
+    }
+
+    const mapper = getAccountMapperForNetwork(networkCode);
+    const mapped = mapper(analytics);
+
     return {
-      followers: toNullableNumber(analytics?.followersCount ?? analytics?.followers),
-      likes: toNullableNumber(analytics?.likeCount),
-      comments: toNullableNumber(analytics?.commentsCount),
-      shares: toNullableNumber(analytics?.shareCount),
-      views: toNullableNumber(analytics?.viewsCount),
-      reach: toNullableNumber(analytics?.reachCount),
-      audienceGenderAge: toNullableRecord(analytics?.audienceGenderAge),
-      audienceCountry: toNullableRecord(analytics?.audienceCountry),
+      ...mapped,
+      audienceGenderAge: toNullableRecord(analytics.audienceGenderAge),
+      audienceCountry: toNullableRecord(analytics.audienceCountry),
       source: 'ayrshare',
     };
   }

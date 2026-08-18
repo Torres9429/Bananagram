@@ -6,7 +6,7 @@ import Typography from '@mui/material/Typography';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { EmptyState } from '@repo/ui/ui';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useActiveBrandId } from './useActiveBrandId';
 
 const GENDER_LABEL: Record<string, string> = { F: 'Mujer', M: 'Hombre', U: 'Sin especificar' };
 const GENDER_COLOR: Record<string, string> = { F: '#E0A800', M: '#1565C0', U: '#9E9E9E' };
@@ -14,8 +14,7 @@ const GENDER_COLOR: Record<string, string> = { F: '#E0A800', M: '#1565C0', U: '#
 // Mismo dato que AudienceGenderAgeChart, sumado por género (sin desglose de
 // edad) — vista rápida de proporción, sin backend nuevo.
 export function AudienceGenderPie() {
-  const campaigns = useFilteredCampaigns();
-  const brandId = campaigns[0]?.brandId;
+  const brandId = useActiveBrandId();
   const { data: history = [] } = useGetBrandMetricsHistoryQuery(brandId ? { brandId } : ({} as never), { skip: !brandId });
 
   const data = useMemo(() => {

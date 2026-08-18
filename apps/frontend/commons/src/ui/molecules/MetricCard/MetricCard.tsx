@@ -6,7 +6,8 @@ import { WidgetCard } from '../WidgetCard/WidgetCard';
 interface MetricCardProps {
   icon: ReactNode;
   label: string;
-  value: number;
+  /** `null` = dato no disponible (nunca se confunde con 0 real) — se muestra "—". */
+  value: number | null;
   /** Sufijo de unidad, ej. '%', 'K', 'seg' */
   unit?: string;
   iconBg?: string;
@@ -16,6 +17,6 @@ interface MetricCardProps {
 }
 
 export function MetricCard({ icon, label, value, unit = '', iconBg, iconColor, formatter }: MetricCardProps) {
-  const display = formatter ? formatter(value) : `${value.toLocaleString()}${unit}`;
+  const display = value === null ? '—' : formatter ? formatter(value) : `${value.toLocaleString()}${unit}`;
   return <WidgetCard icon={icon} label={label} value={display} iconBg={iconBg} iconColor={iconColor} />;
 }

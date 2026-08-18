@@ -6,7 +6,7 @@ import Typography from '@mui/material/Typography';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { EmptyState } from '@repo/ui/ui';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useActiveBrandId } from './useActiveBrandId';
 
 const GENDER_LABEL: Record<string, string> = { F: 'Mujer', M: 'Hombre', U: 'Sin especificar' };
 const GENDER_COLOR: Record<string, string> = { F: '#E0A800', M: '#1565C0', U: '#9E9E9E' };
@@ -18,8 +18,7 @@ const GENDER_COLOR: Record<string, string> = { F: '#E0A800', M: '#1565C0', U: '#
 // Requiere que Instagram haya liberado el dato (≥100 interacciones en 30
 // días) — mientras no, esta cuenta muestra el estado vacío honesto de abajo.
 export function AudienceGenderAgeChart() {
-  const campaigns = useFilteredCampaigns();
-  const brandId = campaigns[0]?.brandId;
+  const brandId = useActiveBrandId();
   const { data: history = [] } = useGetBrandMetricsHistoryQuery(brandId ? { brandId } : ({} as never), { skip: !brandId });
 
   const { data, genders } = useMemo(() => {

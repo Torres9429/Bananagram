@@ -222,6 +222,26 @@ export const analyticsApi = createApi({
     getPostMetrics: builder.query<PostMetricsDetail, { campaignId: string; postId: string }>({
       query: ({ campaignId, postId }) => `campaigns/${campaignId}/posts/${postId}/metrics`,
     }),
+
+    // Refresh al entrar a Métricas (2026-08-17) — dispara una llamada real a
+    // Ayrshare del lado del backend (ignora la ventana anti-duplicado de 5h),
+    // reusa el endpoint que ya existía para el botón "Actualizar" de brands-
+    // front, no se inventó nada nuevo. Invalida los tags de solo-lectura
+    // relacionados para que los widgets se refresquen solos al terminar —
+    // sin bloquear la pantalla (se dispara en segundo plano, ver metrics/
+    // page.tsx). Cuenta social y score comparten el mismo cron
+    // (AccountMetricsCronService), por eso un solo refresh invalida ambos.
+    refreshBrandMetrics: builder.mutation<BrandMetricsHistoryPoint[], string>({
+      query: (brandId) => ({ url: `brands/${brandId}/metrics-history/refresh`, method: 'POST' }),
+      invalidatesTags: ['BrandMetricsHistory', 'BrandScoreHistory', 'BrandScore', 'SocialAccounts'],
+    }),
+    // Acotado a UNA campaña — nunca se dispara en bucle por todas las
+    // campañas filtradas (ver metrics/page.tsx, evita N llamadas a Ayrshare
+    // por cada entrada a Métricas).
+    refreshCampaignMetrics: builder.mutation<unknown, string>({
+      query: (campaignId) => ({ url: `campaigns/${campaignId}/metrics/refresh`, method: 'POST' }),
+      invalidatesTags: ['CampaignsMetricsSummary', 'CampaignMetricsHistory'],
+    }),
   }),
 });
 
@@ -234,4 +254,6 @@ export const {
   useGetBrandScoreHistoryQuery,
   useGetCampaignMetricsHistoryQuery,
   useGetPostMetricsQuery,
+  useRefreshBrandMetricsMutation,
+  useRefreshCampaignMetricsMutation,
 } = analyticsApi;

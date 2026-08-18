@@ -15,7 +15,7 @@ import {
 } from '../../store/api/analytics.api';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useDateRangeParams } from './useDateRangeParams';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useActiveBrandId } from './useActiveBrandId';
 
 // Visible solo para Cliente/Administrador (decisión confirmada) — el
 // backend ya lo exige (ScoreController/BrandsController.
@@ -27,8 +27,7 @@ import { useFilteredCampaigns } from './useFilteredCampaigns';
 // código específico ('instagram', etc.) para filtrar a esa sola red cuando
 // se usa dentro de una pestaña de red — mismo patrón que NetworkOverview.
 export function AccountGrowthOverview({ networkCode = null }: { networkCode?: string | null }) {
-  const campaigns = useFilteredCampaigns();
-  const brandId = campaigns[0]?.brandId;
+  const brandId = useActiveBrandId();
   const range = useDateRangeParams();
 
   const { data: score } = useGetBrandScoreQuery(brandId ?? '', { skip: !brandId });
