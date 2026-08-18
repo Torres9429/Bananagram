@@ -132,8 +132,20 @@ export class PostsService {
 
     validateTransition(post.status as PostStatus, PostStatus.EN_REVISION, undefined, post.createdBy, user.sub);
 
+    // Si el propio CM asignado a la campaña es quien creó Y envía el post,
+    // pedirle un segundo paso de "aprobar" su propio trabajo no aporta nada
+    // — ya es la máxima autoridad de este primer tramo. Se salta
+    // en_revision y pasa directo a aprobado (visible para el Cliente),
+    // registrando igual los 2 pasos reales en post_status_history (inmutable,
+    // no se pierde trazabilidad). Pedido explícito del usuario (2026-08-17).
+    // NO toca post-state-machine.ts: la regla de "el creador no puede
+    // aprobar su propia publicación" sigue intacta para approvePost — un
+    // Diseñador (o cualquiera que no sea el CM asignado) sigue necesitando
+    // que el CM apruebe, sin excepción.
+    const cmSelfApproves = post.createdBy === post.campaign.cmId && user.sub === post.campaign.cmId;
+
     const updatedPost = await prisma.$transaction(async (tx) => {
-      const updated = await tx.post.update({
+      let current = await tx.post.update({
         where: { id: postId },
         data: { status: PostStatus.EN_REVISION },
       });
@@ -147,15 +159,40 @@ export class PostsService {
         },
       });
 
-      return updated;
+      if (cmSelfApproves) {
+        current = await tx.post.update({
+          where: { id: postId },
+          data: { status: PostStatus.APROBADO },
+        });
+
+        await tx.postStatusHistory.create({
+          data: {
+            postId,
+            fromStatus: PostStatus.EN_REVISION,
+            toStatus: PostStatus.APROBADO,
+            changedBy: user.sub,
+          },
+        });
+      }
+
+      return current;
     });
 
-    void this.notifications.notify(post.campaign.cmId, 'post_submitted_for_review', {
-      postId,
-      campaignId: post.campaignId,
-      campaignName: post.campaign.name,
-      postSnippet: snippet(post.content),
-    });
+    if (cmSelfApproves) {
+      void this.notifications.notify(post.brand.ownerId, 'post_pending_client_approval', {
+        postId,
+        campaignId: post.campaignId,
+        campaignName: post.campaign.name,
+        postSnippet: snippet(post.content),
+      });
+    } else {
+      void this.notifications.notify(post.campaign.cmId, 'post_submitted_for_review', {
+        postId,
+        campaignId: post.campaignId,
+        campaignName: post.campaign.name,
+        postSnippet: snippet(post.content),
+      });
+    }
 
     return updatedPost;
   }
@@ -177,8 +214,14 @@ export class PostsService {
       throw new ForbiddenException('No tienes permiso para aprobar esta publicación');
     }
 
-    // validateTransition también bloquea la auto-aprobación (createdBy === userId).
-    validateTransition(post.status as PostStatus, PostStatus.APROBADO, undefined, post.createdBy, user.sub);
+    // validateTransition también bloquea la auto-aprobación (createdBy ===
+    // userId) — salvo cuando el creador ES el CM asignado a la campaña: ahí
+    // no hay nadie de mayor autoridad a quien pedirle la aprobación (mismo
+    // criterio ya aplicado en submitPostForReview). Sigue bloqueado sin
+    // excepción para cualquier otro creador (ej. Diseñador).
+    validateTransition(post.status as PostStatus, PostStatus.APROBADO, undefined, post.createdBy, user.sub, {
+      allowSelfApproval: post.createdBy === post.campaign.cmId,
+    });
 
     const updatedPost = await prisma.$transaction(async (tx) => {
       const updated = await tx.post.update({ where: { id: postId }, data: { status: PostStatus.APROBADO } });
@@ -486,6 +529,7 @@ export class PostsService {
     return prisma.post.findMany({
       where,
       include: {
+        campaign: { select: { name: true } },
         socialNetworks: { include: { socialNetwork: true } },
         media: { include: { media: true }, orderBy: { order: 'asc' } },
       },
@@ -663,13 +707,20 @@ export class PostsService {
         uploadedFiles.push(await this.cloudinary.uploadFile(file));
       }
 
+      // Bug real (encontrado en vivo con datos reales, ver contentTypeBreakdown
+      // de analytics-front): index + 1 se calculaba solo contra el lote que se
+      // está subiendo en ESTE momento, sin contar los adjuntos que el post ya
+      // tenía de subidas anteriores — dos subidas distintas al mismo post
+      // terminaban ambas con order 1. Se calcula el offset real primero.
+      const existingMediaCount = await prisma.postMedia.count({ where: { postId } });
+
       return await prisma.$transaction(async (tx) => {
         const updatedPost = await tx.post.update({
           where: { id: postId },
           data: {
             media: {
               create: uploadedFiles.map((uploadedFile, index) => ({
-                order: index + 1,
+                order: existingMediaCount + index + 1,
                 media: {
                   create: {
                     brandId: post.brandId,

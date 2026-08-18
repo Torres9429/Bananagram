@@ -6,7 +6,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
-import { DataTable, type DataTableColumn, FormDialog, LabeledField } from '@repo/ui/ui';
+import { DataTable, type DataTableColumn, FormDialog, LabeledField, usePermissions } from '@repo/ui/ui';
 import {
   useListCategoriesQuery,
   useCreateCategoryMutation,
@@ -28,6 +28,7 @@ interface CatalogListProps {
 // (catalogs/categories | catalogs/specialties), así que un solo componente
 // alterna entre los hooks de RTK Query según `kind` en vez de duplicarse.
 export function CatalogList({ title, kind }: CatalogListProps) {
+  const { can } = usePermissions();
   const isCategory = kind === 'category';
 
   const categoriesQuery = useListCategoriesQuery(undefined, { skip: !isCategory });
@@ -66,7 +67,12 @@ export function CatalogList({ title, kind }: CatalogListProps) {
       header: 'Activo',
       align: 'right',
       render: (item) => (
-        <Switch size="small" checked={!item.deletedAt} disabled={!!item.deletedAt} onChange={() => handleToggle(item)} />
+        <Switch
+          size="small"
+          checked={!item.deletedAt}
+          disabled={!!item.deletedAt || !can('catalogos', 'eliminar')}
+          onChange={() => handleToggle(item)}
+        />
       ),
     },
   ];
@@ -77,9 +83,11 @@ export function CatalogList({ title, kind }: CatalogListProps) {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>{title}</Typography>
-          <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
-            + Agregar
-          </Button>
+          {can('catalogos', 'crear') && (
+            <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
+              + Agregar
+            </Button>
+          )}
         </Stack>
         <DataTable
           columns={columns}

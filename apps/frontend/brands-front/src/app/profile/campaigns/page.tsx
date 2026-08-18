@@ -9,7 +9,7 @@ import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { PrimaryButton } from '@repo/ui/ui';
+import { PrimaryButton, usePermissions } from '@repo/ui/ui';
 import { CreateCampaignDialog } from '../../../components/CreateCampaignDialog';
 import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
 import { useSelectedBrand } from '../../../hooks/useSelectedBrand';
@@ -20,6 +20,7 @@ import { CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
 // activa (useSelectedBrand, compartida con ClientSection) en vez de tomar
 // myBrands[0] a ciegas — un Cliente puede tener varias marcas.
 export default function ProfileCampaignsPage() {
+  const { can } = usePermissions();
   const router = useRouter();
   const { selectedBrand: profile } = useSelectedBrand();
   const { data: allCampaigns = [] } = useListCampaignsQuery();
@@ -27,6 +28,14 @@ export default function ProfileCampaignsPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   if (!profile) return null;
+
+  // El permiso RBAC es la única autoridad de SI puede crear (decisión de
+  // producto confirmada 2026-08-17) — la relación con esta marca ya quedó
+  // implícita en que `profile` viene de useListMyBrandsQuery (GET /brands),
+  // que para no-admin ya filtra a solo marcas con relación real; el backend
+  // (CampaignsService.createCampaign) la vuelve a validar de forma
+  // independiente igualmente.
+  const canCreateCampaign = can('campanas', 'crear');
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
@@ -42,9 +51,11 @@ export default function ProfileCampaignsPage() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Campañas — {profile.name}</Typography>
-          <PrimaryButton onClick={() => setCreateOpen(true)}>
-            + Nueva campaña
-          </PrimaryButton>
+          {canCreateCampaign && (
+            <PrimaryButton onClick={() => setCreateOpen(true)}>
+              + Nueva campaña
+            </PrimaryButton>
+          )}
         </Stack>
         <Stack gap={1.5}>
           {campaigns.map((c) => {

@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import { PrimaryButton } from '@repo/ui/ui';
+import { PrimaryButton, usePermissions } from '@repo/ui/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { CreateCampaignDialog } from '../../../../components/CreateCampaignDialog';
 import { useListCampaignsQuery } from '../../../../store/api/campaigns.api';
@@ -14,9 +14,17 @@ import { useGetBrandQuery } from '../../../../store/api/brands.api';
 import { CAMPAIGN_STATUS_LABEL } from '../../../../lib/mock-data';
 
 export default function CampaignsPage() {
+  const { can } = usePermissions();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { data: brand } = useGetBrandQuery(params.id);
+  // El permiso RBAC es la única autoridad de SI puede crear (decisión de
+  // producto confirmada 2026-08-17) — la relación con ESTA marca ya quedó
+  // validada por BrandAccessGuard al cargar `brand` arriba (dueño, o CM/
+  // Diseñador de alguna campaña de esa marca); no se replica ese chequeo
+  // aquí, el backend (CampaignsService.createCampaign) lo vuelve a validar
+  // de forma independiente igualmente.
+  const canCreateCampaign = can('campanas', 'crear');
   // El backend no filtra por brandId en la URL — se filtra client-side.
   const { data: allCampaigns = [] } = useListCampaignsQuery();
   const campaigns = allCampaigns.filter((c) => c.brandId === params.id);
@@ -30,9 +38,11 @@ export default function CampaignsPage() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Campañas — {brand.name}</Typography>
-          <PrimaryButton onClick={() => setCreateOpen(true)}>
-            + Nueva campaña
-          </PrimaryButton>
+          {canCreateCampaign && (
+            <PrimaryButton onClick={() => setCreateOpen(true)}>
+              + Nueva campaña
+            </PrimaryButton>
+          )}
         </Stack>
         <Stack gap={1.5}>
           {campaigns.map((c) => {

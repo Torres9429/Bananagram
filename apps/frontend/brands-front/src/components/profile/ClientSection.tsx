@@ -20,7 +20,7 @@ import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast } from '@repo/ui/ui';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser, useListCategoriesQuery } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
@@ -64,6 +64,7 @@ const SOCIAL_NETWORK_COLORS: Record<string, string> = {
 export function ClientSection() {
   const router = useRouter();
   const user = useSelector(selectUser);
+  const { can } = usePermissions();
 
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [createBrandOpen, setCreateBrandOpen] = useState(false);
@@ -223,26 +224,50 @@ export function ClientSection() {
   const displayColor = realBrand?.primaryColor ?? '#616161';
   const initials = getInitials(displayName).toUpperCase();
 
+  // Guard defensivo: en la práctica hasProfileAccess (marcas:crear||editar,
+  // ver /profile/page.tsx) ya garantiza marcas:ver — la cascada ver↔resto en
+  // AdminRolesService.updateRolePermission activa 'ver' automáticamente al
+  // conceder cualquier otra acción del módulo — pero esta sección entera
+  // gira en torno a "ver marcas", así que se valida explícitamente en vez
+  // de asumirlo. Va después de todos los hooks (Rules of Hooks), igual que
+  // el guard de !user en /profile/page.tsx.
+  if (!can('marcas', 'ver')) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+        <EmptyState title="No tienes permiso para ver esta sección" description="Contacta a un administrador si crees que esto es un error." />
+      </Paper>
+    );
+  }
+
   return (
     <Stack gap={3}>
-      {/* Un Cliente puede tener varias marcas (ej. Barcel) — selector solo
-          visible cuando hay más de una, para no agregar ruido al caso común
-          de una sola marca. */}
-      {myBrands.length > 1 && (
+      {/* Un Cliente puede tener varias marcas (ej. Barcel) — el selector solo
+          se muestra cuando ya hay más de una (no agrega ruido con una sola),
+          pero el botón "Nueva marca" debe verse desde la primera marca: era
+          el único punto de entrada para crear la SEGUNDA, y antes vivía
+          dentro de este mismo bloque condicionado a length > 1 — con
+          exactamente 1 marca (el caso común) nadie podía llegar a la
+          segunda. Gateado por permiso, igual que el resto de acciones
+          protegidas del sistema. */}
+      {myBrands.length > 0 && (
         <Stack direction="row" gap={1.5} alignItems="center">
-          <Select
-            size="small"
-            value={realBrandId ?? ''}
-            onChange={(e) => setSelectedBrandId(e.target.value as string)}
-            sx={{ minWidth: 220, bgcolor: '#fff' }}
-          >
-            {myBrands.map((b) => (
-              <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
-            ))}
-          </Select>
-          <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
-            Nueva marca
-          </Button>
+          {myBrands.length > 1 && (
+            <Select
+              size="small"
+              value={realBrandId ?? ''}
+              onChange={(e) => setSelectedBrandId(e.target.value as string)}
+              sx={{ minWidth: 220, bgcolor: '#fff' }}
+            >
+              {myBrands.map((b) => (
+                <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+              ))}
+            </Select>
+          )}
+          {can('marcas', 'crear') && (
+            <Button size="small" startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
+              Nueva marca
+            </Button>
+          )}
         </Stack>
       )}
 
@@ -265,28 +290,38 @@ export function ClientSection() {
           </Stack>
           {/* Score digital real: falta el endpoint (score.service.ts existe
               pero sin controller, ver CLAUDE.md) — se muestra un placeholder
-              en vez de inventar un número. */}
-          <Box sx={{ textAlign: 'center', minWidth: 140 }}>
-            <Typography variant="body2" color="text.secondary">Score Digital</Typography>
-            <Typography variant="caption" color="text.secondary">Aún no disponible</Typography>
-          </Box>
+              en vez de inventar un número. Gateado por score:ver aunque hoy
+              sea solo texto — para no dejarlo sin permiso el día que se
+              conecte a datos reales. */}
+          {can('score', 'ver') && (
+            <Box sx={{ textAlign: 'center', minWidth: 140 }}>
+              <Typography variant="body2" color="text.secondary">Score Digital</Typography>
+              <Typography variant="caption" color="text.secondary">Aún no disponible</Typography>
+            </Box>
+          )}
         </Stack>
 
         <Divider sx={{ my: 2.5 }} />
 
         <Stack direction="row" gap={1.5} flexWrap="wrap">
-          <Button size="small" variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEditProfile} disabled={!realBrand}
-            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
-            Editar perfil
-          </Button>
-          <Button size="small" variant="outlined" startIcon={<CalendarMonthOutlinedIcon />} onClick={() => router.push('/profile/calendar')}
-            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
-            Ver calendario
-          </Button>
-          <Button size="small" variant="outlined" startIcon={<RateReviewOutlinedIcon />} onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/approvals`; }}
-            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
-            Ver aprobaciones
-          </Button>
+          {can('marcas', 'editar') && (
+            <Button size="small" variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEditProfile} disabled={!realBrand}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
+              Editar perfil
+            </Button>
+          )}
+          {can('campanas', 'ver') && (
+            <Button size="small" variant="outlined" startIcon={<CalendarMonthOutlinedIcon />} onClick={() => router.push('/profile/calendar')}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
+              Ver calendario
+            </Button>
+          )}
+          {can('publicaciones', 'ver') && (
+            <Button size="small" variant="outlined" startIcon={<RateReviewOutlinedIcon />} onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/approvals`; }}
+              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
+              Ver aprobaciones
+            </Button>
+          )}
         </Stack>
       </Paper>
 
@@ -299,9 +334,11 @@ export function ClientSection() {
             title="Aún no tienes una marca"
             description="Crea tu marca para conectar redes sociales reales y empezar a coordinar campañas."
             action={
-              <PrimaryButton startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
-                Crear marca
-              </PrimaryButton>
+              can('marcas', 'crear') ? (
+                <PrimaryButton startIcon={<AddCircleOutlineIcon />} onClick={() => setCreateBrandOpen(true)}>
+                  Crear marca
+                </PrimaryButton>
+              ) : undefined
             }
           />
         </Paper>
@@ -315,28 +352,30 @@ export function ClientSection() {
       <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="subtitle1" fontWeight={700}>Redes conectadas</Typography>
-          <Stack direction="row" gap={1}>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<LinkOutlinedIcon />}
-              onClick={handleConnectAnotherNetwork}
-              disabled={!realBrandId || connectingKey === 'top'}
-              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
-            >
-              {connectingKey === 'top' ? 'Generando enlace…' : 'Conectar otra red'}
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<SyncOutlinedIcon />}
-              onClick={handleSync}
-              disabled={!realBrandId || isSyncing}
-              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
-            >
-              {isSyncing ? 'Sincronizando…' : 'Sincronizar'}
-            </Button>
-          </Stack>
+          {can('marcas', 'editar') && (
+            <Stack direction="row" gap={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<LinkOutlinedIcon />}
+                onClick={handleConnectAnotherNetwork}
+                disabled={!realBrandId || connectingKey === 'top'}
+                sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
+              >
+                {connectingKey === 'top' ? 'Generando enlace…' : 'Conectar otra red'}
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<SyncOutlinedIcon />}
+                onClick={handleSync}
+                disabled={!realBrandId || isSyncing}
+                sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
+              >
+                {isSyncing ? 'Sincronizando…' : 'Sincronizar'}
+              </Button>
+            </Stack>
+          )}
         </Stack>
         {isLoadingSocialAccounts ? (
           <Typography variant="body2" color="text.secondary">Cargando cuentas conectadas…</Typography>
@@ -359,7 +398,7 @@ export function ClientSection() {
                     </Stack>
                     <Typography variant="body2" fontWeight={600} noWrap>{a.handle ?? '—'}</Typography>
                     <Typography variant="caption" color="text.secondary">{a.followers.toLocaleString()} seguidores</Typography>
-                    {a.active ? (
+                    {can('marcas', 'editar') && (a.active ? (
                       <Box mt={1.5}>
                         <Button size="small" disabled={isDisconnecting} onClick={() => setDisconnectTarget(a)} sx={{ color: '#C62828', px: 0 }}>
                           Desconectar
@@ -377,7 +416,7 @@ export function ClientSection() {
                           {connectingKey === a.id ? 'Generando enlace…' : 'Reconectar'}
                         </Button>
                       </Box>
-                    )}
+                    ))}
                   </Paper>
                 </Grid>
               );
@@ -386,61 +425,70 @@ export function ClientSection() {
         )}
       </Paper>
 
-      {/* Campañas — cards clickeables */}
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="subtitle1" fontWeight={700}>Campañas</Typography>
-          <PrimaryButton
-            size="small"
-            startIcon={<AddCircleOutlineIcon />}
-            onClick={() => setCreateCampaignOpen(true)}
-            disabled={!realBrandId}
-          >
-            Crear nueva campaña
-          </PrimaryButton>
-        </Stack>
-        {campaigns.length === 0 ? (
-          <EmptyState
-            title="Aún no tienes campañas"
-            description="Crea tu primera campaña para empezar a coordinar contenido con tu equipo."
-            action={
-              <PrimaryButton onClick={() => setCreateCampaignOpen(true)} disabled={!realBrandId}>
-                Crear primera campaña
+      {/* Campañas — cards clickeables. Sección entera gateada por
+          campanas:ver (no solo el botón de crear) — antes aparecía siempre
+          que el usuario llegaba a /profile, sin importar si tenía permiso
+          para ver campañas. */}
+      {can('campanas', 'ver') && (
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="subtitle1" fontWeight={700}>Campañas</Typography>
+            {can('campanas', 'crear') && (
+              <PrimaryButton
+                size="small"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={() => setCreateCampaignOpen(true)}
+                disabled={!realBrandId}
+              >
+                Crear nueva campaña
               </PrimaryButton>
-            }
-          />
-        ) : (
-          // Cards simples en vez de <CampaignCard> — ese componente asume
-          // datos que el modelo real de Campaign no trae (postsCount, redes
-          // sociales por campaña). Mismo estilo que profile/campaigns/page.tsx.
-          <Stack gap={1.5}>
-            {campaigns.map((c) => {
-              const s = CAMPAIGN_STATUS_LABEL[c.status];
-              return (
-                <Stack
-                  key={c.id}
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  onClick={() => router.push(`/brands/${c.brandId}/campaigns/${c.id}`)}
-                  sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
-                >
-                  <Box>
-                    <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
-                  </Box>
-                  <Stack direction="row" gap={1} alignItems="center">
-                    {c.cmStatus === 'rechazada' && (
-                      <Chip size="small" label="Rechazada por el CM" sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
-                    )}
-                    <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
-                  </Stack>
-                </Stack>
-              );
-            })}
+            )}
           </Stack>
-        )}
-      </Paper>
+          {campaigns.length === 0 ? (
+            <EmptyState
+              title="Aún no tienes campañas"
+              description="Crea tu primera campaña para empezar a coordinar contenido con tu equipo."
+              action={
+                can('campanas', 'crear') ? (
+                  <PrimaryButton onClick={() => setCreateCampaignOpen(true)} disabled={!realBrandId}>
+                    Crear primera campaña
+                  </PrimaryButton>
+                ) : undefined
+              }
+            />
+          ) : (
+            // Cards simples en vez de <CampaignCard> — ese componente asume
+            // datos que el modelo real de Campaign no trae (postsCount, redes
+            // sociales por campaña). Mismo estilo que profile/campaigns/page.tsx.
+            <Stack gap={1.5}>
+              {campaigns.map((c) => {
+                const s = CAMPAIGN_STATUS_LABEL[c.status];
+                return (
+                  <Stack
+                    key={c.id}
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    onClick={() => router.push(`/brands/${c.brandId}/campaigns/${c.id}`)}
+                    sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
+                  >
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                    </Box>
+                    <Stack direction="row" gap={1} alignItems="center">
+                      {c.cmStatus === 'rechazada' && (
+                        <Chip size="small" label="Rechazada por el CM" sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
+                      )}
+                      <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
+                    </Stack>
+                  </Stack>
+                );
+              })}
+            </Stack>
+          )}
+        </Paper>
+      )}
 
       {/* CreateCampaignDialog y la lista de campañas de arriba ya son reales
           (ver plan de integración) — el resto de esta sección (perfil, redes

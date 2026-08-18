@@ -24,8 +24,8 @@ export class ReportsController {
 
   @Get(':id')
   @RequirePermission('reportes', 'ver')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reports.getReport(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
+    return this.reports.getReport(id, user);
   }
 
   @Post()

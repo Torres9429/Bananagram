@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { prisma } from '../prisma/client';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
@@ -55,13 +55,15 @@ export class BrandsService {
     return this.toBrandResponse(brand);
   }
 
-  // ownerId siempre es un Cliente (regla de negocio) — se toma del JWT, no
-  // del body: nadie puede crear una marca a nombre de otro usuario.
+  // La autoridad de SI puede crear una marca es el permiso RBAC
+  // (`marcas:crear`, ya validado por PermissionGuard) — no un chequeo de
+  // rol. No hay recurso ajeno que proteger aquí: la marca todavía no
+  // existe, y ownerId se toma del JWT (user.sub), nunca del body — nadie
+  // puede crear una marca a nombre de otro usuario, pero cualquiera con el
+  // permiso se vuelve dueño de lo que él mismo crea. Decisión de producto
+  // confirmada 2026-08-17 (antes exigía roles.includes('cliente') a mano,
+  // dejando `marcas:crear` sin efecto para cualquier otro rol).
   async createBrand(dto: CreateBrandDto, user: CurrentUser): Promise<BrandResponse> {
-    if (!user.roles.includes('cliente') && !user.roles.includes('administrador')) {
-      throw new ForbiddenException('Solo un Cliente puede crear una marca');
-    }
-
     const brand = await this.runWithUniqueGuard(() =>
       prisma.brand.create({
         data: {
@@ -234,6 +236,13 @@ export class BrandsService {
         privateKey,
         profileKey,
         allowedSocial,
+        // Sin esto, el widget de Ayrshare reusa la sesión ya autenticada del
+        // navegador para esa red social — tras desconectar una cuenta y
+        // pedir una nueva connectUrl, "Conectar" revinculaba la misma cuenta
+        // vieja en vez de pedir login de nuevo (bug real reportado en vivo).
+        // logout:true fuerza a Ayrshare a cerrar esa sesión antes de mostrar
+        // la pantalla de vinculación.
+        logout: true,
       }),
     });
 

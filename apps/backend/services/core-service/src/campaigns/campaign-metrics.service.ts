@@ -9,7 +9,22 @@ type LatestMetricRow = {
   shares: number | null;
   views: number | null;
   reach: number | null;
+  raw: unknown;
 };
+
+// Campos específicos de red que NUNCA se normalizaron como columna a
+// propósito (docs/backend/auditoria-integracion-ayrshare.md §7: "solo
+// Instagram lo expone de forma clara" para saves, inconsistentes entre
+// redes) — ya viven en PostMetric.raw desde que se capturan. Se leen aquí
+// mismo, sin tocar schema ni mappers, defensivo (raw puede no tener el
+// campo — para esa red, o para capturas viejas anteriores a que Ayrshare
+// empezara a mandarlo).
+function extractRawField(raw: unknown, key: string): number | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = (raw as Record<string, unknown>)[key];
+  const num = typeof value === 'string' ? Number(value) : value;
+  return typeof num === 'number' && !Number.isNaN(num) ? num : null;
+}
 
 type NetworkGroup = {
   networkCode: string;
@@ -17,7 +32,19 @@ type NetworkGroup = {
   deliveries: { id: string }[];
 };
 
-type TopPost = { postId: string; network: string; date: Date | null; engagementRate: number };
+type TopPost = {
+  postId: string;
+  network: string;
+  date: Date | null;
+  engagementRate: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  views: number;
+  reach: number;
+};
+
+type ContentTypeBreakdown = { type: 'imagen' | 'video' | 'carrusel' | 'sin_media'; count: number };
 
 // Diseño completo en docs/backend/auditoria-integracion-ayrshare.md §22:
 // dinámico en cada request (no hay snapshot todavía, no hace falta con el
@@ -33,8 +60,17 @@ export class CampaignMetricsService {
       where: { campaignId, deletedAt: null },
       include: {
         socialAccounts: { include: { socialAccount: { include: { socialNetwork: true } } } },
+        media: { include: { media: true } },
       },
     });
+
+    // Bug real (encontrado en vivo): `posts` no filtra por status a propósito
+    // arriba (deliveries/topPost/etc. ya se resuelven solos por no tener
+    // PostSocialAccount hasta que se publican), pero cualquier conteo que
+    // hable de "publicaciones" debe excluir borradores/en revisión/
+    // rechazados/cancelados — antes un borrador de prueba nunca enviado a
+    // ninguna red se contaba igual que uno real.
+    const publishedPosts = posts.filter((post) => post.status === 'publicado' || post.status === 'parcial');
 
     const deliveries = posts.flatMap((post) => post.socialAccounts);
     const latestMetrics = await this.getLatestMetrics(deliveries.map((delivery) => delivery.id));
@@ -50,7 +86,9 @@ export class CampaignMetricsService {
       // Nombres explícitos y distintos a propósito (auditoría §22.6): un
       // "post" es contenido interno, una "externalDelivery" es su entrega a
       // una red específica — nunca reportar ambos como si fueran lo mismo.
-      posts: posts.length,
+      // Solo publicados/parciales (ver publishedPosts arriba) — un borrador
+      // nunca enviado no es una "publicación" para efectos de este resumen.
+      posts: publishedPosts.length,
       externalDeliveries: deliveries.length,
       successfulDeliveries,
       failedDeliveries,
@@ -79,19 +117,74 @@ export class CampaignMetricsService {
     });
 
     const postById = new Map(posts.map((post) => [post.id, post]));
-    const topPost = this.computeTopPost(deliveries, metricsByDeliveryId, postById);
+    const rankedPosts = this.rankPostsByEngagement(deliveries, metricsByDeliveryId, postById);
+    const contentTypeBreakdown = this.buildContentTypeBreakdown(publishedPosts);
 
     return {
       campaignId,
       summary,
       byNetwork,
-      topPost,
+      topPost: rankedPosts[0] ?? null,
+      // Top 5 — el widget "Publicaciones destacadas" del dashboard necesita
+      // un ranking, no solo la mejor (topPost, que se mantiene igual para no
+      // romper CampaignComparison, que sí solo quiere una).
+      topPosts: rankedPosts.slice(0, 5),
+      contentTypeBreakdown,
       dataStatus: {
         lastSyncedAt: lastSyncRun?.finishedAt ?? null,
         partial: coveragePercentage < 100,
         missingNetworks,
         coveragePercentage,
       },
+    };
+  }
+
+  // Métricas de UNA publicación específica, por red — reusa getLatestMetrics
+  // (DISTINCT ON, igual que el resto del service) parametrizado por las
+  // entregas de este post en particular, en vez de las de toda una campaña.
+  // No existía ningún endpoint a este nivel de detalle (solo agregados por
+  // campaña/red o el top post) — usado por el widget "Detalle de publicación".
+  async getPostMetrics(postId: string): Promise<any> {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      include: { socialAccounts: { include: { socialAccount: { include: { socialNetwork: true } } } } },
+    });
+    if (!post) throw new NotFoundException('Publicación no encontrada');
+
+    const latestMetrics = await this.getLatestMetrics(post.socialAccounts.map((d) => d.id));
+    const metricsByDeliveryId = new Map(latestMetrics.map((m) => [m.postSocialAccountId, m]));
+
+    const byNetwork = post.socialAccounts.map((delivery) => {
+      const metric = metricsByDeliveryId.get(delivery.id);
+      const likes = metric?.likes ?? 0;
+      const comments = metric?.comments ?? 0;
+      const shares = metric?.shares ?? 0;
+      const views = metric?.views ?? 0;
+      const reach = metric?.reach ?? 0;
+      const interactions = likes + comments + shares;
+      const denominator = reach > 0 ? reach : views > 0 ? views : null;
+      return {
+        networkCode: delivery.socialAccount.socialNetwork.code,
+        networkName: delivery.socialAccount.socialNetwork.name,
+        status: delivery.status,
+        hasMetrics: !!metric,
+        likes,
+        comments,
+        shares,
+        views,
+        reach,
+        interactions,
+        engagementRate: denominator ? Math.round((interactions / denominator) * 100 * 100) / 100 : null,
+      };
+    });
+
+    return {
+      postId: post.id,
+      campaignId: post.campaignId,
+      content: post.content,
+      status: post.status,
+      publishedAt: post.publishedAt,
+      byNetwork,
     };
   }
 
@@ -206,17 +299,17 @@ export class CampaignMetricsService {
     return Array.from(buckets.values());
   }
 
-  // Mejor publicación individual de la campaña por engagementRate — a
-  // diferencia de `byNetwork` (agregado, nunca combina redes con
-  // denominador distinto), aquí cada delivery ya es de UNA sola red, así
+  // Publicaciones individuales de la campaña ordenadas por engagementRate
+  // descendente — a diferencia de `byNetwork` (agregado, nunca combina redes
+  // con denominador distinto), aquí cada delivery ya es de UNA sola red, así
   // que comparar su propio engagementRate entre deliveries de redes
   // distintas es válido (cada uno normalizado sobre su propio reach/views).
-  private computeTopPost(
+  private rankPostsByEngagement(
     deliveries: Array<{ id: string; postId: string; socialAccount: { socialNetwork: { code: string } } }>,
     metricsByDeliveryId: Map<string, LatestMetricRow>,
     postById: Map<string, { publishedAt: Date | null }>,
-  ): TopPost | null {
-    let best: TopPost | null = null;
+  ): TopPost[] {
+    const ranked: TopPost[] = [];
     for (const delivery of deliveries) {
       const metric = metricsByDeliveryId.get(delivery.id);
       if (!metric) continue;
@@ -225,17 +318,44 @@ export class CampaignMetricsService {
       const denominator = (metric.reach ?? 0) > 0 ? metric.reach! : (metric.views ?? 0) > 0 ? metric.views! : null;
       if (!denominator) continue;
 
-      const engagementRate = Math.round((interactions / denominator) * 100 * 100) / 100;
-      if (!best || engagementRate > best.engagementRate) {
-        best = {
-          postId: delivery.postId,
-          network: delivery.socialAccount.socialNetwork.code,
-          date: postById.get(delivery.postId)?.publishedAt ?? null,
-          engagementRate,
-        };
+      ranked.push({
+        postId: delivery.postId,
+        network: delivery.socialAccount.socialNetwork.code,
+        date: postById.get(delivery.postId)?.publishedAt ?? null,
+        engagementRate: Math.round((interactions / denominator) * 100 * 100) / 100,
+        likes: metric.likes ?? 0,
+        comments: metric.comments ?? 0,
+        shares: metric.shares ?? 0,
+        views: metric.views ?? 0,
+        reach: metric.reach ?? 0,
+      });
+    }
+    return ranked.sort((a, b) => b.engagementRate - a.engagementRate);
+  }
+
+  // Tipo de contenido derivado de Media.mimeType (dato propio, nunca de
+  // Ayrshare — Post.media ya vive en nuestra BD) — 0 adjuntos = texto solo,
+  // 1 = imagen o video según mimeType, 2+ = carrusel (misma clasificación
+  // que Instagram usa para mediaProductType, sin depender de que la
+  // respuesta de esa red la traiga).
+  private buildContentTypeBreakdown(
+    posts: Array<{ media: Array<{ media: { mimeType: string } }> }>,
+  ): ContentTypeBreakdown[] {
+    const counts: Record<ContentTypeBreakdown['type'], number> = { imagen: 0, video: 0, carrusel: 0, sin_media: 0 };
+    for (const post of posts) {
+      if (post.media.length === 0) {
+        counts.sin_media += 1;
+      } else if (post.media.length > 1) {
+        counts.carrusel += 1;
+      } else if (post.media[0].media.mimeType.startsWith('video/')) {
+        counts.video += 1;
+      } else {
+        counts.imagen += 1;
       }
     }
-    return best;
+    return (Object.entries(counts) as [ContentTypeBreakdown['type'], number][])
+      .filter(([, count]) => count > 0)
+      .map(([type, count]) => ({ type, count }));
   }
 
   private groupByNetwork(
@@ -280,11 +400,35 @@ export class CampaignMetricsService {
       reach,
       interactions,
       engagementRate,
+      // Nunca normalizados como columna a propósito (auditoría §7: solo
+      // Instagram expone `saves` de forma clara, `profileVisits`/`follows`
+      // ninguna red los devuelve consistente) — se leen de PostMetric.raw
+      // por request, null si esa red/captura no lo trae.
+      saves: this.sumRawField(metrics, 'savedCount'),
+      profileVisits: this.sumRawField(metrics, 'profileVisitsCount'),
+      follows: this.sumRawField(metrics, 'followsCount'),
     };
   }
 
   private sum(metrics: LatestMetricRow[], field: 'likes' | 'comments' | 'shares' | 'views' | 'reach'): number {
     return metrics.reduce((total, metric) => total + (metric[field] ?? 0), 0);
+  }
+
+  // A diferencia de sum() (siempre suma, 0 si falta): si NINGUNA entrega de
+  // la red trae este campo en su raw, el total queda null ("no disponible
+  // para esta red"), no 0 ("medido y vale cero") — mismo criterio que el
+  // resto del sistema.
+  private sumRawField(metrics: LatestMetricRow[], key: string): number | null {
+    let total = 0;
+    let hasAny = false;
+    for (const metric of metrics) {
+      const value = extractRawField(metric.raw, key);
+      if (value !== null) {
+        total += value;
+        hasAny = true;
+      }
+    }
+    return hasAny ? total : null;
   }
 
   private sumField(
@@ -306,7 +450,7 @@ export class CampaignMetricsService {
     return prisma.$queryRaw<LatestMetricRow[]>(
       Prisma.sql`
         SELECT DISTINCT ON ("postSocialAccountId")
-          "postSocialAccountId", likes, comments, shares, views, reach
+          "postSocialAccountId", likes, comments, shares, views, reach, raw
         FROM post_metrics
         WHERE "postSocialAccountId" IN (${Prisma.join(postSocialAccountIds)})
         ORDER BY "postSocialAccountId", "capturedAt" DESC

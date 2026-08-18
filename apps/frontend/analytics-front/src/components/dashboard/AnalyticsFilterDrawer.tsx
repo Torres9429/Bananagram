@@ -35,6 +35,7 @@ import {
 import { selectAnalyticsFilters } from '../../store/analytics.selectors';
 import { useGetBrandsQuery, useGetCampaignsMetricsSummaryQuery, useGetBrandSocialAccountsQuery } from '../../store/api/analytics.api';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
+import { useActiveBrandId } from './useActiveBrandId';
 import {
   MOCK_CATEGORY_OPTIONS,
   MOCK_CM_OPTIONS,
@@ -85,7 +86,7 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
   const campaignOptions = filters.profileId ? allCampaigns.filter((c) => c.brandId === filters.profileId) : allCampaigns;
   // Mismo criterio que arma los Tabs en metrics/page.tsx: redes realmente
   // conectadas de la marca activa, no una lista fija de 6.
-  const networkBrandId = filters.profileId ?? allCampaigns[0]?.brandId;
+  const networkBrandId = useActiveBrandId();
   const { data: socialAccounts = [] } = useGetBrandSocialAccountsQuery(networkBrandId ?? '', { skip: !networkBrandId });
   const networkOptions = Array.from(new Set(socialAccounts.filter((a) => a.active).map((a) => a.socialNetwork.code)));
 

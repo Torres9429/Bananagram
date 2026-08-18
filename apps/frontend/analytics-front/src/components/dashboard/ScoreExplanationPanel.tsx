@@ -11,6 +11,7 @@ import { totalsByNetwork } from '../../lib/analytics/real-metrics';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
 import { useNetworkCodesFilter } from './useNetworkCodesFilter';
+import { useActiveBrandId } from './useActiveBrandId';
 
 /**
  * Explica el Score Digital real (GET /brands/:id/score, Fase P3/Q) —
@@ -23,7 +24,7 @@ import { useNetworkCodesFilter } from './useNetworkCodesFilter';
 export function ScoreExplanationPanel() {
   const campaigns = useFilteredCampaigns();
   const networkCodes = useNetworkCodesFilter();
-  const brandId = campaigns[0]?.brandId;
+  const brandId = useActiveBrandId();
   const { data: score } = useGetBrandScoreQuery(brandId ?? '', { skip: !brandId });
 
   if (!score) {

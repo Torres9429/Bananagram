@@ -24,13 +24,15 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
   // Mis Campañas / Mi perfil van primero (justo después de Dashboard): mismo
   // destino que "Mi perfil" de abajo NO existe más abajo — se quitó ese
-  // duplicado (apuntaba al mismo /profile). El backend real da campanas:ver
-  // a los 3 roles no-admin (cliente/CM/diseñador) por igual, así que ya no
-  // hay un permiso que separe "Cliente" de "CM/Diseñador" aquí — la
-  // exclusividad (Cliente ve Mi perfil, CM/Diseñador ve Mis Campañas) se
-  // resuelve por rol explícito más abajo (isCliente), no por permiso.
+  // duplicado (apuntaba al mismo /profile). "Mis Campañas" (campanas:ver) y
+  // "Mi perfil" (marcas:crear/editar) son mutuamente excluyentes por diseño
+  // (landings distintos) — la exclusividad se resuelve por el permiso real
+  // de marcas más abajo (hasProfileAccess), no por nombre de rol.
   { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
-  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }] },
+  // requirePermission: marcas:crear/editar es el permiso real que distingue
+  // "puede poseer/gestionar una marca" — no un proxy de rol; cualquier rol
+  // futuro con ese permiso otorgado ve este ítem, sin tocar código.
+  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.CREATE }, { module: AppModule.BRANDS, action: AppAction.EDIT }] },
   { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
@@ -54,15 +56,15 @@ export function Sidebar() {
   const permissionVisible = NAV_ITEMS_WITH_PERMISSION.filter(
     (item) => !item.requirePermission || item.requirePermission.some((p) => can(p.module, p.action)),
   );
-  // Ajuste de UX (no de permisos): igual que isAdmin abajo. "Mis Campañas" y
-  // "Mi perfil" comparten permiso real (campanas:ver lo tienen los 3 roles
-  // no-admin) así que ya no se pueden separar por permiso — se decide por
-  // rol explícito cuál de los dos ve cada quien (eran, y siguen siendo,
-  // mutuamente excluyentes por diseño: apuntan a landings distintos).
-  const isCliente = user?.roles?.includes(AppRole.CLIENTE) ?? false;
+  // "Mis Campañas" y "Mi perfil" siguen siendo mutuamente excluyentes por
+  // diseño (landings distintos), pero ya NO se decide por nombre de rol
+  // (antes: isCliente) — se decide por el permiso real que separa ambas
+  // identidades: quien puede crear/editar marcas "es dueño de marca", sin
+  // importar su rol.
+  const hasProfileAccess = can('marcas', 'crear') || can('marcas', 'editar');
   const roleAdjusted = permissionVisible.filter((item) => {
-    if (item.key === 'my-campaigns') return !isCliente;
-    if (item.key === 'my-brand') return isCliente;
+    if (item.key === 'my-campaigns') return !hasProfileAccess;
+    if (item.key === 'my-brand') return hasProfileAccess;
     return true;
   });
   // Ajuste de UX (no de permisos): Admin no debe operar como usuario de negocio

@@ -20,7 +20,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-import { StatusChip, PrimaryButton, useToast } from '@repo/ui/ui';
+import { StatusChip, PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { ZONE_URLS } from '@repo/ui/config';
 import type { PostSocialAccountStatus } from '@repo/ui/types';
@@ -88,6 +88,7 @@ export default function PostDetailPage() {
   const router = useRouter();
   const user = useSelector(selectUser);
   const { showSuccess, showError } = useToast();
+  const { can } = usePermissions();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
   const [editing, setEditing] = useState(false);
@@ -459,19 +460,25 @@ export default function PostDetailPage() {
                 )}
                 {post.status === 'en_revision' && isCm && (
                   <>
-                    <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
-                      Rechazar
-                    </Button>
-                    <Button variant="contained" disabled={isApproving} onClick={handleApprove} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
-                      {isApproving ? 'Aprobando…' : 'Aprobar'}
-                    </Button>
+                    {can('publicaciones', 'rechazar') && (
+                      <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                        Rechazar
+                      </Button>
+                    )}
+                    {can('publicaciones', 'aprobar') && (
+                      <Button variant="contained" disabled={isApproving} onClick={handleApprove} sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
+                        {isApproving ? 'Aprobando…' : 'Aprobar'}
+                      </Button>
+                    )}
                   </>
                 )}
                 {post.status === 'aprobado' && isClient && (
                   <>
-                    <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
-                      Rechazar
-                    </Button>
+                    {can('publicaciones', 'rechazar') && (
+                      <Button variant="outlined" onClick={() => setRejectOpen(true)} sx={{ color: '#C62828', borderColor: '#C62828' }}>
+                        Rechazar
+                      </Button>
+                    )}
                     <Button variant="contained" disabled={isScheduling} onClick={handleSchedule} sx={{ bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}>
                       {isScheduling ? 'Programando…' : 'Programar / Publicar ahora'}
                     </Button>

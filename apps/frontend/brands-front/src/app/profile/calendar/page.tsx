@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
@@ -22,18 +21,11 @@ import { Calendar, dateFnsLocalizer, type EventProps, type Messages, type View }
 import { format, parse, startOfWeek, endOfWeek, getDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { LabeledField, LabeledSelect, PostPreviewDialog, WidgetCard, STATUS_LABELS, STATUS_COLORS, usePermissions } from '@repo/ui/ui';
-import { selectUser } from '@repo/ui/state';
-import { ZONE_URLS } from '@repo/ui/config';
-import {
-  MOCK_CAMPAIGNS,
-  MOCK_CALENDAR_EVENTS,
-  getSocialAccount,
-  getSocialNetwork,
-  getSocialAccountsByProfile,
-  getCurrentClientProfile,
-} from '../../../lib/mock-data';
-import type { MockCampaignPost, SocialNetworkCode, CalendarEventItem } from '../../../interfaces/interface';
+import { LabeledField, LabeledSelect, PostPreviewDialog, FormDialog, STATUS_LABELS, STATUS_COLORS, usePermissions, useToast } from '@repo/ui/ui';
+import type { PostStatus } from '@repo/ui/types';
+import { useSelectedBrand } from '../../../hooks/useSelectedBrand';
+import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
+import { useListPostsByBrandQuery, useApprovePostMutation, useRejectPostMutation, type PostListItem } from '../../../store/api/posts.api';
 
 const localizer = dateFnsLocalizer({
   format,
@@ -61,10 +53,35 @@ const CALENDAR_MESSAGES: Messages = {
   showMore: (total: number) => `+${total} más`,
 };
 
-const ALL_STATUSES: MockCampaignPost['status'][] = ['borrador', 'en_revision', 'aprobado', 'rechazado', 'programado', 'publicado'];
+// Colores por red solo para el calendario/Chips — el catálogo real
+// (SocialNetwork) no trae color, es puramente visual (mismo criterio ya
+// usado en profile/page.tsx, no vale la pena agregarlo al modelo).
+const NETWORK_COLORS: Record<string, string> = {
+  instagram: '#E1306C',
+  tiktok: '#010101',
+  facebook: '#1877F2',
+  linkedin: '#0A66C2',
+  x: '#000000',
+  youtube: '#FF0000',
+};
 
-// Fila del evento — reemplaza el título default de react-big-calendar por un
-// punto de color (red) + título + acento de color por estado, sin librería nueva.
+// Un evento por combinación (post × red objetivo) — un Post puede tener
+// fan-out a varias redes (PostSocialAccount), esto mantiene el mismo nivel
+// de granularidad que tenía la versión mock (un punto de color por red).
+interface CalendarEventItem {
+  key: string;
+  postId: string;
+  title: string;
+  start: Date;
+  end: Date;
+  networkCode: string;
+  networkColor: string;
+  networkLabel: string;
+  status: PostStatus;
+  campaignId: string;
+  campaignName: string;
+}
+
 function EventRow({ event }: EventProps<CalendarEventItem>) {
   const statusColor = STATUS_COLORS[event.status]?.color ?? '#6B6B6B';
   return (
@@ -77,40 +94,37 @@ function EventRow({ event }: EventProps<CalendarEventItem>) {
   );
 }
 
-// Calendario del Cliente en /profile — mismo react-big-calendar que ya
-// funcionaba (no se cambió a FullCalendar: no estaba instalado y
-// react-big-calendar ya cubre lo pedido vía eventPropGetter/components,
-// sin agregar una dependencia nueva), ahora con cards resumen, filtros en
-// toolbar, leyenda de redes y estilos propios. SIN BrandTabs.
+const ALL_STATUSES: PostStatus[] = [
+  'borrador', 'en_revision', 'rechazado', 'aprobado', 'rechazado_cliente',
+  'programado', 'publicando', 'publicado', 'parcial', 'error', 'cancelado',
+];
+
+// Calendario del Cliente en /profile — conectado a publicaciones reales
+// (antes 100% mock). Respeta la marca activa (useSelectedBrand) y aprobar/
+// rechazar ejecuta la mutación real, igual que en posts-front/posts/approvals.
 export default function ProfileCalendarPage() {
   const { can } = usePermissions();
-  const user = useSelector(selectUser);
-  const profile = getCurrentClientProfile(user?.email);
+  const { showSuccess, showError } = useToast();
+  const { selectedBrand } = useSelectedBrand();
+  const brandId = selectedBrand?.id;
 
-  const campaigns = useMemo(() => MOCK_CAMPAIGNS.filter((c) => c.brandId === profile.id), [profile.id]);
-  const socialAccounts = useMemo(() => getSocialAccountsByProfile(profile.id), [profile.id]);
-  const connectedNetworks = useMemo(() => Array.from(new Set(socialAccounts.map((a) => a.socialNetworkId))), [socialAccounts]);
+  const { data: allCampaigns = [] } = useListCampaignsQuery();
+  const campaigns = useMemo(() => allCampaigns.filter((c) => c.brandId === brandId), [allCampaigns, brandId]);
 
-  // Estado local (no MOCK_CALENDAR_EVENTS directo) para poder aprobar/rechazar
-  // un evento puntual desde el modal — mismo patrón ya usado en
-  // ClientSection.tsx/posts-front, aplicado aquí sin depender de posts-front.
-  const [events, setEvents] = useState(() => MOCK_CALENDAR_EVENTS.filter((e) => e.brandId === profile.id));
+  const { data: posts = [] } = useListPostsByBrandQuery(brandId ?? '', { skip: !brandId });
+  const [approvePost] = useApprovePostMutation();
+  const [rejectPost] = useRejectPostMutation();
 
   const [campaignFilter, setCampaignFilter] = useState('');
-  const [networkFilter, setNetworkFilter] = useState<SocialNetworkCode | ''>('');
-  const [statusFilter, setStatusFilter] = useState<MockCampaignPost['status'] | ''>('');
+  const [networkFilter, setNetworkFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<PostStatus | ''>('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectComment, setRejectComment] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(true);
 
-  // Toolbar propia en vez de la default de react-big-calendar: la default
-  // (.rbc-toolbar) vive DENTRO de .rbc-calendar, el mismo contenedor que
-  // necesita minWidth+scroll horizontal para la grilla — eso obligaba a la
-  // barra a estirarse al mismo ancho mínimo, dejando los botones de
-  // Mes/Semana/Día fuera de la pantalla en mobile sin scrollear primero.
-  // Con `toolbar={false}` + view/date controlados a mano, esta barra queda
-  // completamente afuera de esa zona de scroll — visible entera siempre.
   const [calView, setCalView] = useState<View>('month');
   const [calDate, setCalDate] = useState(new Date());
 
@@ -144,103 +158,138 @@ export default function ProfileCalendarPage() {
     setDateTo('');
   }
 
-  const filteredEvents = useMemo(() => {
-    return events.filter((e) => {
-      if (campaignFilter && e.campaignId !== campaignFilter) return false;
-      if (networkFilter && getSocialAccount(e.socialAccountId)?.socialNetworkId !== networkFilter) return false;
-      if (statusFilter && e.status !== statusFilter) return false;
-      if (dateFrom && e.start.slice(0, 10) < dateFrom) return false;
-      if (dateTo && e.start.slice(0, 10) > dateTo) return false;
-      return true;
-    });
-  }, [events, campaignFilter, networkFilter, statusFilter, dateFrom, dateTo]);
+  // Un CalendarEventItem por (post × red social objetivo). start/end: los
+  // posts no son un rango, así que ambos apuntan a scheduledAt (o
+  // publishedAt si ya se publicó y nunca tuvo fecha programada).
+  const allEvents = useMemo<CalendarEventItem[]>(() => {
+    const items: CalendarEventItem[] = [];
+    for (const post of posts) {
+      const when = post.scheduledAt ?? post.publishedAt;
+      if (!when) continue;
+      const campaignName = post.campaign?.name ?? 'Sin campaña';
+      const networks = post.socialNetworks.length > 0 ? post.socialNetworks : [];
+      for (const { socialNetwork } of networks) {
+        items.push({
+          key: `${post.id}:${socialNetwork.id}`,
+          postId: post.id,
+          title: `${campaignName} · ${post.content.split('\n')[0]?.slice(0, 40) || 'Sin contenido'}`,
+          start: new Date(when),
+          end: new Date(when),
+          networkCode: socialNetwork.code,
+          networkColor: NETWORK_COLORS[socialNetwork.code] ?? '#6B6B6B',
+          networkLabel: socialNetwork.name,
+          status: post.status,
+          campaignId: post.campaignId,
+          campaignName,
+        });
+      }
+    }
+    return items;
+  }, [posts]);
 
-  const calendarEvents = useMemo<CalendarEventItem[]>(
-    () =>
-      filteredEvents.map((e) => {
-        const networkCode = (getSocialAccount(e.socialAccountId)?.socialNetworkId ?? 'instagram') as SocialNetworkCode;
-        const networkColor = getSocialNetwork(networkCode)?.color ?? '#6B6B6B';
-        return {
-          id: e.id,
-          title: e.title,
-          start: new Date(e.start),
-          end: new Date(e.end),
-          networkCode,
-          networkColor,
-          status: e.status,
-          postId: e.postId,
-        };
-      }),
-    [filteredEvents],
+  const connectedNetworks = useMemo(
+    () => Array.from(new Map(allEvents.map((e) => [e.networkCode, e])).values()),
+    [allEvents],
   );
 
-  // Clic en un evento: abre el modal de detalle rápido — nunca navega ni
-  // cambia de ruta, con o sin postId (§1 del ajuste UX).
+  const filteredEvents = useMemo(() => {
+    return allEvents.filter((e) => {
+      if (campaignFilter && e.campaignId !== campaignFilter) return false;
+      if (networkFilter && e.networkCode !== networkFilter) return false;
+      if (statusFilter && e.status !== statusFilter) return false;
+      const day = format(e.start, 'yyyy-MM-dd');
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
+      return true;
+    });
+  }, [allEvents, campaignFilter, networkFilter, statusFilter, dateFrom, dateTo]);
+
   function handleSelectEvent(event: CalendarEventItem) {
-    setSelectedEventId(event.id);
+    setSelectedKey(event.key);
   }
 
-  const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
-  const selectedCampaign = selectedEvent ? campaigns.find((c) => c.id === selectedEvent.campaignId) ?? null : null;
-  const selectedNetworkLabel = selectedEvent
-    ? getSocialNetwork(getSocialAccount(selectedEvent.socialAccountId)?.socialNetworkId ?? '')?.label
-    : undefined;
+  const selectedEvent = allEvents.find((e) => e.key === selectedKey) ?? null;
   const selectedScheduledAt = selectedEvent
-    ? new Date(selectedEvent.start).toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    ? selectedEvent.start.toLocaleString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : undefined;
-  // Aprobar/Rechazar solo cuando el estado (en_revision) Y el permiso lo
-  // permiten — mismo criterio ya usado en posts-front/posts/approvals, mutando
-  // aquí el estado local de este evento (no el de posts-front, no persiste).
   const canReviewEvent = selectedEvent?.status === 'en_revision';
 
-  function handleApproveSelected() {
+  async function handleApproveSelected() {
     if (!selectedEvent) return;
-    setEvents((prev) => prev.map((e) => (e.id === selectedEvent.id ? { ...e, status: 'aprobado' } : e)));
-    setSelectedEventId(null);
+    try {
+      await approvePost(selectedEvent.postId).unwrap();
+      showSuccess('Publicación aprobada.');
+    } catch {
+      showError('No se pudo aprobar la publicación.');
+    } finally {
+      setSelectedKey(null);
+    }
   }
 
-  function handleRejectSelected() {
-    if (!selectedEvent) return;
-    setEvents((prev) => prev.map((e) => (e.id === selectedEvent.id ? { ...e, status: 'rechazado' } : e)));
-    setSelectedEventId(null);
+  async function handleConfirmReject() {
+    if (!selectedEvent || !rejectComment.trim()) return;
+    try {
+      await rejectPost({ id: selectedEvent.postId, comment: rejectComment.trim() }).unwrap();
+      showSuccess('Publicación rechazada.');
+    } catch {
+      showError('No se pudo rechazar la publicación.');
+    } finally {
+      setRejectOpen(false);
+      setRejectComment('');
+      setSelectedKey(null);
+    }
   }
 
-  // Cards resumen — siempre sobre el perfil completo, no sobre los filtros
-  // activos, para que sigan sirviendo como panorama general mientras se filtra.
-  const programmedCount = events.filter((e) => e.status === 'programado').length;
+  const programmedCount = allEvents.filter((e) => e.status === 'programado').length;
   const activeCampaignsCount = campaigns.filter((c) => c.status === 'active').length;
   const networksUsedCount = connectedNetworks.length;
-  const nextEvent = [...events]
-    .filter((e) => new Date(e.start).getTime() >= Date.now())
-    .sort((a, b) => a.start.localeCompare(b.start))[0];
+  const nextEvent = [...allEvents]
+    .filter((e) => e.start.getTime() >= Date.now())
+    .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
   const nextEventLabel = nextEvent
-    ? new Date(nextEvent.start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    ? nextEvent.start.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
     : 'Sin próximas';
+
+  if (!brandId) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="body2" color="text.secondary">Selecciona una marca para ver su calendario.</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
-      {/* Sin header propio: el TopBar ya muestra "Calendario" y el Sidebar ya
-          tiene el link a "Mi perfil" — no hace falta una franja blanca ni un
-          botón de volver aparte. */}
       <Box sx={{ p: 3 }}>
         {/* KPIs */}
         <Grid container spacing={2} mb={3}>
           <Grid item xs={12} sm={6} lg={3}>
-            <WidgetCard icon={<EventAvailableOutlinedIcon />} label="Publicaciones programadas" value={programmedCount} iconBg="#FFF3E0" iconColor="#E65100" />
+            <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ bgcolor: '#FFF3E0', color: '#E65100', borderRadius: 2, p: 1, display: 'flex' }}><EventAvailableOutlinedIcon /></Box>
+              <Box><Typography variant="caption" color="text.secondary">Publicaciones programadas</Typography><Typography variant="subtitle1" fontWeight={700}>{programmedCount}</Typography></Box>
+            </Paper>
           </Grid>
           <Grid item xs={12} sm={6} lg={3}>
-            <WidgetCard icon={<CampaignOutlinedIcon />} label="Campañas activas" value={activeCampaignsCount} iconBg="#E8F5E9" iconColor="#2E7D32" />
+            <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', borderRadius: 2, p: 1, display: 'flex' }}><CampaignOutlinedIcon /></Box>
+              <Box><Typography variant="caption" color="text.secondary">Campañas activas</Typography><Typography variant="subtitle1" fontWeight={700}>{activeCampaignsCount}</Typography></Box>
+            </Paper>
           </Grid>
           <Grid item xs={12} sm={6} lg={3}>
-            <WidgetCard icon={<ShareOutlinedIcon />} label="Redes usadas" value={networksUsedCount} iconBg="#E3F2FD" iconColor="#1565C0" />
+            <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ bgcolor: '#E3F2FD', color: '#1565C0', borderRadius: 2, p: 1, display: 'flex' }}><ShareOutlinedIcon /></Box>
+              <Box><Typography variant="caption" color="text.secondary">Redes usadas</Typography><Typography variant="subtitle1" fontWeight={700}>{networksUsedCount}</Typography></Box>
+            </Paper>
           </Grid>
           <Grid item xs={12} sm={6} lg={3}>
-            <WidgetCard icon={<UpcomingOutlinedIcon />} label="Próxima publicación" value={nextEventLabel} iconBg="primary.light" iconColor="primary.contrastTextMuted" />
+            <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Box sx={{ bgcolor: 'primary.light', color: 'primary.contrastTextMuted', borderRadius: 2, p: 1, display: 'flex' }}><UpcomingOutlinedIcon /></Box>
+              <Box><Typography variant="caption" color="text.secondary">Próxima publicación</Typography><Typography variant="subtitle1" fontWeight={700}>{nextEventLabel}</Typography></Box>
+            </Paper>
           </Grid>
         </Grid>
 
-        {/* Filtros — toolbar, contraíble para liberar espacio vertical
-            (sobre todo en mobile, donde 5 campos ocupan bastante). */}
+        {/* Filtros */}
         <Paper elevation={0} sx={{ p: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
           <Stack
             direction="row"
@@ -260,68 +309,42 @@ export default function ProfileCalendarPage() {
             </Stack>
             <Stack direction="row" alignItems="center" gap={0.5}>
               {hasActiveFilters && (
-                <Button
-                  size="small"
-                  onClick={(e) => { e.stopPropagation(); handleClearFilters(); }}
-                  sx={{ color: 'primary.contrastTextMuted' }}
-                >
+                <Button size="small" onClick={(e) => { e.stopPropagation(); handleClearFilters(); }} sx={{ color: 'primary.contrastTextMuted' }}>
                   Limpiar filtros
                 </Button>
               )}
-              <IconButton
-                size="small"
-                aria-label={filtersOpen ? 'Contraer filtros' : 'Expandir filtros'}
-                sx={{ transform: filtersOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}
-              >
+              <IconButton size="small" aria-label={filtersOpen ? 'Contraer filtros' : 'Expandir filtros'} sx={{ transform: filtersOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>
                 <ExpandMoreIcon fontSize="small" />
               </IconButton>
             </Stack>
           </Stack>
           <Collapse in={filtersOpen}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <LabeledSelect label="Campaña" displayEmpty value={campaignFilter} onChange={(e) => setCampaignFilter(e.target.value as string)}>
-                <MenuItem value="">Todas las campañas</MenuItem>
-                {campaigns.map((c) => (
-                  <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-                ))}
-              </LabeledSelect>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <LabeledSelect label="Campaña" displayEmpty value={campaignFilter} onChange={(e) => setCampaignFilter(e.target.value as string)}>
+                  <MenuItem value="">Todas las campañas</MenuItem>
+                  {campaigns.map((c) => (<MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>))}
+                </LabeledSelect>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <LabeledSelect label="Red social" displayEmpty value={networkFilter} onChange={(e) => setNetworkFilter(e.target.value as string)}>
+                  <MenuItem value="">Todas las redes</MenuItem>
+                  {connectedNetworks.map((n) => (<MenuItem key={n.networkCode} value={n.networkCode}>{n.networkLabel}</MenuItem>))}
+                </LabeledSelect>
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <LabeledSelect label="Estado" displayEmpty value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PostStatus | '')}>
+                  <MenuItem value="">Todos</MenuItem>
+                  {ALL_STATUSES.map((s) => (<MenuItem key={s} value={s}>{STATUS_LABELS[s] ?? s}</MenuItem>))}
+                </LabeledSelect>
+              </Grid>
+              <Grid item xs={6} sm={3} md={2}>
+                <LabeledField type="date" label="Desde" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} />
+              </Grid>
+              <Grid item xs={6} sm={3} md={2}>
+                <LabeledField type="date" label="Hasta" value={dateTo} onChange={(e) => setDateTo(e.target.value)} InputLabelProps={{ shrink: true }} />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <LabeledSelect label="Red social" displayEmpty value={networkFilter} onChange={(e) => setNetworkFilter(e.target.value as SocialNetworkCode | '')}>
-                <MenuItem value="">Todas las redes</MenuItem>
-                {connectedNetworks.map((code) => (
-                  <MenuItem key={code} value={code}>{getSocialNetwork(code)?.label ?? code}</MenuItem>
-                ))}
-              </LabeledSelect>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <LabeledSelect label="Estado" displayEmpty value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as MockCampaignPost['status'] | '')}>
-                <MenuItem value="">Todos</MenuItem>
-                {ALL_STATUSES.map((s) => (
-                  <MenuItem key={s} value={s}>{STATUS_LABELS[s]}</MenuItem>
-                ))}
-              </LabeledSelect>
-            </Grid>
-            <Grid item xs={6} sm={3} md={2}>
-              <LabeledField
-                type="date"
-                label="Desde"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={6} sm={3} md={2}>
-              <LabeledField
-                type="date"
-                label="Hasta"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-          </Grid>
           </Collapse>
         </Paper>
 
@@ -329,18 +352,9 @@ export default function ProfileCalendarPage() {
         {connectedNetworks.length > 0 && (
           <Stack direction="row" gap={1} flexWrap="wrap" mb={2} alignItems="center">
             <Typography variant="caption" color="text.secondary" fontWeight={600}>Redes:</Typography>
-            {connectedNetworks.map((code) => {
-              const network = getSocialNetwork(code);
-              const color = network?.color ?? '#6B6B6B';
-              return (
-                <Chip
-                  key={code}
-                  size="small"
-                  label={network?.label ?? code}
-                  sx={{ bgcolor: `${color}18`, color, fontWeight: 700, height: 22, fontSize: 11 }}
-                />
-              );
-            })}
+            {connectedNetworks.map((n) => (
+              <Chip key={n.networkCode} size="small" label={n.networkLabel} sx={{ bgcolor: `${n.networkColor}18`, color: n.networkColor, fontWeight: 700, height: 22, fontSize: 11 }} />
+            ))}
           </Stack>
         )}
 
@@ -348,89 +362,48 @@ export default function ProfileCalendarPage() {
         <Paper
           elevation={0}
           sx={{
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 3,
-            p: 2,
-            height: 640,
-            display: 'flex',
-            flexDirection: 'column',
+            border: '1px solid', borderColor: 'divider', borderRadius: 3, p: 2, height: 640,
+            display: 'flex', flexDirection: 'column',
             '& .rbc-calendar': { fontFamily: 'inherit' },
             '& .rbc-header': { py: 1, fontWeight: 700, fontSize: 12, borderColor: 'divider' },
             '& .rbc-month-view, & .rbc-time-view, & .rbc-agenda-view': { borderColor: 'divider', borderRadius: 2 },
             '& .rbc-day-bg + .rbc-day-bg, & .rbc-header + .rbc-header': { borderColor: '#F0F0F0' },
             '& .rbc-off-range-bg': { bgcolor: '#FAFAFA' },
             '& .rbc-today': { bgcolor: 'primary.light' },
-            '& .rbc-event': {
-              border: 'none',
-              borderRadius: 1.5,
-              padding: '2px 6px',
-              transition: 'transform 0.1s ease, box-shadow 0.1s ease',
-            },
+            '& .rbc-event': { border: 'none', borderRadius: 1.5, padding: '2px 6px', transition: 'transform 0.1s ease, box-shadow 0.1s ease' },
             '& .rbc-event:hover': { transform: 'scale(1.02)', boxShadow: '0 2px 6px rgba(0,0,0,0.2)', cursor: 'pointer' },
             '& .rbc-show-more': { color: 'primary.contrastTextMuted', fontWeight: 600 },
           }}
         >
-          {/* Toolbar propia — ver comentario en calView/handleCalendarNavigate
-              arriba. flexShrink: 0 para que nunca se comprima cuando el
-              calendario de abajo necesite su espacio. */}
           <Stack direction="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap={1} sx={{ flexShrink: 0, mb: 2 }}>
             <Stack direction="row" gap={1} flexWrap="wrap">
-              {([
-                { action: 'TODAY' as const, label: 'Hoy' },
-                { action: 'PREV' as const, label: 'Anterior' },
-                { action: 'NEXT' as const, label: 'Siguiente' },
-              ]).map((b) => (
-                <Button
-                  key={b.action}
-                  size="small"
-                  variant="outlined"
-                  onClick={() => handleCalendarNavigate(b.action)}
-                  sx={{ borderRadius: 2, borderColor: 'divider', color: '#1A1A1A', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' } }}
-                >
+              {([{ action: 'TODAY' as const, label: 'Hoy' }, { action: 'PREV' as const, label: 'Anterior' }, { action: 'NEXT' as const, label: 'Siguiente' }]).map((b) => (
+                <Button key={b.action} size="small" variant="outlined" onClick={() => handleCalendarNavigate(b.action)} sx={{ borderRadius: 2, borderColor: 'divider', color: '#1A1A1A', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' } }}>
                   {b.label}
                 </Button>
               ))}
             </Stack>
-
             <Typography variant="subtitle1" fontWeight={700} sx={{ textTransform: 'capitalize' }}>{calendarLabel}</Typography>
-
             <Stack direction="row" gap={1} flexWrap="wrap">
-              {([
-                { view: 'month' as View, label: 'Mes' },
-                { view: 'week' as View, label: 'Semana' },
-                { view: 'day' as View, label: 'Día' },
-                { view: 'agenda' as View, label: 'Agenda' },
-              ]).map((v) => (
-                <Button
-                  key={v.view}
-                  size="small"
-                  variant={calView === v.view ? 'contained' : 'outlined'}
-                  onClick={() => setCalView(v.view)}
-                  sx={calView === v.view
-                    ? { borderRadius: 2, textTransform: 'none', fontWeight: 600 }
-                    : { borderRadius: 2, borderColor: 'divider', color: '#1A1A1A', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' } }}
-                >
+              {([{ view: 'month' as View, label: 'Mes' }, { view: 'week' as View, label: 'Semana' }, { view: 'day' as View, label: 'Día' }, { view: 'agenda' as View, label: 'Agenda' }]).map((v) => (
+                <Button key={v.view} size="small" variant={calView === v.view ? 'contained' : 'outlined'} onClick={() => setCalView(v.view)} sx={calView === v.view ? { borderRadius: 2, textTransform: 'none', fontWeight: 600 } : { borderRadius: 2, borderColor: 'divider', color: '#1A1A1A', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'primary.light', borderColor: 'primary.main' } }}>
                   {v.label}
                 </Button>
               ))}
             </Stack>
           </Stack>
 
-          {calendarEvents.length === 0 ? (
+          {filteredEvents.length === 0 ? (
             <Stack alignItems="center" justifyContent="center" sx={{ flex: 1, minHeight: 0 }} gap={1}>
               <EventAvailableOutlinedIcon sx={{ fontSize: 40, color: '#D0D0D0' }} />
               <Typography variant="body2" color="text.secondary">Sin publicaciones para estos filtros.</Typography>
             </Stack>
           ) : (
-            // La grilla (mes/semana/agenda) sí necesita un ancho mínimo legible
-            // — a diferencia de la toolbar de arriba, esto SÍ scrollea
-            // horizontal en mobile, pero ya no arrastra a la navegación con ella.
             <Box sx={{ flex: 1, minHeight: 0, overflowX: 'auto' }}>
               <Box sx={{ minWidth: 720, height: '100%' }}>
                 <Calendar
                   localizer={localizer}
-                  events={calendarEvents}
+                  events={filteredEvents}
                   startAccessor="start"
                   endAccessor="end"
                   style={{ height: '100%' }}
@@ -443,13 +416,7 @@ export default function ProfileCalendarPage() {
                   onNavigate={setCalDate}
                   components={{ event: EventRow }}
                   onSelectEvent={handleSelectEvent}
-                  eventPropGetter={(event) => ({
-                    style: {
-                      backgroundColor: `${event.networkColor}E6`,
-                      color: '#fff',
-                      cursor: 'pointer',
-                    },
-                  })}
+                  eventPropGetter={(event) => ({ style: { backgroundColor: `${event.networkColor}E6`, color: '#fff', cursor: 'pointer' } })}
                 />
               </Box>
             </Box>
@@ -459,16 +426,35 @@ export default function ProfileCalendarPage() {
 
       <PostPreviewDialog
         open={!!selectedEvent}
-        onClose={() => setSelectedEventId(null)}
+        onClose={() => setSelectedKey(null)}
         title={selectedEvent?.title ?? ''}
         status={selectedEvent?.status}
-        networkLabel={selectedNetworkLabel}
-        campaignName={selectedCampaign?.name ?? null}
+        networkLabel={selectedEvent?.networkLabel}
+        campaignName={selectedEvent?.campaignName}
         scheduledAt={selectedScheduledAt}
-        onViewFull={selectedEvent?.postId ? () => { window.location.href = `${ZONE_URLS.postsFront}/posts/${selectedEvent.postId}`; } : undefined}
         onApprove={canReviewEvent && can('publicaciones', 'aprobar') ? handleApproveSelected : undefined}
-        onReject={canReviewEvent && can('publicaciones', 'rechazar') ? handleRejectSelected : undefined}
+        onReject={canReviewEvent && can('publicaciones', 'rechazar') ? () => setRejectOpen(true) : undefined}
       />
+
+      <FormDialog
+        open={rejectOpen}
+        title="Rechazar publicación"
+        confirmLabel="Rechazar"
+        confirmDisabled={!rejectComment.trim()}
+        onClose={() => { setRejectOpen(false); setRejectComment(''); }}
+        onConfirm={handleConfirmReject}
+      >
+        <LabeledField
+          label="Motivo del rechazo"
+          placeholder="Explica qué debe corregirse…"
+          value={rejectComment}
+          onChange={(e) => setRejectComment(e.target.value)}
+          required
+          multiline
+          rows={3}
+          autoFocus
+        />
+      </FormDialog>
     </Box>
   );
 }

@@ -12,7 +12,7 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import { PrimaryButton, useToast } from '@repo/ui/ui';
+import { PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { NETWORK_DISPLAY_COLORS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
 import {
@@ -46,12 +46,17 @@ export default function PostsApprovalPage() {
   const router = useRouter();
   const user = useSelector(selectUser);
   const { showSuccess, showError } = useToast();
+  const { can, canAny } = usePermissions();
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
 
   const roles = user?.roles ?? [];
   const isCm = roles.includes('community_manager');
   const isDesigner = roles.includes('disenador');
   const isClient = roles.includes('cliente');
+  // Aprobar/Rechazar es la acción protegida — se gatea por permiso, no por
+  // rol. El resto de esta pantalla (a quién le toca ver qué cola, reenviar a
+  // revisión) sigue siendo lógica de negocio por rol, sin tocar.
+  const canReviewPublicaciones = canAny('publicaciones', ['aprobar', 'rechazar']);
 
   const { data: campaigns = [] } = useListCampaignsQuery();
   const { data: draftPosts = [] } = useListPostsQuery({ status: 'borrador' });
@@ -152,14 +157,14 @@ export default function PostsApprovalPage() {
       <PostsTabs />
       <Box sx={{ p: 3 }}>
       <Stack direction="row" gap={1.5} mb={3} flexWrap="wrap">
-        {isCm && <Chip label={`${reviewPosts.length} para revisar`} sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />}
+        {canReviewPublicaciones && <Chip label={`${reviewPosts.length} para revisar`} sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />}
         {isCm && <Chip label={`${clientRejectedPosts.length} rechazadas por el cliente`} sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />}
         <Chip label={`${pendingClientPosts.length} esperando al cliente`} sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 600 }} />
         <Chip label={`${rejectedPosts.length} rechazadas por el CM`} sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
         <Chip label={`${draftPosts.length} borradores`} sx={{ bgcolor: '#F5F5F5', color: '#616161', fontWeight: 600 }} />
       </Stack>
 
-      {isCm && (
+      {canReviewPublicaciones && (
         <>
           <Typography variant="subtitle1" mb={2}>Para revisar</Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
@@ -175,22 +180,26 @@ export default function PostsApprovalPage() {
               actions={
                 <>
                   {viewButton(post.id)}
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={(e) => { e.stopPropagation(); setRejectTargetId(post.id); }}
-                    sx={{ color: '#C62828', borderColor: '#C62828' }}
-                  >
-                    Rechazar
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={(e) => { e.stopPropagation(); handleApprove(post.id); }}
-                    sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
-                  >
-                    Aprobar
-                  </Button>
+                  {can('publicaciones', 'rechazar') && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={(e) => { e.stopPropagation(); setRejectTargetId(post.id); }}
+                      sx={{ color: '#C62828', borderColor: '#C62828' }}
+                    >
+                      Rechazar
+                    </Button>
+                  )}
+                  {can('publicaciones', 'aprobar') && (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={(e) => { e.stopPropagation(); handleApprove(post.id); }}
+                      sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
+                    >
+                      Aprobar
+                    </Button>
+                  )}
                 </>
               }
             />

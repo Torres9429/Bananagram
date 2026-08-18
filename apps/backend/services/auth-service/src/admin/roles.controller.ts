@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionGuard } from '@repo/backend-commons';
 import { RequirePermission } from '@repo/backend-commons';
 import { AdminRolesService } from './admin-roles.service';
+import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRolePermissionDto } from './dto/update-role-permission.dto';
 
 @ApiTags('admin')
@@ -17,6 +18,12 @@ export class RolesController {
   @RequirePermission('privilegios', 'ver')
   findAll() {
     return this.roles.listRoles();
+  }
+
+  @Post('roles')
+  @RequirePermission('privilegios', 'crear')
+  create(@Body() dto: CreateRoleDto) {
+    return this.roles.createRole(dto);
   }
 
   @Get('roles/:id')

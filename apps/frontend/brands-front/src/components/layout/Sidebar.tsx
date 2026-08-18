@@ -11,6 +11,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import MicOutlinedIcon from '@mui/icons-material/MicOutlined';
 import { SidebarNav, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { AppRole, AppModule, AppAction } from '@repo/ui/types';
@@ -24,11 +25,10 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
   // Mis Campañas / Mi perfil van primero (justo después de Dashboard): mismo
   // destino que "Mi perfil" de abajo NO existe más abajo — se quitó ese
-  // duplicado (apuntaba al mismo /profile). El backend real da campanas:ver
-  // a los 3 roles no-admin (cliente/CM/diseñador) por igual, así que ya no
-  // hay un permiso que separe "Cliente" de "CM/Diseñador" aquí — la
-  // exclusividad (Cliente ve Mi perfil, CM/Diseñador ve Mis Campañas) se
-  // resuelve por rol explícito más abajo (isCliente), no por permiso.
+  // duplicado (apuntaba al mismo /profile). "Mis Campañas" (campanas:ver) y
+  // "Mi perfil" (marcas:crear/editar) son mutuamente excluyentes por diseño
+  // (landings distintos) — la exclusividad se resuelve por el permiso real
+  // de marcas más abajo (hasProfileAccess), no por nombre de rol.
   // activeMatchPrefixes: el detalle/equipo/publicaciones de una campaña vive
   // en /profile/campaigns/*, que no tiene su propio ítem de nav — sin esto,
   // ningún ítem quedaba activo al entrar al detalle de una campaña.
@@ -39,13 +39,23 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // Solo "Mis Campañas" (CM/Diseñador) lo reclama — Cliente no ve este ítem,
   // así que en detalle de campaña le corresponde a "Marcas" (ver abajo).
   { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', activeMatchPrefixes: ['/profile/campaigns'], activeMatchSegmentPrefixes: [['brands', '*', 'campaigns']], icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
-  // Sin activeMatchSegmentPrefixes de campañas: Cliente sí ve "Marcas" (a
-  // diferencia de CM/Diseñador con "Mis Campañas"), así que el detalle de
-  // campaña le corresponde a ese ítem, no a este — ver el ajuste de
-  // "brands".activeMatchExcludeSegmentPrefixes más abajo (isCliente).
-  // "/profile/alexa" sí queda aquí: no tiene ítem propio en el sidebar, y es
-  // un sub-destino de "Mi perfil" (se entra desde ahí), no de campañas.
-  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, activeMatchPrefixes: ['/profile/campaigns', '/profile/alexa'], icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }] },
+  // Sin activeMatchSegmentPrefixes de campañas: quien ve "Mi perfil" también
+  // ve "Marcas" (a diferencia de CM/Diseñador con "Mis Campañas"), así que
+  // el detalle de campaña le corresponde a ese ítem, no a este — ver el
+  // ajuste de "brands".activeMatchExcludeSegmentPrefixes más abajo
+  // (hasProfileAccess). requirePermission: marcas:crear/editar es el
+  // permiso real que distingue "puede poseer/gestionar una marca" — no un
+  // proxy de rol; cualquier rol futuro con ese permiso otorgado ve este
+  // ítem, sin tocar código.
+  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, activeMatchPrefixes: ['/profile/campaigns'], icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.CREATE }, { module: AppModule.BRANDS, action: AppAction.EDIT }] },
+  // Alexa Skill no tiene módulo propio en el catálogo de permisos (no
+  // existe ningún `alexa:*` en el seed/enum real, confirmado) — el gate real
+  // es de rol (Cliente/Diseñador), tanto aquí como en la propia página
+  // /profile/alexa y en el backend (auth.service.ts.createLinkCode). Antes
+  // solo se llegaba entrando primero a "Mi perfil" — inalcanzable para
+  // Diseñador, que no ve ese ítem (ver roleAdjusted). Ítem propio para que
+  // el permiso/rol que ya autoriza a Diseñador tenga un camino real.
+  { key: 'alexa', label: 'Alexa Skill', href: '/profile/alexa', icon: <MicOutlinedIcon /> },
   { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
@@ -80,23 +90,33 @@ export function Sidebar() {
   const permissionVisible = NAV_ITEMS_WITH_PERMISSION.filter(
     (item) => !item.requirePermission || item.requirePermission.some((p) => can(p.module, p.action)),
   );
-  // Ajuste de UX (no de permisos): igual que isAdmin abajo. "Mis Campañas" y
-  // "Mi perfil" comparten permiso real (campanas:ver lo tienen los 3 roles
-  // no-admin) así que ya no se pueden separar por permiso — se decide por
-  // rol explícito cuál de los dos ve cada quien (eran, y siguen siendo,
-  // mutuamente excluyentes por diseño: apuntan a landings distintos).
-  const isCliente = user?.roles?.includes(AppRole.CLIENTE) ?? false;
+  // "Mis Campañas" y "Mi perfil" apuntan a landings distintos (cola de
+  // trabajo vs. identidad dueña de marca) y siguen siendo mutuamente
+  // excluyentes por diseño — pero la distinción ya NO se decide por nombre
+  // de rol (antes: isCliente). Se decide por el permiso real que separa
+  // ambas identidades: quien puede crear/editar marcas es quien "es dueño de
+  // marca" (hoy, en la práctica, Cliente/Admin — BrandsService.createBrand
+  // así lo exige — pero cualquier rol futuro con ese permiso otorgado
+  // calificaría igual, sin tocar código).
+  const hasProfileAccess = can('marcas', 'crear') || can('marcas', 'editar');
+  // Alexa Skill sigue siendo la única excepción documentada: no existe
+  // ningún permiso real para Alexa en el catálogo (confirmado en auditoría),
+  // y el propio backend (auth.service.ts.createLinkCode) también autoriza
+  // por rol hardcodeado, no por permiso — generalizar solo aquí crearía un
+  // desfase con el backend real. No se inventa un permiso `alexa:*` nuevo.
+  const canUseAlexaSkill = (user?.roles ?? []).some((r) => r === AppRole.CLIENTE || r === AppRole.DISENADOR);
   const roleAdjusted = permissionVisible
     .filter((item) => {
-      if (item.key === 'my-campaigns') return !isCliente;
-      if (item.key === 'my-brand') return isCliente;
+      if (item.key === 'my-campaigns') return !hasProfileAccess;
+      if (item.key === 'my-brand') return hasProfileAccess;
+      if (item.key === 'alexa') return canUseAlexaSkill;
       return true;
     })
     // "Marcas" solo cede el active de /brands/:id/campaigns/* a "Mis
-    // Campañas" cuando ese ítem existe (CM/Diseñador, filtrado arriba) — el
-    // Cliente no lo ve (ve "Mi perfil" en su lugar, que ya no reclama
-    // campañas), así que ahí "Marcas" debe quedarse activo él mismo.
-    .map((item) => (item.key === 'brands' && isCliente ? { ...item, activeMatchExcludeSegmentPrefixes: undefined } : item));
+    // Campañas" cuando ese ítem existe (filtrado arriba) — quien tiene "Mi
+    // perfil" en su lugar (no reclama campañas ahí), así que "Marcas" debe
+    // quedarse activo él mismo.
+    .map((item) => (item.key === 'brands' && hasProfileAccess ? { ...item, activeMatchExcludeSegmentPrefixes: undefined } : item));
   // Ajuste de UX (no de permisos): Admin no debe operar como usuario de negocio
   // (Marcas/Posts/Métricas/Mis Campañas/Team/Mi perfil), solo Dashboard y Admin
   // (que ya contiene Usuarios/Roles/Catálogos/Auditoría vía AdminTabs).

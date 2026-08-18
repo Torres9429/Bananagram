@@ -8,7 +8,7 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
 import InputAdornment from '@mui/material/InputAdornment';
-import { DataTable, type DataTableColumn, FormDialog, LabeledField, LabeledSelect } from '@repo/ui/ui';
+import { DataTable, type DataTableColumn, FormDialog, LabeledField, LabeledSelect, usePermissions } from '@repo/ui/ui';
 import type { SocialNetwork, SocialNetworkCode } from '@repo/ui/types';
 import { useListSocialNetworksQuery, useCreateSocialNetworkMutation } from '@repo/ui/state';
 import { AdminTabs } from './AdminTabs';
@@ -23,6 +23,7 @@ const SOCIAL_NETWORK_CODES: SocialNetworkCode[] = ['instagram', 'tiktok', 'faceb
 // sistema para identificar la red) y `baseEngagementRate` (% base que
 // alimenta el cron job de métricas simuladas — ver modelo.txt).
 export function SocialNetworkForm() {
+  const { can } = usePermissions();
   const { data: list = [], isFetching } = useListSocialNetworksQuery();
   const [createSocialNetwork] = useCreateSocialNetworkMutation();
 
@@ -76,9 +77,11 @@ export function SocialNetworkForm() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Redes sociales</Typography>
-          <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
-            + Agregar
-          </Button>
+          {can('catalogos', 'crear') && (
+            <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
+              + Agregar
+            </Button>
+          )}
         </Stack>
         <DataTable columns={columns} rows={list} getRowKey={(item) => item.id} emptyMessage={isFetching ? 'Cargando…' : 'Sin redes sociales registradas.'} />
       </Box>

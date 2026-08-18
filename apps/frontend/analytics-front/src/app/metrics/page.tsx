@@ -1,14 +1,17 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import { useDispatch, useSelector } from 'react-redux';
-import { EmptyState, usePermissions } from '@repo/ui/ui';
+import { EmptyState, usePermissions, useToast } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
+import { exportVisibleMetricsAsPdf } from '../../lib/export-metrics-pdf';
 import { AnalyticsFilterBar } from '../../components/dashboard/AnalyticsFilterBar';
 import { AnalyticsBreadcrumb } from '../../components/dashboard/AnalyticsBreadcrumb';
 import { NetworkOverview } from '../../components/dashboard/NetworkOverview';
@@ -25,10 +28,17 @@ import { TrendAnalysis } from '../../components/dashboard/TrendAnalysis';
 import { PostingHeatMap } from '../../components/dashboard/PostingHeatMap';
 import { AudienceOverview } from '../../components/dashboard/AudienceOverview';
 import { AccountGrowthOverview } from '../../components/dashboard/AccountGrowthOverview';
-import { useGetBrandSocialAccountsQuery } from '../../store/api/analytics.api';
+import { NetworkRadarComparison } from '../../components/dashboard/NetworkRadarComparison';
+import { PostPerformanceChart } from '../../components/dashboard/PostPerformanceChart';
+import { ReachEngagementScatter } from '../../components/dashboard/ReachEngagementScatter';
+import { ContentTypeBreakdown } from '../../components/dashboard/ContentTypeBreakdown';
+import { AudienceGenderAgeChart } from '../../components/dashboard/AudienceGenderAgeChart';
+import { AudienceGenderPie } from '../../components/dashboard/AudienceGenderPie';
+import { AudienceCountryChart } from '../../components/dashboard/AudienceCountryChart';
+import { useGetBrandSocialAccountsQuery, useRefreshBrandMetricsMutation, useRefreshCampaignMetricsMutation } from '../../store/api/analytics.api';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectSelectedNetwork } from '../../store/analytics.selectors';
-import { useFilteredCampaigns } from '../../components/dashboard/useFilteredCampaigns';
+import { useActiveBrandId } from '../../components/dashboard/useActiveBrandId';
 import type { TabValue } from '../../interfaces/interface';
 
 const ALL_NETWORK_TABS: { value: TabValue; label: string }[] = [
@@ -42,11 +52,30 @@ const ALL_NETWORK_TABS: { value: TabValue; label: string }[] = [
 
 export default function MetricsPage() {
   const { can } = usePermissions();
+  const { showError } = useToast();
   const user = useSelector(selectUser);
   const dispatch = useDispatch();
   const filters = useSelector(selectAnalyticsFilters);
   const selectedNetwork = useSelector(selectSelectedNetwork);
   const activeTab: TabValue = selectedNetwork ?? 'general';
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Exporta exactamente lo que está renderizado en contentRef en este
+  // momento — ya refleja marca/campaña/red/rango activos, sin volver a
+  // pedirlos ni recalcular nada del lado del servidor.
+  async function handleExport() {
+    if (!contentRef.current || isExporting) return;
+    setIsExporting(true);
+    try {
+      const scope = activeTab === 'general' ? 'general' : activeTab;
+      await exportVisibleMetricsAsPdf(contentRef.current, `metricas-${scope}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch {
+      showError('No se pudo generar el PDF.');
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   // Score + crecimiento de cuenta: exclusivo de Cliente/Administrador
   // (decisión confirmada) — el backend ya lo exige aparte
@@ -62,15 +91,38 @@ export default function MetricsPage() {
 
   // Solo mostrar pestañas de redes que el usuario tiene realmente
   // conectadas — antes las 6 aparecían siempre, aunque no hubiera ninguna
-  // cuenta vinculada para esa red.
-  const campaigns = useFilteredCampaigns();
-  const brandId = campaigns[0]?.brandId;
+  // cuenta vinculada para esa red. brandId ya NO depende de que existan
+  // campañas (useActiveBrandId) — una marca recién conectada, sin ninguna
+  // campaña todavía, ahora sí muestra sus pestañas de red reales.
+  const brandId = useActiveBrandId();
   const { data: socialAccounts = [] } = useGetBrandSocialAccountsQuery(brandId ?? '', { skip: !brandId });
   const connectedCodes = new Set(socialAccounts.filter((account) => account.active).map((account) => account.socialNetwork.code));
   const TABS = [
     { value: 'general' as TabValue, label: 'General' },
     ...ALL_NETWORK_TABS.filter((tab) => connectedCodes.has(tab.value)),
   ];
+
+  // Refresh al entrar a Métricas (2026-08-17) — una vez por montaje (o por
+  // cambio real de marca/campaña seleccionada), nunca polling. Muestra el
+  // cache existente de inmediato (no bloquea la pantalla); dispara la
+  // llamada real a Ayrshare en segundo plano y, al terminar, los widgets se
+  // refrescan solos vía invalidatesTags. Máximo 2 llamadas a Ayrshare por
+  // entrada: cuenta social completa (siempre, si hay brandId) + la campaña
+  // actualmente seleccionada (solo si el usuario ya entró al detalle de
+  // una) — nunca una por cada campaña filtrada, para no arriesgar rate
+  // limits de Ayrshare (decisión explícita, ver reporte de la auditoría).
+  const [refreshBrandMetrics] = useRefreshBrandMetricsMutation();
+  const [refreshCampaignMetrics] = useRefreshCampaignMetricsMutation();
+
+  useEffect(() => {
+    if (!brandId) return;
+    refreshBrandMetrics(brandId);
+  }, [brandId, refreshBrandMetrics]);
+
+  useEffect(() => {
+    if (!filters.campaignId) return;
+    refreshCampaignMetrics(filters.campaignId);
+  }, [filters.campaignId, refreshCampaignMetrics]);
 
   // Mientras la sesión aún no hidrata desde la cookie, `can()` siempre da
   // false (permissions arranca en {}) — sin este guard se veía un flash de
@@ -104,20 +156,30 @@ export default function MetricsPage() {
           ))}
         </Tabs>
 
-        {/* Exportación pendiente (§B.5): debe serializar exactamente la vista ya
-            renderizada de la pestaña activa, nunca recalcular ni pedir configuración
-            — sin backend real de reportes todavía, por eso no se conecta aquí. */}
-        <Tooltip title="Exportación pendiente — próxima fase">
-          <span>
-            <Button variant="outlined" size="small" disabled sx={{ borderColor: 'divider', color: '#9E9E9E', flexShrink: 0 }}>
-              Exportar
-            </Button>
-          </span>
-        </Tooltip>
+        {/* Captura exactamente lo renderizado en contentRef — nunca recalcula
+            ni pide configuración aparte, el PDF coincide con lo que ya se ve
+            filtrado en pantalla. */}
+        {can('metricas', 'exportar') && (
+          <Tooltip title="Descargar como PDF lo que estás viendo">
+            <span>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<DownloadOutlinedIcon />}
+                onClick={handleExport}
+                disabled={isExporting}
+                sx={{ borderColor: 'divider', color: 'secondary.main', flexShrink: 0, '&:hover': { borderColor: 'primary.main' } }}
+              >
+                {isExporting ? 'Generando…' : 'Exportar'}
+              </Button>
+            </span>
+          </Tooltip>
+        )}
       </Stack>
 
       <AnalyticsBreadcrumb />
 
+      <Box ref={contentRef} sx={{ bgcolor: '#F7F7F7' }}>
       {filters.postId ? (
         <SelectedPostDetail />
       ) : selectedNetwork ? (
@@ -128,6 +190,8 @@ export default function MetricsPage() {
           <EngagementChart />
           <NetworkMetricCards />
           <CampaignBreakdown />
+          <PostPerformanceChart />
+          <ReachEngagementScatter />
           <TopContent />
           <InsightsPanel />
         </>
@@ -138,17 +202,25 @@ export default function MetricsPage() {
           <NetworkOverview networkCode={null} />
           <EngagementChart />
           <CampaignBreakdown />
+          <PostPerformanceChart />
+          <ReachEngagementScatter />
+          <ContentTypeBreakdown />
           <TopContent />
           <InsightsPanel />
           {showAccountOverview && <ScoreExplanationPanel />}
 
           <NetworkComparison />
+          <NetworkRadarComparison />
           <CampaignComparison />
           <TrendAnalysis />
           <PostingHeatMap />
           <AudienceOverview />
+          {showAccountOverview && <AudienceGenderAgeChart />}
+          {showAccountOverview && <AudienceGenderPie />}
+          {showAccountOverview && <AudienceCountryChart />}
         </>
       )}
+      </Box>
     </Box>
   );
 }

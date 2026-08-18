@@ -16,7 +16,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { ConfirmDialog, EmptyState, FormDialog, PrimaryButton, useToast } from '@repo/ui/ui';
+import { ConfirmDialog, EmptyState, FormDialog, PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials } from '@repo/ui/utils';
 import {
@@ -38,13 +38,18 @@ export default function CampaignTeamPage() {
   const router = useRouter();
   const params = useParams<{ id: string; campaignId: string }>();
   const user = useSelector(selectUser);
-  const role = user?.roles?.[0] ?? '';
-  const isCm = role === 'community_manager';
+  const { can } = usePermissions();
+  // Autoridad de capacidad: campanas:asignar (RBAC) — no el rol. La
+  // pertenencia real a ESTA campaña (¿soy el CM asignado y ya la acepté?)
+  // sigue viviendo en `canManage`, más abajo — es una regla de integridad
+  // de recurso (solo el CM asignado gestiona su propio equipo), no una
+  // regla de rol, y no se toca.
+  const canAssignDesigners = can('campanas', 'asignar');
 
   const { data: campaign } = useGetCampaignQuery(params.campaignId);
   const { data: allCMs = [] } = useListEligibleCMsQuery([]);
   const { data: allDesigners = [] } = useListEligibleDesignersQuery();
-  const { data: myRoster = [] } = useListMyTeamQuery(undefined, { skip: !isCm });
+  const { data: myRoster = [] } = useListMyTeamQuery(undefined, { skip: !canAssignDesigners });
   const [assignDesigner, { isLoading: isAssigning }] = useAssignDesignerMutation();
   const [removeDesigner] = useRemoveDesignerMutation();
   const { showSuccess, showError } = useToast();
@@ -61,7 +66,7 @@ export default function CampaignTeamPage() {
     return { userId: d.userId, name: profile?.name ?? 'Usuario', avatarUrl: profile?.avatarUrl ?? null };
   });
 
-  const canManage = isCm && campaign.cmId === user?.id && campaign.cmStatus === 'aceptada';
+  const canManage = canAssignDesigners && campaign.cmId === user?.id && campaign.cmStatus === 'aceptada';
   const availableFromRoster = myRoster.filter((m) => !assignedDesigners.some((a) => a.userId === m.designerUserId));
   const totalMembers = assignedDesigners.length + (cm ? 1 : 0);
 
@@ -109,7 +114,7 @@ export default function CampaignTeamPage() {
               {totalMembers} {totalMembers === 1 ? 'integrante' : 'integrantes'}
             </Typography>
           </Box>
-          {isCm && (
+          {canAssignDesigners && (
             <PrimaryButton
               startIcon={<PersonAddOutlinedIcon />}
               onClick={() => setAddOpen(true)}
@@ -120,7 +125,7 @@ export default function CampaignTeamPage() {
           )}
         </Stack>
 
-        {isCm && campaign.cmId === user?.id && campaign.cmStatus !== 'aceptada' && (
+        {campaign.cmId === user?.id && campaign.cmStatus !== 'aceptada' && (
           <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
             Todavía no aceptaste esta campaña — acéptala desde "Mis campañas" para poder armar el equipo.
           </Alert>
@@ -159,7 +164,7 @@ export default function CampaignTeamPage() {
           {assignedDesigners.length === 0 ? (
             <EmptyState
               title="Sin diseñadores"
-              description={isCm ? 'Usa "Agregar Diseñador" para incorporar a tu equipo.' : 'El Community Manager todavía no asignó diseñadores.'}
+              description={canAssignDesigners ? 'Usa "Agregar Diseñador" para incorporar a tu equipo.' : 'El Community Manager todavía no asignó diseñadores.'}
             />
           ) : (
             <Stack gap={1.5}>
