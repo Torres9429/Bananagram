@@ -2,6 +2,33 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { prisma } from '../prisma/client';
 import { getAyrshareConfig, getAyrshareErrorMessage } from '../brands/ayrshare.util';
 
+export interface AccountNetworkSummary {
+  networkCode: string;
+  networkName: string;
+  followers: number | null;
+  posts: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  views: number | null;
+  reach: number | null;
+  engagementRate: number | null;
+}
+
+export interface AccountMetricsSummary {
+  byNetwork: AccountNetworkSummary[];
+  summary: {
+    followers: number | null;
+    posts: number | null;
+    likes: number | null;
+    comments: number | null;
+    shares: number | null;
+    views: number | null;
+    reach: number | null;
+    engagementRate: number | null;
+  };
+}
+
 type CurrentUser = { sub: string; roles: string[] };
 
 type AyrshareUserResponse =
@@ -64,6 +91,98 @@ export class SocialAccountsService {
       include: { socialAccount: { include: { socialNetwork: true } } },
       orderBy: { capturedAt: 'asc' },
     });
+  }
+
+  // Totales de la cuenta completa AHORA MISMO (no serie histórica) — a
+  // diferencia de campaign-metrics.service.ts, no depende de que existan
+  // campañas/posts en Bananagram: cubre TODAS las publicaciones reales de
+  // cada red conectada, tal como las reporta Ayrshare. Único punto donde se
+  // agregan los snapshots de cuenta en un solo resumen — antes no existía
+  // ningún método así, cada widget del frontend hacía su propio cálculo ad
+  // hoc a partir de la serie cruda de getMetricsHistory.
+  async getAccountMetricsSummary(brandId: string, from?: Date, to?: Date): Promise<AccountMetricsSummary> {
+    // Reusa la misma query que getMetricsHistory (ordenada asc por
+    // capturedAt) y se queda con la última captura por cuenta — no hace
+    // falta SQL crudo tipo DISTINCT ON, una marca tiene pocas redes
+    // conectadas (nunca cientos), un reduce en JS alcanza y es más simple.
+    const snapshots = await prisma.socialAccountMetricSnapshot.findMany({
+      where: {
+        socialAccount: { brandId, active: true, deletedAt: null },
+        capturedAt: { gte: from, lte: to },
+      },
+      include: { socialAccount: { include: { socialNetwork: true } } },
+      orderBy: { capturedAt: 'asc' },
+    });
+
+    const latestByAccount = new Map<string, (typeof snapshots)[number]>();
+    for (const snapshot of snapshots) {
+      latestByAccount.set(snapshot.socialAccountId, snapshot); // el último en el orden asc gana
+    }
+
+    const byNetwork: AccountNetworkSummary[] = [...latestByAccount.values()].map((snapshot) => {
+      // A DIFERENCIA de computeEngagement() (pensado para UNA publicación,
+      // donde views/reach son de la misma escala), acá NO se cae a `views`
+      // como denominador cuando falta `reach` — verificado en vivo
+      // (2026-08-18) que rompe: TikTok reporta reach=null y viewCountTotal
+      // sin base de tiempo confirmada, mientras likeCountTotal sí es
+      // acumulado real — cayendo a views daba un engagementRate de
+      // ~49,000%. Sin reach real, queda null: mismo criterio "no inventar
+      // una equivalencia no confirmada" que ya aplica el mapper de Facebook.
+      const interactions = (snapshot.likes ?? 0) + (snapshot.comments ?? 0) + (snapshot.shares ?? 0);
+      const engagement =
+        snapshot.reach !== null && snapshot.reach > 0 ? Math.round((interactions / snapshot.reach) * 100 * 100) / 100 : null;
+      return {
+        networkCode: snapshot.socialAccount.socialNetwork.code,
+        networkName: snapshot.socialAccount.socialNetwork.name,
+        followers: snapshot.followers,
+        posts: snapshot.posts,
+        likes: snapshot.likes,
+        comments: snapshot.comments,
+        shares: snapshot.shares,
+        views: snapshot.views,
+        reach: snapshot.reach,
+        engagementRate: engagement,
+      };
+    });
+
+    // Sumas simples para conteos (posts/followers/likes/etc.) — cada red
+    // ausente de un campo se excluye de la suma, nunca cuenta como 0 (mismo
+    // criterio "null = no disponible" del resto del sistema). engagementRate
+    // del resumen NUNCA es el promedio de los engagementRate por red (eso
+    // mezclaría denominadores distintos) — se recalcula sumando interacciones
+    // y sumando el denominador de todas las redes, una sola división al final.
+    const sum = (values: (number | null)[]): number | null => {
+      const present = values.filter((v): v is number => v !== null);
+      return present.length > 0 ? present.reduce((a, b) => a + b, 0) : null;
+    };
+
+    // El ratio del resumen solo combina redes que YA tienen un reach válido
+    // propio (mismas que traen engagementRate no-null arriba) — sumar las
+    // interacciones de una red sin reach (ej. TikTok en este endpoint,
+    // verificado en vivo) contra el reach de OTRA red daría un ratio sin
+    // sentido, no solo "impreciso". `reach`/`views` que sí se muestran en
+    // summary (no son un ratio) sí suman todo lo disponible, honesto tal cual.
+    const networksWithReach = byNetwork.filter((n) => n.reach !== null && n.reach > 0);
+    const ratioInteractions = sum(networksWithReach.map((n) => (n.likes ?? 0) + (n.comments ?? 0) + (n.shares ?? 0)));
+    const ratioReach = sum(networksWithReach.map((n) => n.reach));
+    const summaryEngagementRate =
+      ratioInteractions !== null && ratioReach !== null && ratioReach > 0
+        ? Math.round((ratioInteractions / ratioReach) * 100 * 100) / 100
+        : null;
+
+    return {
+      byNetwork,
+      summary: {
+        followers: sum(byNetwork.map((n) => n.followers)),
+        posts: sum(byNetwork.map((n) => n.posts)),
+        likes: sum(byNetwork.map((n) => n.likes)),
+        comments: sum(byNetwork.map((n) => n.comments)),
+        shares: sum(byNetwork.map((n) => n.shares)),
+        views: sum(byNetwork.map((n) => n.views)),
+        reach: sum(byNetwork.map((n) => n.reach)),
+        engagementRate: summaryEngagementRate,
+      },
+    };
   }
 
   // Cierra el loop de "conectar redes": Ayrshare no manda webhook para esto

@@ -53,7 +53,7 @@ export function ScoreExplanationPanel() {
           <Stack gap={1.5}>
             {[
               { label: 'Consistencia', value: score.consistency },
-              { label: 'Engagement', value: score.engagement },
+              { label: 'Engagement (factor del score, 0-100)', value: score.engagement },
               { label: 'Frecuencia', value: score.frequency },
             ].map((component) => (
               <Stack key={component.label}>

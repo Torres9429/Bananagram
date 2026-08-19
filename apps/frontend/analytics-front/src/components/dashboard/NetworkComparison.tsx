@@ -42,7 +42,7 @@ export function NetworkComparison() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparación entre redes</Typography>
+      <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparación entre redes (campañas en Bananagram)</Typography>
 
       <Box sx={{ overflowX: 'auto', mb: 3 }}>
         <Table size="small">

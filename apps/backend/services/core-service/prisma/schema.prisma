@@ -229,6 +229,12 @@ model SocialAccountMetricSnapshot {
   shares   Int?
   views    Int?
   reach    Int?
+  // Total de publicaciones de la cuenta completa (no solo las hechas desde
+  // Bananagram) — confirmado en vivo (2026-08-18): Instagram expone
+  // `mediaCount`, TikTok `videoCountTotal`. Facebook/X no traen un campo
+  // equivalente en este endpoint, queda null ahí a propósito (mismo
+  // criterio "null = no disponible, nunca 0" del resto de este modelo).
+  posts    Int?
 
   // Demografía de audiencia — confirmado en vivo (esta sesión) que el shape
   // real es { "F.25-34": 15, ... } y { "US": 161, ... }. Sigue null en

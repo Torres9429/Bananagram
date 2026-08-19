@@ -110,6 +110,10 @@ export interface BrandMetricsHistoryPoint {
   shares: number | null;
   views: number | null;
   reach: number | null;
+  // Total de publicaciones de la cuenta completa (no solo las hechas desde
+  // Bananagram) — confirmado en vivo 2026-08-18: Instagram/TikTok sí lo
+  // exponen, Facebook/X no tienen campo equivalente en este endpoint (null).
+  posts: number | null;
   // Demografía — confirmado en vivo (shape real: {"F.25-34": 15, ...} /
   // {"US": 161, ...}). null en cuentas con <100 interacciones en 30 días
   // (requisito de Instagram, no de este código).
@@ -170,6 +174,43 @@ export interface PostMetricsDetail {
   byNetwork: PostNetworkMetrics[];
 }
 
+// Totales de CUENTA COMPLETA ahora mismo (SocialAccountMetricSnapshot más
+// reciente por red) — a diferencia de CampaignMetricsSummary, no depende de
+// campañas ni de Post/PostMetric. engagementRate por red: (likes+comments+
+// shares)/reach — SIN caer a `views` como denominador (a propósito, verificado
+// en vivo 2026-08-18: TikTok da reach=null con conteos de views/likes en
+// escalas no comparables, caer a views daba un ~49,000%). null = sin reach
+// propio válido para esa red, nunca una tasa inventada.
+export interface AccountNetworkSummary {
+  networkCode: string;
+  networkName: string;
+  followers: number | null;
+  posts: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  views: number | null;
+  reach: number | null;
+  engagementRate: number | null;
+}
+
+export interface AccountMetricsSummary {
+  byNetwork: AccountNetworkSummary[];
+  // Sumas simples (nunca promedio de tasas); engagementRate del resumen solo
+  // combina redes con reach propio válido — mismo criterio que byNetwork,
+  // ver comentario en SocialAccountsService.getAccountMetricsSummary.
+  summary: {
+    followers: number | null;
+    posts: number | null;
+    likes: number | null;
+    comments: number | null;
+    shares: number | null;
+    views: number | null;
+    reach: number | null;
+    engagementRate: number | null;
+  };
+}
+
 function withRange(path: string, range?: DateRangeParams): string {
   if (!range?.from && !range?.to) return path;
   const params = new URLSearchParams();
@@ -181,7 +222,14 @@ function withRange(path: string, range?: DateRangeParams): string {
 export const analyticsApi = createApi({
   reducerPath: 'analyticsApi',
   baseQuery: createAuthenticatedBaseQuery(),
-  tagTypes: ['CampaignsMetricsSummary', 'Brands', 'BrandScore', 'SocialAccounts', 'BrandMetricsHistory', 'BrandScoreHistory', 'CampaignMetricsHistory'],
+  tagTypes: ['CampaignsMetricsSummary', 'Brands', 'BrandScore', 'SocialAccounts', 'BrandMetricsHistory', 'BrandScoreHistory', 'CampaignMetricsHistory', 'AccountMetricsSummary'],
+  // Sin esto, RTK Query sirve la caché tal cual si el usuario vuelve a
+  // /metrics dentro de los 60s (keepUnusedDataFor default) sin pedir nada
+  // nuevo a nuestro propio backend — cada widget siempre debe leer el
+  // estado más reciente de nuestra BD al montar. Esto NO dispara llamadas
+  // nuevas a Ayrshare (eso lo sigue gobernando el refresh explícito de
+  // metrics/page.tsx, acotado a 2 llamadas máx. por entrada — ver ahí).
+  refetchOnMountOrArgChange: true,
   endpoints: (builder) => ({
     getCampaignsMetricsSummary: builder.query<CampaignMetricsSummary[], void>({
       query: () => 'campaigns/metrics-summary',
@@ -222,6 +270,15 @@ export const analyticsApi = createApi({
     getPostMetrics: builder.query<PostMetricsDetail, { campaignId: string; postId: string }>({
       query: ({ campaignId, postId }) => `campaigns/${campaignId}/posts/${postId}/metrics`,
     }),
+    // Cliente/Admin únicamente (BrandsController.assertIsBrandOwnerOrAdmin ya
+    // lo exige — 403 para CM/Diseñador). Se pide igual sin chequear rol acá
+    // (mismo criterio ya usado por getBrandMetricsHistory): para CM/Diseñador
+    // simplemente no llega data, los widgets caen a su estado "sin dato" en
+    // vez de duplicar el chequeo de rol en el frontend.
+    getAccountMetricsSummary: builder.query<AccountMetricsSummary, { brandId: string; range?: DateRangeParams }>({
+      query: ({ brandId, range }) => withRange(`brands/${brandId}/account-metrics-summary`, range),
+      providesTags: ['AccountMetricsSummary'],
+    }),
 
     // Refresh al entrar a Métricas (2026-08-17) — dispara una llamada real a
     // Ayrshare del lado del backend (ignora la ventana anti-duplicado de 5h),
@@ -233,7 +290,7 @@ export const analyticsApi = createApi({
     // (AccountMetricsCronService), por eso un solo refresh invalida ambos.
     refreshBrandMetrics: builder.mutation<BrandMetricsHistoryPoint[], string>({
       query: (brandId) => ({ url: `brands/${brandId}/metrics-history/refresh`, method: 'POST' }),
-      invalidatesTags: ['BrandMetricsHistory', 'BrandScoreHistory', 'BrandScore', 'SocialAccounts'],
+      invalidatesTags: ['BrandMetricsHistory', 'BrandScoreHistory', 'BrandScore', 'SocialAccounts', 'AccountMetricsSummary'],
     }),
     // Acotado a UNA campaña — nunca se dispara en bucle por todas las
     // campañas filtradas (ver metrics/page.tsx, evita N llamadas a Ayrshare
@@ -254,6 +311,7 @@ export const {
   useGetBrandScoreHistoryQuery,
   useGetCampaignMetricsHistoryQuery,
   useGetPostMetricsQuery,
+  useGetAccountMetricsSummaryQuery,
   useRefreshBrandMetricsMutation,
   useRefreshCampaignMetricsMutation,
 } = analyticsApi;

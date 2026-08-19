@@ -97,4 +97,20 @@ export class BrandsController {
     await this.accountMetricsCron.generateAccountMetrics({ brandId: id, ignoreRecentWindow: true });
     return this.socialAccounts.getMetricsHistory(id);
   }
+
+  // Totales de la cuenta completa ahora mismo (no serie histórica) — a
+  // diferencia de GET campaigns/metrics-summary, no depende de que existan
+  // campañas: cubre todas las publicaciones reales de cada red conectada.
+  // Mismo guard que metrics-history (dueño de marca o Administrador).
+  @Get(':id/account-metrics-summary')
+  @RequirePermission('marcas', 'ver')
+  async getAccountMetricsSummary(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: { sub: string; roles: string[] },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    await this.socialAccounts.assertIsBrandOwnerOrAdmin(id, user);
+    return this.socialAccounts.getAccountMetricsSummary(id, from ? new Date(from) : undefined, to ? new Date(to) : undefined);
+  }
 }
