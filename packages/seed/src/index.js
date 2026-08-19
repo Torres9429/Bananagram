@@ -16,6 +16,11 @@ const MODULES = [
   { slug: 'publicaciones', name: 'Publicaciones' },
   { slug: 'calendario', name: 'Calendario' },
   { slug: 'campanas', name: 'Campañas' },
+  // Agregado 2026-08-19: ideas de contenido (Alexa Skill + web) es una
+  // capacidad distinta de crear/editar campañas — antes reusaba
+  // campanas:crear, lo que dejaba a Diseñador sin poder generar/guardar
+  // ideas (solo tiene campanas:ver) pese a que sí es trabajo suyo.
+  { slug: 'ideas', name: 'Ideas' },
   { slug: 'metricas', name: 'Métricas' },
   { slug: 'score', name: 'Score' },
   { slug: 'reportes', name: 'Reportes' },
@@ -49,6 +54,9 @@ const ROLE_PERMISSIONS = {
     publicaciones: ['ver', 'crear', 'editar', 'aprobar', 'rechazar'],
     calendario: ['ver', 'crear', 'editar'],
     campanas: ['ver', 'crear', 'editar', 'asignar', 'aprobar', 'rechazar'],
+    // Agregado 2026-08-19: generar/guardar/borrar ideas de contenido, ya
+    // desacoplado de campanas:crear (ver modules.enum.ts).
+    ideas: ['ver', 'crear'],
     metricas: ['ver'],
     score: ['ver'],
     reportes: ['ver'],
@@ -61,6 +69,11 @@ const ROLE_PERMISSIONS = {
     publicaciones: ['ver', 'crear', 'editar'],
     calendario: ['ver'],
     campanas: ['ver'],
+    // Agregado 2026-08-19: antes Diseñador no podía generar/guardar ideas
+    // porque ese endpoint reusaba campanas:crear (que Diseñador no tiene) —
+    // generar ideas de contenido sí es trabajo suyo, solo crear/editar
+    // campañas no lo es. Ver modules.enum.ts.
+    ideas: ['ver', 'crear'],
   },
   cliente: {
     catalogos: ['ver'],
@@ -74,6 +87,8 @@ const ROLE_PERMISSIONS = {
     // sin esto el Cliente daba 403 al intentarlo. assertCanManage/
     // BrandAccessGuard ya limitan esto a sus propias marcas.
     campanas: ['ver', 'crear', 'editar'],
+    // Agregado 2026-08-19: ver nota en community_manager/disenador arriba.
+    ideas: ['ver', 'crear'],
     metricas: ['ver'],
     score: ['ver'],
     reportes: ['ver', 'exportar'],

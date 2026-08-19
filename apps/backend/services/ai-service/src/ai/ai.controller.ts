@@ -10,12 +10,16 @@ import { CampaignRecommendationsDto } from './dto/campaign-recommendations.dto';
 
 type Claims = { sub: string; roles: string[] };
 
-// Permisos reutilizados del catálogo real, sin módulo "ia" nuevo (decisión
-// ya tomada, ver docs de la auditoría): generate-ideas vive en el dominio de
-// campañas (mismo criterio que alexa-service/ideas.controller.ts), analyze
-// es de solo lectura sobre una publicación (publicaciones:ver — el Cliente
-// debe poder analizar sin poder editar), improve sí propone una reescritura
-// (publicaciones:editar).
+// Permisos reutilizados del catálogo real: analyze es de solo lectura sobre
+// una publicación (publicaciones:ver — el Cliente debe poder analizar sin
+// poder editar), improve sí propone una reescritura (publicaciones:editar).
+// generate-ideas usaba campanas:crear (decisión vieja, ver docs de la
+// auditoría) — cambiado 2026-08-19 a ideas:crear, mismo módulo nuevo que
+// alexa-service/ideas.controller.ts, porque generar ideas es una capacidad
+// distinta de crear/editar una campaña (dejaba a Diseñador sin poder
+// generar ideas pese a que sí es trabajo suyo). campaign-recommendations
+// se queda en campanas:ver a propósito — es de solo lectura y todo rol con
+// acceso a la campaña ya lo tiene, sin el mismo problema.
 @ApiTags('ai')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -24,7 +28,7 @@ export class AiController {
   constructor(private readonly ai: AiService) {}
 
   @Post('generate-ideas')
-  @RequirePermission('campanas', 'crear')
+  @RequirePermission('ideas', 'crear')
   generateIdeas(@Body() dto: GenerateIdeasDto, @CurrentUser() _user: Claims) {
     return this.ai.generateIdeas(dto);
   }

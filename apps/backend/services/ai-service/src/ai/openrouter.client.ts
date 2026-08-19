@@ -18,7 +18,27 @@ type OpenRouterResponse = {
 // marca) ni la API key.
 @Injectable()
 export class OpenRouterClient {
-  async chatCompletion(messages: ChatMessage[]): Promise<string> {
+  // maxTokens es opcional a propósito: sin límite explícito, OpenRouter deja
+  // que el modelo genere tanto como quiera, y cada token de más suma
+  // latencia real al round-trip completo. Solo se pasa desde los callers que
+  // necesitan ese margen — analyzePost/improvePost/suggestCaption se quedan
+  // sin cambios para no arriesgar truncar sus respuestas (esquemas más
+  // grandes, con arrays opcionales como visualRecommendations/variants).
+  //
+  // El modelo configurado (google/gemini-3.7-flash) es un modelo de
+  // razonamiento con un bloque de "thinking" interno OBLIGATORIO — ni
+  // `reasoning: {enabled:false}` (lo rechaza: "Reasoning is mandatory for
+  // this endpoint") ni `reasoning: {effort:'low'}` (lo acepta pero no cambia
+  // nada) lo reducen. Verificado en vivo (2026-08-19, varias corridas
+  // reales): ese bloque es VARIABLE, no de tamaño fijo — entre 576 y 864
+  // reasoning_tokens según la corrida — así que ni siquiera un maxTokens
+  // generoso garantiza no truncar el JSON final en una corrida con más
+  // razonamiento de lo normal. Es la causa real de los 8-9.3s de latencia
+  // consistente de este modelo — maxTokens acá es solo contención de
+  // truncamiento, no acelera la respuesta. La única forma real de bajar la
+  // latencia (o de eliminar el riesgo de truncamiento) es otro modelo
+  // (OPENROUTER_MODEL) sin razonamiento obligatorio.
+  async chatCompletion(messages: ChatMessage[], options?: { maxTokens?: number }): Promise<string> {
     const { apiKey, model, baseUrl } = getOpenRouterConfig();
 
     // IMPORTANTE: fetch() resuelve en cuanto llegan los headers, no cuando
@@ -39,7 +59,12 @@ export class OpenRouterClient {
             'Content-Type': 'application/json',
             'X-Title': 'Bananagram',
           },
-          body: JSON.stringify({ model, messages, temperature: 0.7 }),
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.7,
+            ...(options?.maxTokens ? { max_tokens: options.maxTokens } : {}),
+          }),
         });
         const payload = (await response.json().catch(() => ({}))) as OpenRouterResponse;
         return { status: response.status, ok: response.ok, payload };

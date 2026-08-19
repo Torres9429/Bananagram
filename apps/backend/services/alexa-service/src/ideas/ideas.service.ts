@@ -19,18 +19,27 @@ export class IdeasService {
 
   constructor(private readonly aiService: AiServiceClient) {}
 
-  async listByCampaign(campaignId: string, authHeader: string): Promise<any> {
+  // Filtrado por createdBy a propósito: aunque varios roles compartan acceso
+  // a la misma campaña (CM, Diseñador, Cliente), las ideas guardadas son
+  // personales — cada quien ve solo las suyas, no las de sus compañeros de
+  // equipo en la misma campaña. Administrador es la única excepción (ve/
+  // gestiona todas, mismo criterio que CampaignsService.assertCanManage en
+  // core-service — ver el `roles.includes('administrador')` de ahí).
+  async listByCampaign(campaignId: string, userId: string, isAdmin: boolean, authHeader: string): Promise<any> {
     await this.assertCampaignAccess(campaignId, authHeader);
     return prisma.contentIdea.findMany({
-      where: { campaignId, deletedAt: null },
+      where: { campaignId, deletedAt: null, ...(isAdmin ? {} : { createdBy: userId }) },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async getIdea(id: string, authHeader: string): Promise<any> {
+  async getIdea(id: string, userId: string, isAdmin: boolean, authHeader: string): Promise<any> {
     const idea = await prisma.contentIdea.findFirst({ where: { id, deletedAt: null } });
     if (!idea) throw new NotFoundException(`ContentIdea ${id} no existe`);
     await this.assertCampaignAccess(idea.campaignId, authHeader);
+    // No se distingue "no existe" de "no es tuya" a propósito — mismo
+    // criterio que assertCampaignAccess más abajo.
+    if (!isAdmin && idea.createdBy !== userId) throw new NotFoundException(`ContentIdea ${id} no existe`);
     return idea;
   }
 
@@ -47,8 +56,8 @@ export class IdeasService {
     });
   }
 
-  async updateIdea(id: string, dto: UpdateIdeaDto, authHeader: string): Promise<any> {
-    await this.getIdea(id, authHeader);
+  async updateIdea(id: string, dto: UpdateIdeaDto, userId: string, isAdmin: boolean, authHeader: string): Promise<any> {
+    await this.getIdea(id, userId, isAdmin, authHeader);
     this.assertAtLeastOneProvided(dto);
 
     return prisma.contentIdea.update({
@@ -57,21 +66,24 @@ export class IdeasService {
     });
   }
 
-  async removeIdea(id: string, authHeader: string): Promise<any> {
-    await this.getIdea(id, authHeader);
+  async removeIdea(id: string, userId: string, isAdmin: boolean, authHeader: string): Promise<any> {
+    await this.getIdea(id, userId, isAdmin, authHeader);
     return prisma.contentIdea.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   // deleteIdeaFromBackend del Lambda real borra por título, no por id —
   // fetchSavedIdeas ni siquiera devuelve uno (solo title/text/createdAt).
   // Si hay más de una coincidencia, borra la más reciente (mismo criterio
-  // razonable que esperaría un humano pidiéndolo por voz).
-  async removeIdeaByTitle(campaignId: string, title: string, authHeader: string): Promise<any> {
+  // razonable que esperaría un humano pidiéndolo por voz). Acotado a las
+  // ideas del propio usuario, mismo criterio que listByCampaign — evita que
+  // alguien borre por voz una idea de un compañero de equipo adivinando/
+  // repitiendo su título exacto (salvo Administrador).
+  async removeIdeaByTitle(campaignId: string, title: string, userId: string, isAdmin: boolean, authHeader: string): Promise<any> {
     await this.assertCampaignAccess(campaignId, authHeader);
 
     const normalized = title.trim().toLowerCase();
     const candidates = await prisma.contentIdea.findMany({
-      where: { campaignId, deletedAt: null },
+      where: { campaignId, deletedAt: null, ...(isAdmin ? {} : { createdBy: userId }) },
       orderBy: { createdAt: 'desc' },
     });
     const match = candidates.find((idea) => idea.title?.trim().toLowerCase() === normalized);
