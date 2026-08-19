@@ -8,13 +8,13 @@ import Tab from '@mui/material/Tab';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
+import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import { useDispatch, useSelector } from 'react-redux';
 import { EmptyState, usePermissions, useToast } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { exportVisibleMetricsAsPdf } from '../../lib/export-metrics-pdf';
 import { AnalyticsFilterBar } from '../../components/dashboard/AnalyticsFilterBar';
 import { AnalyticsBreadcrumb } from '../../components/dashboard/AnalyticsBreadcrumb';
-import { NetworkOverview } from '../../components/dashboard/NetworkOverview';
 import { EngagementChart } from '../../components/dashboard/EngagementChart';
 import { NetworkMetricCards } from '../../components/dashboard/NetworkMetricCards';
 import { CampaignBreakdown } from '../../components/dashboard/CampaignBreakdown';
@@ -35,7 +35,7 @@ import { ContentTypeBreakdown } from '../../components/dashboard/ContentTypeBrea
 import { AudienceGenderAgeChart } from '../../components/dashboard/AudienceGenderAgeChart';
 import { AudienceGenderPie } from '../../components/dashboard/AudienceGenderPie';
 import { AudienceCountryChart } from '../../components/dashboard/AudienceCountryChart';
-import { useGetBrandSocialAccountsQuery, useRefreshBrandMetricsMutation, useRefreshCampaignMetricsMutation } from '../../store/api/analytics.api';
+import { analyticsApi, useGetBrandSocialAccountsQuery, useRefreshBrandMetricsMutation, useRefreshCampaignMetricsMutation } from '../../store/api/analytics.api';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { selectAnalyticsFilters, selectSelectedNetwork } from '../../store/analytics.selectors';
 import { useActiveBrandId } from '../../components/dashboard/useActiveBrandId';
@@ -111,8 +111,8 @@ export default function MetricsPage() {
   // actualmente seleccionada (solo si el usuario ya entró al detalle de
   // una) — nunca una por cada campaña filtrada, para no arriesgar rate
   // limits de Ayrshare (decisión explícita, ver reporte de la auditoría).
-  const [refreshBrandMetrics] = useRefreshBrandMetricsMutation();
-  const [refreshCampaignMetrics] = useRefreshCampaignMetricsMutation();
+  const [refreshBrandMetrics, { isLoading: isRefreshingBrand }] = useRefreshBrandMetricsMutation();
+  const [refreshCampaignMetrics, { isLoading: isRefreshingCampaign }] = useRefreshCampaignMetricsMutation();
 
   useEffect(() => {
     if (!brandId) return;
@@ -123,6 +123,30 @@ export default function MetricsPage() {
     if (!filters.campaignId) return;
     refreshCampaignMetrics(filters.campaignId);
   }, [filters.campaignId, refreshCampaignMetrics]);
+
+  // Botón "Actualizar" — mismo tope de 2 llamadas reales a Ayrshare que el
+  // refresh automático de arriba (marca + la campaña filtrada, si hay una;
+  // nunca una por cada campaña visible, mismo criterio anti-rate-limit).
+  // Además fuerza a releer nuestra propia BD para TODO lo que esté montado
+  // en este momento (resumen general incluido, que el refresh automático no
+  // cubre si no hay una campaña específica filtrada).
+  function handleRefresh() {
+    dispatch(
+      analyticsApi.util.invalidateTags([
+        'CampaignsMetricsSummary',
+        'Brands',
+        'BrandScore',
+        'SocialAccounts',
+        'BrandMetricsHistory',
+        'BrandScoreHistory',
+        'CampaignMetricsHistory',
+        'AccountMetricsSummary',
+      ]),
+    );
+    if (brandId) refreshBrandMetrics(brandId);
+    if (filters.campaignId) refreshCampaignMetrics(filters.campaignId);
+  }
+  const isRefreshing = isRefreshingBrand || isRefreshingCampaign;
 
   // Mientras la sesión aún no hidrata desde la cookie, `can()` siempre da
   // false (permissions arranca en {}) — sin este guard se veía un flash de
@@ -156,6 +180,21 @@ export default function MetricsPage() {
           ))}
         </Tabs>
 
+        <Tooltip title="Volver a pedir los datos más recientes">
+          <span>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RefreshOutlinedIcon />}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              sx={{ borderColor: 'divider', color: 'secondary.main', flexShrink: 0, '&:hover': { borderColor: 'primary.main' } }}
+            >
+              {isRefreshing ? 'Actualizando…' : 'Actualizar'}
+            </Button>
+          </span>
+        </Tooltip>
+
         {/* Captura exactamente lo renderizado en contentRef — nunca recalcula
             ni pide configuración aparte, el PDF coincide con lo que ya se ve
             filtrado en pantalla. */}
@@ -186,7 +225,6 @@ export default function MetricsPage() {
         // ── Pestaña de red — estructura estricta, idéntica en las 6 (§B.2) ──
         <>
           {showAccountOverview && <AccountGrowthOverview networkCode={selectedNetwork} />}
-          <NetworkOverview networkCode={selectedNetwork} />
           <EngagementChart />
           <NetworkMetricCards />
           <CampaignBreakdown />
@@ -199,7 +237,6 @@ export default function MetricsPage() {
         // ── General — misma base de 6 secciones + widgets embebidos (§B.3), nunca sub-tabs ──
         <>
           {showAccountOverview && <AccountGrowthOverview />}
-          <NetworkOverview networkCode={null} />
           <EngagementChart />
           <CampaignBreakdown />
           <PostPerformanceChart />

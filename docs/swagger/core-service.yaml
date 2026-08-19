@@ -1,5 +1,12 @@
 openapi: 3.0.0
 paths:
+  /health:
+    get:
+      operationId: HealthController_health
+      parameters: []
+      responses:
+        '200':
+          description: ''
   /api/catalogs/categories:
     get:
       operationId: CategoriesController_findAll
@@ -237,6 +244,20 @@ paths:
         - catalogs
       security:
         - bearer: []
+  /api/internal/user-profiles/{userId}:
+    get:
+      operationId: UserProfilesController_getByUserId
+      parameters:
+        - name: userId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - internal
   /api/internal/user-profiles:
     post:
       operationId: UserProfilesController_upsert
@@ -250,6 +271,10 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - internal
   /api/brands:
@@ -259,6 +284,12 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
       tags:
         - brands
       security:
@@ -275,6 +306,10 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - brands
       security:
@@ -291,6 +326,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - brands
       security:
@@ -312,6 +351,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - brands
       security:
@@ -327,6 +370,138 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/connect-url:
+    post:
+      operationId: BrandsController_createConnectUrl
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectUrlDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/reprovision-ayrshare:
+    post:
+      operationId: BrandsController_reprovisionAyrshare
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectUrlDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/metrics-history:
+    get:
+      operationId: BrandsController_getMetricsHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/metrics-history/refresh:
+    post:
+      operationId: BrandsController_refreshMetricsHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/account-metrics-summary:
+    get:
+      operationId: BrandsController_getAccountMetricsSummary
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - brands
       security:
@@ -343,6 +518,12 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
       tags:
         - social-accounts
       security:
@@ -359,8 +540,83 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
       tags:
         - social-accounts
+      security:
+        - bearer: []
+  /api/brands/{brandId}/social-accounts/{id}/disconnect:
+    post:
+      operationId: SocialAccountsController_disconnect
+      parameters:
+        - name: brandId
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - social-accounts
+      security:
+        - bearer: []
+  /api/brands/{id}/score:
+    get:
+      operationId: ScoreController_getScore
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - score
+      security:
+        - bearer: []
+  /api/brands/{id}/score-history:
+    get:
+      operationId: ScoreController_getScoreHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - score
       security:
         - bearer: []
   /api/campaigns:
@@ -370,6 +626,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - campaigns
       security:
@@ -386,6 +646,10 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - campaigns
       security:
@@ -393,10 +657,19 @@ paths:
   /api/campaigns/eligible-community-managers:
     get:
       operationId: CampaignsController_findEligibleCommunityManagers
-      parameters: []
+      parameters:
+        - name: categoryIds
+          required: true
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - campaigns
       security:
@@ -408,6 +681,27 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/metrics-summary:
+    get:
+      operationId: CampaignsController_findAllWithMetrics
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
       tags:
         - campaigns
       security:
@@ -424,6 +718,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - campaigns
       security:
@@ -445,6 +743,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - campaigns
       security:
@@ -460,6 +762,139 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/metrics:
+    get:
+      operationId: CampaignsController_getMetrics
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/metrics-history:
+    get:
+      operationId: CampaignsController_getMetricsHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/posts/{postId}/metrics:
+    get:
+      operationId: CampaignsController_getPostMetrics
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: postId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/metrics/refresh:
+    post:
+      operationId: CampaignsController_refreshMetrics
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/accept:
+    post:
+      operationId: CampaignsController_accept
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/reject:
+    post:
+      operationId: CampaignsController_reject
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectCampaignDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - campaigns
       security:
@@ -507,7 +942,79 @@ paths:
         - campaigns
       security:
         - bearer: []
+  /api/cm-team:
+    get:
+      operationId: CmTeamController_listMine
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - cm-team
+      security:
+        - bearer: []
+    post:
+      operationId: CmTeamController_add
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeamMemberDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - cm-team
+      security:
+        - bearer: []
+  /api/cm-team/{designerUserId}:
+    delete:
+      operationId: CmTeamController_remove
+      parameters:
+        - name: designerUserId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - cm-team
+      security:
+        - bearer: []
   /api/posts:
+    get:
+      operationId: PostsController_list
+      parameters:
+        - name: campaignId
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: brandId
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: status
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
     post:
       operationId: PostsController_create
       parameters: []
@@ -519,6 +1026,70 @@ paths:
               $ref: '#/components/schemas/CreatePostDto'
       responses:
         '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}:
+    get:
+      operationId: PostsController_get
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+    patch:
+      operationId: PostsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePostDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+    delete:
+      operationId: PostsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
           description: ''
       tags:
         - posts
@@ -536,6 +1107,154 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/approve:
+    post:
+      operationId: PostsController_approve
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/reject:
+    post:
+      operationId: PostsController_reject
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectPostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/client-reject:
+    post:
+      operationId: PostsController_clientReject
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectPostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/forward-to-designer:
+    post:
+      operationId: PostsController_forwardToDesigner
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForwardToDesignerDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/schedule:
+    post:
+      operationId: PostsController_schedule
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulePostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/cancel:
+    post:
+      operationId: PostsController_cancel
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - posts
       security:
@@ -552,6 +1271,35 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/media/{mediaId}:
+    delete:
+      operationId: PostsController_removeMedia
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: mediaId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - posts
       security:
@@ -563,6 +1311,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - reports
       security:
@@ -579,6 +1331,10 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - reports
       security:
@@ -595,92 +1351,12 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - reports
-      security:
-        - bearer: []
-  /api/ideas:
-    get:
-      operationId: IdeasController_findByCampaign
-      parameters:
-        - name: campaignId
-          required: true
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: ''
-      tags:
-        - ideas
-      security:
-        - bearer: []
-    post:
-      operationId: IdeasController_create
-      parameters: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateIdeaDto'
-      responses:
-        '201':
-          description: ''
-      tags:
-        - ideas
-      security:
-        - bearer: []
-  /api/ideas/{id}:
-    get:
-      operationId: IdeasController_findOne
-      parameters:
-        - name: id
-          required: true
-          in: path
-          schema:
-            type: string
-      responses:
-        '200':
-          description: ''
-      tags:
-        - ideas
-      security:
-        - bearer: []
-    patch:
-      operationId: IdeasController_update
-      parameters:
-        - name: id
-          required: true
-          in: path
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateIdeaDto'
-      responses:
-        '200':
-          description: ''
-      tags:
-        - ideas
-      security:
-        - bearer: []
-    delete:
-      operationId: IdeasController_remove
-      parameters:
-        - name: id
-          required: true
-          in: path
-          schema:
-            type: string
-      responses:
-        '200':
-          description: ''
-      tags:
-        - ideas
       security:
         - bearer: []
 info:
@@ -784,6 +1460,8 @@ components:
           enum:
             - brand
             - profile
+        categoryId:
+          type: string
         logoUrl:
           type: string
         primaryColor:
@@ -808,10 +1486,19 @@ components:
           enum:
             - brand
             - profile
+        categoryId:
+          type: string
         logoUrl:
           type: string
         primaryColor:
           type: string
+    CreateConnectUrlDto:
+      type: object
+      properties:
+        allowedSocial:
+          type: array
+          items:
+            type: string
     CreateCampaignDto:
       type: object
       properties:
@@ -858,6 +1545,11 @@ components:
           type: string
         endDate:
           type: string
+    RejectCampaignDto:
+      type: object
+      properties:
+        reason:
+          type: string
     AssignDesignerDto:
       type: object
       properties:
@@ -865,6 +1557,13 @@ components:
           type: string
       required:
         - userId
+    AddTeamMemberDto:
+      type: object
+      properties:
+        designerUserId:
+          type: string
+      required:
+        - designerUserId
     CreatePostDto:
       type: object
       properties:
@@ -889,6 +1588,32 @@ components:
         - campaignId
         - socialNetworkIds
         - content
+    RejectPostDto:
+      type: object
+      properties:
+        comment:
+          type: string
+      required:
+        - comment
+    ForwardToDesignerDto:
+      type: object
+      properties:
+        comment:
+          type: string
+    UpdatePostDto:
+      type: object
+      properties:
+        content:
+          type: string
+        instructions:
+          type: string
+          nullable: true
+    SchedulePostDto:
+      type: object
+      properties:
+        scheduledAt:
+          type: string
+          nullable: true
     CreateReportDto:
       type: object
       properties:
@@ -902,27 +1627,3 @@ components:
       required:
         - brandId
         - format
-    CreateIdeaDto:
-      type: object
-      properties:
-        campaignId:
-          type: string
-        text:
-          type: string
-        title:
-          type: string
-        source:
-          type: string
-          enum:
-            - sugerida
-            - propia
-      required:
-        - campaignId
-        - text
-    UpdateIdeaDto:
-      type: object
-      properties:
-        text:
-          type: string
-        title:
-          type: string

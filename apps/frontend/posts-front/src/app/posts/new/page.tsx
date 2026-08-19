@@ -11,6 +11,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { type SelectChangeEvent } from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
+import Collapse from '@mui/material/Collapse';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Alert from '@mui/material/Alert';
@@ -20,12 +21,15 @@ import TextField from '@mui/material/TextField';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-import { PrimaryButton, useToast } from '@repo/ui/ui';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { useListSocialNetworksQuery } from '@repo/ui/state';
 import { POST_CHAR_LIMIT, NETWORK_DISPLAY_COLORS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
 import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
 import { useCreatePostMutation, useUploadMediaMutation, useDeletePostMutation, useSubmitForReviewMutation } from '../../../store/api/posts.api';
 import { MediaCarousel } from '../../../components/MediaCarousel';
+import { SuggestCaptionPanel } from '../../../components/SuggestCaptionPanel';
 
 // Reescrita a datos reales (Fase N). Cambios de fondo respecto al mock:
 // - Ya no hay "biblioteca de media" reutilizable (no existe ese concepto en
@@ -40,12 +44,14 @@ import { MediaCarousel } from '../../../components/MediaCarousel';
 export default function NewPostPage() {
   const router = useRouter();
   const { showSuccess, showError } = useToast();
+  const { can } = usePermissions();
   const [campaignId, setCampaignId] = useState('');
   const [socialNetworkIds, setSocialNetworkIds] = useState<string[]>([]);
   const [content, setContent] = useState('');
   const [instructions, setInstructions] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   const { data: campaigns = [] } = useListCampaignsQuery();
   const { data: socialNetworks = [] } = useListSocialNetworksQuery();
@@ -185,7 +191,41 @@ export default function NewPostPage() {
               </Stack>
             )}
 
-            <Typography variant="subtitle2" color="text.secondary" mb={1}>Contenido</Typography>
+            {/* Asistente de IA arriba del contenido a propósito (2026-08-19):
+                se usa para REDACTAR el copy, tiene más sentido antes que el
+                campo que termina llenando. Antes un Dialog modal
+                (SuggestCaptionDialog) — ahora una sección inline que se
+                abre/cierra con este mismo botón, sin tapar el formulario. */}
+            {can('publicaciones', 'crear') && (
+              <>
+                <Stack direction="row" justifyContent="flex-end" mb={1}>
+                  <Button
+                    size="small"
+                    startIcon={<AutoAwesomeIcon fontSize="small" />}
+                    endIcon={
+                      <ExpandMoreIcon
+                        fontSize="small"
+                        sx={{ transform: suggestOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                      />
+                    }
+                    onClick={() => setSuggestOpen((v) => !v)}
+                    sx={{ color: '#6A1B9A' }}
+                  >
+                    Sugerir con IA
+                  </Button>
+                </Stack>
+                <Collapse in={suggestOpen} sx={{ mb: suggestOpen ? 2 : 0 }}>
+                  <SuggestCaptionPanel
+                    platform={selectedNetworks[0]?.name ?? ''}
+                    files={files}
+                    active={suggestOpen}
+                    onApply={(text) => { setContent(text); setSuggestOpen(false); }}
+                  />
+                </Collapse>
+              </>
+            )}
+
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>Contenido Final</Typography>
             <TextField
               multiline
               minRows={5}

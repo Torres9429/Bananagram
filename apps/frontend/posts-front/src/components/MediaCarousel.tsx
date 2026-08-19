@@ -3,9 +3,11 @@
 import { useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
+import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 
 export interface MediaCarouselItem {
   url: string;
@@ -39,11 +41,17 @@ export function MediaCarousel({ items, emptyLabel = 'Sin imagen adjunta' }: Medi
     setIndex(Math.round(track.scrollLeft / track.clientWidth));
   }
 
+  // Sin media: antes esto era un cuadrado completo (aspect-ratio 1/1, mismo
+  // tamaño que una foto real) — visualmente se veía como una "foto rota"
+  // enorme y vacía en la vista previa de /posts/new en cuanto se elegía una
+  // red, antes de adjuntar nada (reportado 2026-08-19). Una barra angosta no
+  // finge ser una imagen que todavía no existe.
   if (items.length === 0) {
     return (
-      <Box sx={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 1.5, bgcolor: '#E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ width: '100%', minHeight: 56, borderRadius: 1.5, bgcolor: '#EDEDED', border: '1px dashed #D0D0D0', px: 2, py: 1.5 }}>
+        <ImageOutlinedIcon sx={{ color: '#B0B0B0', fontSize: 20 }} />
         <Typography variant="caption" sx={{ color: '#9E9E9E' }}>{emptyLabel}</Typography>
-      </Box>
+      </Stack>
     );
   }
 

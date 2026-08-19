@@ -1,4 +1,4 @@
-import { RawMetricsResponse, toNullableNumber } from './mapper.interface';
+import { RawMetricsResponse, getPath, toNullableNumber } from './mapper.interface';
 
 // Mapper específico por red para métricas de CUENTA (POST /analytics/social),
 // análogo a mapper.registry.ts (que ya existe para métricas de PUBLICACIÓN,
@@ -20,14 +20,27 @@ import { RawMetricsResponse, toNullableNumber } from './mapper.interface';
 //   que el parser universal anterior perdía por completo. Sin ningún campo
 //   de reach a nivel de cuenta — se mapea a null, no es un bug, Ayrshare no
 //   lo expone para TikTok en este endpoint.
-// - Facebook: followersCount SÍ coincide (ya funcionaba), pero NO existe
-//   ningún campo equivalente a likes/comments/shares/views/reach en la
-//   forma que esperamos — Facebook expone en su lugar agregados distintos
-//   (reactions.*, pagePostEngagements, pageMediaView, pageVideoViews) sin
-//   correspondencia 1:1 clara. Se dejan en null a propósito — mapear
-//   "reactions.total" como si fuera "likes" sería inventar una equivalencia
-//   no confirmada, decisión de producto pendiente (ver reporte de la
-//   auditoría de métricas 2026-08-17).
+// - Facebook: followersCount SÍ coincide (ya funcionaba). Payload real
+//   capturado en vivo (2026-08-19, cuenta de prueba, ver auditoría de
+//   métricas): no hay ningún campo "commentsCount"/"shareCount"/"reachCount"
+//   ni equivalente — Ayrshare no expone comentarios/shares/reach a nivel de
+//   PÁGINA de Facebook en este endpoint (sí existen por publicación, endpoint
+//   distinto). Sí hay 2 campos con correspondencia directa y honesta (no una
+//   ratio inventada, valores reales de Meta): `reactions.total` (suma de
+//   like/love/wow/haha/sorry/anger — es literalmente "likes" agregados de la
+//   página) → likes, y `pageMediaView` (vistas de contenido de la página) →
+//   views. `pagePostEngagements` se deja fuera a propósito: es una métrica
+//   combinada propia de Meta (clics+reacciones+comentarios+shares) sin
+//   equivalente limpio a ninguno de nuestros campos individuales — sumarlo a
+//   cualquiera de ellos duplicaría conteos ya cubiertos por `reactions.total`.
+//   `comments`/`shares`/`reach`/`posts` siguen en null AQUÍ (este mapper es
+//   solo el baseline de /analytics/social, acotado por `quarters`) —
+//   `posts`/`likes`/`comments`/`shares`/`views` de Facebook se RE-CALCULAN
+//   aparte en ayrshare.service.ts.getAccountMetrics() contando GET
+//   /history/facebook (all-time, sin ventana), porque /analytics/social deja
+//   estos campos casi en 0 para páginas con actividad real pero vieja
+//   (verificado en vivo 2026-08-19). Solo `reach` sigue sin ninguna fuente
+//   real conocida para Facebook.
 // - X/Twitter: sin cuenta conectada para probar en vivo — se deja igual que
 //   antes (followersCount ?? followers), sin verificar, documentado como
 //   pendiente.
@@ -38,6 +51,10 @@ export interface AccountMappedMetrics {
   shares: number | null;
   views: number | null;
   reach: number | null;
+  // Total de publicaciones de la cuenta completa — confirmado en vivo
+  // 2026-08-18 contra Ayrshare real: Instagram expone `mediaCount`, TikTok
+  // `videoCountTotal`. Facebook/X no traen campo equivalente, queda null.
+  posts: number | null;
 }
 
 export type AccountMetricsMapper = (raw: RawMetricsResponse) => AccountMappedMetrics;
@@ -49,16 +66,20 @@ const instagramAccountMapper: AccountMetricsMapper = (raw) => ({
   shares: toNullableNumber(raw.shareCount),
   views: toNullableNumber(raw.viewsCount),
   reach: toNullableNumber(raw.reachCount),
+  posts: toNullableNumber(raw.mediaCount),
 });
 
 const facebookAccountMapper: AccountMetricsMapper = (raw) => ({
   followers: toNullableNumber(raw.followersCount),
-  // Sin equivalente confirmado en la respuesta real — no se inventa uno.
-  likes: null,
+  likes: toNullableNumber(getPath(raw, ['reactions', 'total'])),
+  // Ayrshare no expone comentarios/shares/reach/conteo de publicaciones a
+  // nivel de página de Facebook en este endpoint — sin equivalente real, no
+  // se inventa uno.
   comments: null,
   shares: null,
-  views: null,
+  views: toNullableNumber(raw.pageMediaView),
   reach: null,
+  posts: null,
 });
 
 const tiktokAccountMapper: AccountMetricsMapper = (raw) => ({
@@ -68,6 +89,7 @@ const tiktokAccountMapper: AccountMetricsMapper = (raw) => ({
   shares: toNullableNumber(raw.shareCountTotal),
   views: toNullableNumber(raw.viewCountTotal),
   reach: null, // Ayrshare no expone reach de cuenta para TikTok en este endpoint.
+  posts: toNullableNumber(raw.videoCountTotal),
 });
 
 const xAccountMapper: AccountMetricsMapper = (raw) => ({
@@ -77,6 +99,7 @@ const xAccountMapper: AccountMetricsMapper = (raw) => ({
   shares: null,
   views: null,
   reach: null,
+  posts: null,
 });
 
 const accountMapperRegistry: Record<string, AccountMetricsMapper> = {

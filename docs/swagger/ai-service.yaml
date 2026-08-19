@@ -1,0 +1,257 @@
+openapi: 3.0.0
+paths:
+  /health:
+    get:
+      operationId: HealthController_health
+      parameters: []
+      responses:
+        '200':
+          description: ''
+  /api/ai/generate-ideas:
+    post:
+      operationId: AiController_generateIdeas
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateIdeasDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - ai
+      security:
+        - bearer: []
+  /api/ai/analyze-post:
+    post:
+      operationId: AiController_analyzePost
+      parameters:
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzePostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ai
+      security:
+        - bearer: []
+  /api/ai/improve-post:
+    post:
+      operationId: AiController_improvePost
+      parameters:
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImprovePostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ai
+      security:
+        - bearer: []
+  /api/ai/suggest-caption:
+    post:
+      operationId: AiController_suggestCaption
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestCaptionDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - ai
+      security:
+        - bearer: []
+  /api/ai/campaign-recommendations:
+    post:
+      operationId: AiController_campaignRecommendations
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignRecommendationsDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ai
+      security:
+        - bearer: []
+info:
+  title: ai-service
+  description: >-
+    Único punto de contacto del backend con OpenRouter — genera ideas, analiza y
+    mejora publicaciones
+  version: '1.0'
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    GenerateIdeasDto:
+      type: object
+      properties:
+        platform:
+          type: string
+          maxLength: 120
+          description: Red social objetivo (ej. instagram, tiktok)
+        campaignId:
+          type: string
+          description: >-
+            Id de campaña, solo para correlación — no se valida pertenencia en
+            esta versión
+        brandName:
+          type: string
+          maxLength: 200
+        category:
+          type: string
+          maxLength: 200
+          description: Categoría/nicho de la marca
+        description:
+          type: string
+          maxLength: 500
+          description: Descripción breve del negocio/objetivo de la campaña
+        audience:
+          type: string
+          maxLength: 300
+        tone:
+          type: string
+          maxLength: 100
+          description: Tono de comunicación (ej. cercano, profesional, divertido)
+        additionalContext:
+          type: string
+          maxLength: 500
+        previousPosts:
+          description: Hasta 5 captions previos, como referencia de estilo
+          type: array
+          items:
+            type: string
+            maxLength: 300
+        quantity:
+          type: number
+          minimum: 1
+          maximum: 8
+          default: 5
+      required:
+        - platform
+    AnalyzePostDto:
+      type: object
+      properties:
+        postId:
+          type: string
+        additionalContext:
+          type: string
+          maxLength: 300
+          description: Instrucción adicional para el análisis (ej. "enfócate en el CTA")
+      required:
+        - postId
+    ImprovePostDto:
+      type: object
+      properties:
+        postId:
+          type: string
+        action:
+          enum:
+            - mejorar
+            - variantes
+            - hashtags
+            - adaptar
+          type: string
+        targetPlatform:
+          type: string
+          maxLength: 120
+          description: Plataforma destino, usado cuando action=adaptar
+        additionalContext:
+          type: string
+          maxLength: 500
+      required:
+        - postId
+        - action
+    SuggestCaptionDto:
+      type: object
+      properties:
+        platform:
+          type: string
+          maxLength: 120
+          description: Red social objetivo (ej. instagram, tiktok)
+        brief:
+          type: string
+          maxLength: 500
+          description: Descripción breve de qué trata la publicación
+        images:
+          description: Hasta 3 imágenes como data URL base64 (data:image/...;base64,...)
+          type: array
+          items:
+            type: string
+            maxLength: 3000000
+            pattern: /^data:image\/(png|jpe?g|webp|gif);base64,/
+      required:
+        - platform
+    CampaignRecommendationsDto:
+      type: object
+      properties:
+        campaignName:
+          type: string
+          maxLength: 200
+        totalPosts:
+          type: number
+          minimum: 0
+        reach:
+          type: number
+          minimum: 0
+        interactions:
+          type: number
+          minimum: 0
+        engagementRate:
+          type: number
+          nullable: true
+        additionalContext:
+          type: string
+          maxLength: 300
+      required:
+        - campaignName
+        - totalPosts
+        - reach
+        - interactions

@@ -78,6 +78,19 @@ services:
     ports: ["3004:3004"]
     depends_on: [core-service, auth-service, redis]
 
+  ai-service:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/backend/services/ai-service/Dockerfile
+    env_file: ./apps/backend/services/ai-service/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
+      CORE_SERVICE_URL: http://core-service:3002
+    ports: ["3005:3005"]
+    depends_on: [core-service, auth-service, redis]
+
   api-gateway:
     profiles: ["full"]
     build:
@@ -90,6 +103,7 @@ services:
       # su nombre — mismo patrón que DATABASE_URL_AUTH/CORE.
       AUTH_SERVICE_URL: http://auth-service:3001
       CORE_SERVICE_URL: http://core-service:3002
+      AI_SERVICE_URL: http://ai-service:3005
       REDIS_URL: redis://redis:6379
       AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
     ports: ["4000:4000"]
@@ -97,6 +111,7 @@ services:
       - auth-service
       - core-service
       - alexa-service
+      - ai-service
       - redis
 
   web-shell:

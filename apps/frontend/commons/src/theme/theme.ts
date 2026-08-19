@@ -82,7 +82,14 @@ export const theme = createTheme({
     },
     MuiInputLabel: {
       styleOverrides: {
-        root: ({ theme }) => ({ '&.Mui-focused': { color: theme.palette.primary.contrastText } }),
+        // Bug real (2026-08-19): contrastText es blanco, pensado para texto
+        // sobre una superficie PINTADA de primary (botones, DialogTitle) —
+        // el label de un TextField enfocado se ve sobre fondo blanco/claro,
+        // así que quedaba blanco sobre blanco, invisible. contrastTextMuted
+        // es la variante ya pensada para esto (texto con tono primary sobre
+        // superficies claras), mismo criterio que ya usan Checkbox/Radio al
+        // marcarse.
+        root: ({ theme }) => ({ '&.Mui-focused': { color: theme.palette.primary.contrastTextMuted } }),
       },
     },
     MuiCheckbox: {
@@ -114,7 +121,14 @@ export const theme = createTheme({
         root: ({ theme }) => ({
           textTransform: 'none',
           fontWeight: 600,
-          '&.Mui-selected': { color: theme.palette.primary.contrastText, fontWeight: 700 },
+          // Mismo bug/fix que MuiInputLabel de arriba: contrastText (blanco)
+          // asumía un Tab sobre fondo pintado de primary — en la práctica
+          // TODAS las Tabs de la app viven sobre fondo blanco/claro, dejando
+          // el tab seleccionado ilegible. Cada consumidor real (metrics,
+          // AdminTabs, PostsTabs, roles) ya lo venía parchando local con
+          // '!important' — se corrige acá de una vez para no seguir
+          // duplicándolo; esos overrides locales quedan como no-ops inocuos.
+          '&.Mui-selected': { color: theme.palette.primary.contrastTextMuted, fontWeight: 700 },
         }),
       },
     },

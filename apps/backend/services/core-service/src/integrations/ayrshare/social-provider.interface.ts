@@ -44,6 +44,14 @@ export interface AccountMetrics {
   shares: number | null;
   views: number | null;
   reach: number | null;
+  // Total de publicaciones de la cuenta completa (Instagram: mediaCount,
+  // TikTok: videoCountTotal — confirmado en vivo 2026-08-18). Facebook no
+  // trae un campo equivalente en ESTE endpoint (/analytics/social) — se
+  // resuelve aparte contando GET /history/facebook (ver ayrshare.service.ts.
+  // fetchFacebookHistorySummary, 2026-08-19: confirmado con soporte de
+  // Ayrshare que no existe un conteo directo). X sigue sin campo ni fuente
+  // alternativa verificada, queda null.
+  posts: number | null;
   // Demografía de audiencia — confirmado en vivo contra Ayrshare real que el
   // shape es { "F.25-34": 15, "M.18-24": 11 } (género.rango unidos por
   // punto) y { "US": 161 } por país. Requiere mandar `quarters` en el

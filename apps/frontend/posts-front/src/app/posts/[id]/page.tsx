@@ -40,6 +40,7 @@ import {
 import { NETWORK_DISPLAY_COLORS, NETWORK_LABELS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
 import { RejectPostDialog } from '../../../components/RejectPostDialog';
 import { MediaCarousel } from '../../../components/MediaCarousel';
+import { AiAssistantSection } from '../../../components/AiAssistantSection';
 
 const PSA_STATUS_STYLES: Record<PostSocialAccountStatus, { bg: string; color: string; label: string }> = {
   pendiente: { bg: '#F5F5F5', color: '#616161', label: 'Pendiente' },
@@ -126,6 +127,27 @@ export default function PostDetailPage() {
   const canEditNow =
     (post.status === 'borrador' || post.status === 'rechazado') && (isCm || isClient || isDesignerOrCreator);
   const canEditRechazadoCliente = post.status === 'rechazado_cliente' && isCm;
+  // Agregado 2026-08-19: el CM ya no necesita rechazar la publicación
+  // primero solo para poder editarla/mejorarla con IA mientras la tiene en
+  // revisión — mismo criterio "solo CM, status no cambia" que ya aplicaba a
+  // rechazado_cliente (backend: posts.service.ts.updatePost).
+  const canEditEnRevision = post.status === 'en_revision' && isCm;
+
+  // Botones de IA: solo visibles mientras la publicación sigue en el flujo
+  // de revisión (nunca en estados post-publicación) y solo para quien tiene
+  // el post "en su cancha" en ese momento — mismo criterio de ownership por
+  // status que ya usan canEditNow/canEditRechazadoCliente/canEditEnRevision y
+  // los botones de aprobar/rechazar de abajo, no una regla nueva. "Analizar"
+  // es de solo lectura (publicaciones:ver) y por eso alcanza a más gente en
+  // cada etapa (ej. el Cliente en 'aprobado' revisando antes de programar);
+  // "Mejorar" propone una reescritura, así que solo aparece donde la edición
+  // realmente es posible.
+  const isCurrentReviewer =
+    ((post.status === 'borrador' || post.status === 'rechazado') && (isCm || isClient || isDesignerOrCreator)) ||
+    (post.status === 'en_revision' && isCm) ||
+    (post.status === 'aprobado' && isClient) ||
+    (post.status === 'rechazado_cliente' && isCm);
+  const canImproveNow = canEditNow || canEditRechazadoCliente || canEditEnRevision;
 
   // Historial más reciente primero, colapsado por defecto (ver más/ver menos).
   const historyDesc = [...post.statusHistory].reverse();
@@ -150,6 +172,16 @@ export default function PostDetailPage() {
 
   function startEditing() {
     setEditContent(post!.content);
+    setEditInstructions(post!.instructions ?? '');
+    setEditFiles([]);
+    setEditing(true);
+  }
+
+  // "Usar esta propuesta"/"Usar esta variante" del diálogo de IA nunca
+  // sobrescribe el post directo — solo precarga el formulario de edición
+  // existente. El usuario todavía tiene que revisar y darle "Guardar".
+  function applyAiImprovedContent(text: string) {
+    setEditContent(text);
     setEditInstructions(post!.instructions ?? '');
     setEditFiles([]);
     setEditing(true);
@@ -448,7 +480,11 @@ export default function PostDetailPage() {
 
             {!editing && (
               <Stack direction="row" gap={1.5} mt={2} flexWrap="wrap">
-                {canEditNow && (
+                {/* Antes solo canEditNow mostraba este botón — canEditRechazadoCliente
+                    no tenía ninguna forma de entrar a `editing` desde la UI (bug real,
+                    corregido de paso 2026-08-19: la nota para el Diseñador y "Guardar y
+                    reenviar" ya asumían que se podía llegar a editar ahí). */}
+                {(canEditNow || canEditRechazadoCliente || canEditEnRevision) && (
                   <Button variant="outlined" onClick={startEditing} sx={{ borderColor: '#E0A800', color: 'secondary.main' }}>
                     Editar
                   </Button>
@@ -504,6 +540,13 @@ export default function PostDetailPage() {
               </Stack>
             )}
           </Paper>
+
+          <AiAssistantSection
+            postId={post.id}
+            canAnalyze={isCurrentReviewer && can('publicaciones', 'ver')}
+            canImprove={canImproveNow && can('publicaciones', 'editar')}
+            onApplyImproved={applyAiImprovedContent}
+          />
 
           <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, mb: 3 }}>
             <Typography variant="subtitle2" color="text.secondary" mb={2}>

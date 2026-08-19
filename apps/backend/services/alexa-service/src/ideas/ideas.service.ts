@@ -1,10 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ContentIdeaSource } from '../../node_modules/.prisma-client';
 import { prisma } from '../prisma/client';
+import { AiServiceClient, GeneratedIdea } from '../integrations/ai-service/ai-service.client';
 import { CreateIdeaDto } from './dto/create-idea.dto';
 import { UpdateIdeaDto } from './dto/update-idea.dto';
+import { GenerateIdeasDto } from './dto/generate-ideas.dto';
 
 type CurrentUser = { sub: string; roles: string[] };
+type AccessibleCampaign = { id: string; name: string };
 
 // Único servicio del sistema con lectura/escritura directa de ContentIdea
 // (Fase 6 del plan): las ideas solo se generan desde la skill, así que
@@ -13,6 +16,8 @@ type CurrentUser = { sub: string; roles: string[] };
 @Injectable()
 export class IdeasService {
   private readonly coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
+
+  constructor(private readonly aiService: AiServiceClient) {}
 
   async listByCampaign(campaignId: string, authHeader: string): Promise<any> {
     await this.assertCampaignAccess(campaignId, authHeader);
@@ -77,14 +82,39 @@ export class IdeasService {
     return prisma.contentIdea.update({ where: { id: match.id }, data: { deletedAt: new Date() } });
   }
 
+  // Cuántas ideas devuelve SIEMPRE esta llamada — fijo, no configurable por
+  // el caller. SaveIdeaIntent (la skill) solo puede referenciar 3 ideas por
+  // voz (su slot `ideaNumber`, tipo CustomAnswer, únicamente define "la
+  // primera/segunda/tercera") — devolver otra cantidad rompería ese intent.
+  private static readonly IDEAS_PER_REQUEST = 3;
+
+  // Genera ideas nuevas vía ai-service (GenerateContentIdeasIntent) — no las
+  // guarda, el Lambda decide cuál guardar después con createIdea/SaveIdeaIntent.
+  // networkName llega opcional desde la skill; sin él, ai-service igual
+  // necesita un `platform` (campo obligatorio de su lado), así que se cae a
+  // un valor genérico en vez de inventar una red específica.
+  async generateIdeas(dto: GenerateIdeasDto, authHeader: string): Promise<{ ideas: GeneratedIdea[] }> {
+    const campaign = await this.assertCampaignAccess(dto.campaignId, authHeader);
+    return this.aiService.generateIdeas(
+      {
+        platform: dto.networkName?.trim() || 'redes sociales',
+        campaignId: dto.campaignId,
+        brandName: campaign?.name,
+        quantity: IdeasService.IDEAS_PER_REQUEST,
+      },
+      authHeader,
+    );
+  }
+
   // alexa-service ya no tiene Campaign en su propio Prisma Client — reutiliza
   // la regla de pertenencia que ya vive (correcta) en core-service vía HTTP,
   // en vez de reimplementarla: GET /campaigns ya filtra server-side por
   // ownership (dueño, CM, diseñador o Administrador — CampaignsService.
   // listCampaigns). Reenvía el mismo Bearer del caller para que el
   // ownership se valide como el usuario real, no como un usuario de
-  // servicio genérico.
-  private async assertCampaignAccess(campaignId: string, authHeader: string): Promise<void> {
+  // servicio genérico. Devuelve la campaña encontrada (antes solo validaba)
+  // para que generateIdeas pueda reusar su `name` sin una segunda llamada.
+  private async assertCampaignAccess(campaignId: string, authHeader: string): Promise<AccessibleCampaign> {
     const response = await fetch(`${this.coreServiceUrl}/api/campaigns`, {
       headers: { Authorization: authHeader },
     });
@@ -92,13 +122,14 @@ export class IdeasService {
       throw new BadRequestException('No se pudo verificar el acceso a la campaña');
     }
 
-    const campaigns = (await response.json()) as Array<{ id: string }>;
-    const hasAccess = campaigns.some((campaign) => campaign.id === campaignId);
-    if (!hasAccess) {
+    const campaigns = (await response.json()) as AccessibleCampaign[];
+    const found = campaigns.find((campaign) => campaign.id === campaignId);
+    if (!found) {
       // No se distingue "no existe" de "no es tuya" a propósito — mismo
       // criterio que no filtrar existencia de recursos a quien no tiene acceso.
       throw new ForbiddenException('No tienes acceso a esta campaña');
     }
+    return found;
   }
 
   private assertAtLeastOneProvided(dto: object): void {

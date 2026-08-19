@@ -1,5 +1,289 @@
 openapi: 3.0.0
-paths: {}
+paths:
+  /health:
+    get:
+      operationId: HealthController_health
+      parameters: []
+      responses:
+        '200':
+          description: ''
+  /api/campaigns:
+    get:
+      operationId: CampaignsController_findAll
+      parameters:
+        - name: name
+          required: false
+          in: query
+          description: Resuelve por nombre en vez de listar todas
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}:
+    get:
+      operationId: CampaignsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/metrics:
+    get:
+      operationId: CampaignsController_getMetrics
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/recommendations:
+    get:
+      operationId: CampaignsController_getRecommendations
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/ideas:
+    get:
+      operationId: IdeasController_findByCampaign
+      parameters:
+        - name: campaignId
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ideas
+      security:
+        - bearer: []
+    post:
+      operationId: IdeasController_create
+      parameters:
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIdeaDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ideas
+      security:
+        - bearer: []
+    delete:
+      operationId: IdeasController_removeByTitle
+      parameters:
+        - name: campaignId
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: title
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ideas
+      security:
+        - bearer: []
+  /api/ideas/{id}:
+    get:
+      operationId: IdeasController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ideas
+      security:
+        - bearer: []
+    patch:
+      operationId: IdeasController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIdeaDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ideas
+      security:
+        - bearer: []
+    delete:
+      operationId: IdeasController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - ideas
+      security:
+        - bearer: []
+  /api/ideas/generate:
+    post:
+      operationId: IdeasController_generate
+      parameters:
+        - name: authorization
+          required: true
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateIdeasDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - ideas
+      security:
+        - bearer: []
 info:
   title: alexa-service
   description: >-
@@ -15,4 +299,41 @@ components:
       scheme: bearer
       bearerFormat: JWT
       type: http
-  schemas: {}
+  schemas:
+    CreateIdeaDto:
+      type: object
+      properties:
+        campaignId:
+          type: string
+        text:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        source:
+          type: string
+          enum:
+            - sugerida
+            - propia
+      required:
+        - campaignId
+        - text
+    GenerateIdeasDto:
+      type: object
+      properties:
+        campaignId:
+          type: string
+        networkName:
+          type: string
+          maxLength: 120
+          description: Slot networkName del intent (ej. instagram, tiktok)
+      required:
+        - campaignId
+    UpdateIdeaDto:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+        title:
+          type: string

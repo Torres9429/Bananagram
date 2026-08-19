@@ -387,15 +387,25 @@ export class PostsService {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
 
+    // EN_REVISION agregado 2026-08-19: el CM puede ajustar el contenido
+    // mientras lo tiene en revisión, sin necesidad de rechazarlo primero solo
+    // para poder editarlo (fricción real reportada) — igual que
+    // RECHAZADO_CLIENTE, edita SOLO el CM (no Diseñador/Cliente, el post no
+    // está en su cancha en ese momento) y el status se queda igual (esto no
+    // aprueba ni rechaza nada, sigue siendo una acción aparte). Sin cambios a
+    // attachMedia/removeMedia — media sigue restringida a borrador/rechazado
+    // (mismo criterio que ya aplicaba a RECHAZADO_CLIENTE).
     const status = post.status as PostStatus;
-    if (status !== PostStatus.BORRADOR && status !== PostStatus.RECHAZADO && status !== PostStatus.RECHAZADO_CLIENTE) {
-      throw new BadRequestException('Solo se puede editar una publicación en borrador, rechazada, o rechazada por el cliente');
+    const cmOnlyEditStatuses: PostStatus[] = [PostStatus.RECHAZADO_CLIENTE, PostStatus.EN_REVISION];
+    const editableStatuses: PostStatus[] = [PostStatus.BORRADOR, PostStatus.RECHAZADO, ...cmOnlyEditStatuses];
+    if (!editableStatuses.includes(status)) {
+      throw new BadRequestException('Solo se puede editar una publicación en borrador, rechazada, en revisión (CM), o rechazada por el cliente');
     }
 
     const isCm = post.campaign.cmId === user.sub;
     const canEdit =
       user.roles.includes('administrador') ||
-      (status === PostStatus.RECHAZADO_CLIENTE
+      (cmOnlyEditStatuses.includes(status)
         ? isCm
         : post.brand.ownerId === user.sub || isCm || post.campaign.designers.some((designer) => designer.userId === user.sub));
 

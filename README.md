@@ -26,6 +26,7 @@ zonas independientes, sin Module Federation). Cada microservicio con base de dat
 | `auth-service` | 3001 | Identidad, login, RBAC dinámico multi-rol. Emite el JWT (RS256) |
 | `core-service` | 3002 | Marcas, campañas, publicaciones, catálogos, métricas, score, reportes, ideas |
 | `alexa-service` | 3004 | BFF de la Alexa Skill, sin base de datos propia |
+| `ai-service` | 3005 | Único punto del backend que habla con OpenRouter (ideas, análisis, mejora y sugerencia de captions). Sin base de datos propia |
 | `postgres` | 5433 | Una instancia, dos bases lógicas: `gestor_redes_auth` / `gestor_redes_core` |
 | `redis` | 6379 | Denylist de access tokens revocados (logout) + rate-limit del gateway |
 
@@ -47,6 +48,7 @@ síncrono entre servicios (sin mensajería async).
 cp apps/backend/services/auth-service/.env.example apps/backend/services/auth-service/.env
 cp apps/backend/services/core-service/.env.example apps/backend/services/core-service/.env
 cp apps/backend/services/alexa-service/.env.example apps/backend/services/alexa-service/.env
+cp apps/backend/services/ai-service/.env.example apps/backend/services/ai-service/.env
 cp apps/backend/gateway/.env.example apps/backend/gateway/.env
 # los valores por defecto ya sirven para desarrollo local
 
@@ -75,6 +77,14 @@ pnpm seed                 # carga roles, permisos y usuarios de prueba
 > `AYRSHARE_DOMAIN`/`AYRSHARE_PRIVATE_KEY` configurados (cuenta de prueba gratuita de
 > [ayrshare.com](https://www.ayrshare.com) alcanza). Sin esto, todo el flujo se corta en el paso 3 de
 > abajo.
+>
+> **`OPENROUTER_API_KEY` es opcional** para el flujo principal (nada del paso 1-8 de abajo depende de
+> IA) — solo hace falta si vas a probar "Analizar/Mejorar con IA" (`/posts/[id]`), "Sugerir descripción
+> con IA" (`/posts/new`) o "Generar ideas con IA" (`/brands/[id]/campaigns/[campaignId]`). Obtenerla en
+> [openrouter.ai](https://openrouter.ai) (Settings → API Keys) y configurarla en
+> `apps/backend/services/ai-service/.env` junto con `OPENROUTER_MODEL` — verificar que el modelo elegido
+> siga existiendo en [openrouter.ai/models](https://openrouter.ai/models), el catálogo de modelos gratis
+> (`:free`) cambia seguido.
 >
 > **Cada servicio de backend lee su propio `.env` local** (`apps/backend/{gateway,services/*}/.env`,
 > no hay un `.env` compartido en la raíz) — los 4 servicios usan `ConfigModule.forRoot({ isGlobal: true })`
@@ -129,7 +139,7 @@ máquina corriendo todo a la vez):
 
 ```bash
 pnpm dev              # todo: backend + frontend completos
-pnpm dev:backend       # gateway + auth-service + core-service + alexa-service
+pnpm dev:backend       # gateway + auth-service + core-service + alexa-service + ai-service
 pnpm dev:frontend      # web-shell + los 5 microfrontends
 pnpm dev:web           # solo web-shell
 
@@ -214,7 +224,14 @@ Programar una fecha, o "Publicar ahora" (sin fecha — el cron de `PostScheduler
 y la recoge sola). También puede rechazar con motivo, lo que regresa al CM (quien la edita él mismo y
 reenvía, o la reenvía al Diseñador con una nota opcional propia).
 
-**9. (Opcional) Publicación real contra Ayrshare, no simulada**
+**9. (Opcional) Probar las funciones de IA** — requiere `OPENROUTER_API_KEY` configurada (ver
+`[!IMPORTANT]` arriba). En el detalle de un post (`/posts/[id]`) los botones "Analizar con IA"/"Mejorar
+con IA" solo aparecen mientras la publicación sigue en revisión y a quien la tiene en su turno (Diseñador
+en borrador → CM en revisión → Cliente en aprobado); en `/posts/new`, "Sugerir descripción con IA" junto al
+campo de contenido; en el detalle de una campaña (`/brands/[id]/campaigns/[campaignId]`), "Generar ideas
+con IA".
+
+**10. (Opcional) Publicación real contra Ayrshare, no simulada**
 Por defecto `SOCIAL_PROVIDER=mock` (el cron simula la publicación y las métricas, ver
 `decay-simulator.ts`). Para publicar de verdad: parar `core-service`, cambiar `SOCIAL_PROVIDER=ayrshare`
 en **su `.env` local** (`apps/backend/services/core-service/.env`, no el de la raíz — ver nota de arriba),
@@ -231,6 +248,7 @@ apps/
       auth-service/      # identidad, RBAC, JWT
       core-service/       # marcas, campañas, posts, catálogos, métricas, score
       alexa-service/        # BFF de la Alexa Skill
+      ai-service/            # único punto del backend que habla con OpenRouter, sin BD propia
     commons/            # código compartido (guards/interceptors/filters sin duplicar aún)
   frontend/
     web-shell/          # host Multi-Zones

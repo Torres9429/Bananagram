@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    // Explícito a propósito (2026-08-18): ai-service es el primer paquete
+    // backend con *.spec.ts dentro de src/ (los demás centralizan tests en
+    // apps/backend/test/) — sin este "types" el editor a veces no carga los
+    // globals ambientales de Jest (describe/it/expect) aunque tsc/jest sí
+    // los resuelven bien vía inclusión implícita. No afecta tsc build ni
+    // jest (ts-jest usa su propia resolución), solo mejora el editor.
+    "types": ["jest", "node"]
+  }
+}

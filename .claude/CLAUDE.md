@@ -9,7 +9,7 @@ Stack: Next.js (MFE host, Multi-Zones) + NestJS (microservicios) + PostgreSQL + 
 ## Reglas críticas
 - NUNCA hardcodear permisos: viven en `role_permissions` (BD)
 - NUNCA borrar registros físicamente: usar `deleted_at` (soft delete)
-- NUNCA exponer `ANTHROPIC_API_KEY` al frontend
+- NUNCA exponer `OPENROUTER_API_KEY` al frontend
 - El creador de una publicación NO puede aprobarla (validar backend, no solo frontend)
 - `post_status_history` y `audit_log` son INMUTABLES (solo insert)
 
@@ -18,9 +18,10 @@ Stack: Next.js (MFE host, Multi-Zones) + NestJS (microservicios) + PostgreSQL + 
 - Guard: `PermissionGuard` lee `user.permissions[module]` del JWT — **desde 2026-07-27 ya está conectado**
   (antes existía en `commons/guards/permission.guard.ts` sin usarse en ningún endpoint). **Desde
   2026-08-16 (`c867e24`) sí es lo que corre en runtime**: `commons/` volvió a ser un paquete workspace real
-  (`@repo/backend-commons`) y los 3 servicios (`auth-service`, `core-service`, `alexa-service`) importan
-  `PermissionGuard`/`RequirePermission` de ahí en vez de duplicarlo localmente — detalle completo en la
-  sección `commons/` bajo Arquitectura → Backend, más abajo.
+  (`@repo/backend-commons`) y 4 de los 5 servicios (`auth-service`, `core-service`, `alexa-service`,
+  `ai-service` — este último desde que se agregó, 2026-08-18) importan `PermissionGuard`/`RequirePermission`
+  de ahí en vez de duplicarlo localmente — detalle completo en la sección `commons/` bajo Arquitectura →
+  Backend, más abajo.
 - Módulos del catálogo (`commons/types/modules.enum.ts` + `packages/seed/src/index.js`): `marcas`,
   `publicaciones`, `calendario`, `campanas`, `metricas`, `score`, `reportes`, `usuarios`, `privilegios`,
   y `catalogos` (agregado 2026-07-27 — los 3 catálogos no encajaban en ninguno existente).
@@ -33,24 +34,95 @@ en `apps/backend/services/core-service/src/score/score.service.ts` calcula
 `Consistencia×0.30 + Engagement×0.40 + Cobertura×0.20 + Frecuencia×0.10` (4 factores, no 3). Confirmar con
 el usuario cuál es la vigente antes de tocar el score.
 
-## Alexa Skill e IA — contrato real (2026-08-13)
+## Alexa Skill — contrato real (2026-08-13)
 
 `docs/skill/AlexaSkill-Diseno-Final.md` y `docs/skill/lambda-codigo-por-pasos.md` quedaron **descartados**
 (diseño anterior, Lambda llamando a Claude directo) — el contrato real y vigente son las 6 funciones
 documentadas en `docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md` (`fetchUserByLinkCode`,
 `fetchCampaigns`, `fetchContentIdeas`, `fetchSavedIdeas`, `saveIdeaToBackend`, `deleteIdeaFromBackend`).
-La generación de ideas con IA vive del lado del **backend de Bananagram**, no del Lambda — sigue sin
-implementarse, pendiente de una `ANTHROPIC_API_KEY` con facturación activa (nunca al frontend, regla de
-arriba sin cambios). El pipeline real de Ayrshare (publish + métricas) ya se verificó en vivo, publicando
-de verdad en Instagram — detalle de los 5 bugs reales encontrados y arreglados en ese mismo documento,
-sección "Fase P1".
+**`fetchContentIdeas` (generación de ideas dictada por voz) — implementado 2026-08-18**:
+`POST alexa-service/ideas/generate` llama a `ai-service` por HTTP (mismo patrón BFF que `alexa-service` ya
+usaba contra `core-service`, ver sección "AI Service" más abajo) y devuelve ideas reales. También se agregó
+`GET campaigns/:id/recommendations` (`GetIdeaRecommendationsIntent`, IA cualitativa sobre métricas reales de
+la campaña) — `GetCampaignSummaryIntent` deliberadamente NO usa IA, se arma con datos puros de
+`GET campaigns/:id/metrics` (decisión explícita). El único intent de voz sin mapeo backend hoy es
+`GetTopContentIntent` con filtro por red/periodo (`docs/skill/backend-api-reference.md` §3-quater). El
+pipeline real de Ayrshare (publish + métricas) ya
+se verificó en vivo, publicando de verdad en Instagram — detalle de los 5 bugs reales encontrados y
+arreglados en ese mismo documento, sección "Fase P1".
+
+## AI Service — OpenRouter (2026-08-18)
+
+`apps/backend/services/ai-service` (puerto 3005, `@repo/ai-service`) es el **único** punto del backend que
+habla con OpenRouter — ningún otro servicio ni el frontend lo hace directo. Sin base de datos propia (el
+primer servicio backend sin Prisma) — es stateless, no persiste nada de lo que genera. Sigue exactamente
+las convenciones de `alexa-service` (mismo esqueleto `main.ts`/`app.module.ts`/`auth/jwt-auth.module.ts`,
+mismo patrón de `JwtAuthGuard`+`PermissionGuard` de `@repo/backend-commons`), con un único dominio flat
+`src/ai/` (sin envoltorio `modules/`, homologado a propósito con el resto del backend).
+
+**Endpoints reales** (proxeados por el gateway en `/api/ai/*`, sin permiso nuevo en el catálogo — se
+reutilizan módulos/acciones ya existentes, mismo criterio que `alexa-service/ideas.controller.ts` con
+`campanas`):
+- `POST ai/generate-ideas` — `campanas:crear`. Contexto libre (marca/categoría/audiencia/tono), sin
+  `postId`/`campaignId` obligatorio.
+- `POST ai/analyze-post` — `publicaciones:ver` (de solo lectura, para que el Cliente pueda analizar sin
+  poder editar). Recibe solo `postId` — el contenido/imagen real se piden a `core-service`
+  (`CoreServiceClient.fetchPostContext`, reenviando el Bearer del caller) para no confiar en un caption
+  arbitrario del body ni reimplementar las reglas de pertenencia de `posts.service.ts`.
+- `POST ai/improve-post` — `publicaciones:editar` (sí propone una reescritura). Mismo mecanismo de
+  `postId` que `analyze-post`. Nunca sobrescribe el post — el frontend precarga la propuesta en el
+  formulario de edición existente, el usuario le da "Guardar" él mismo.
+- `POST ai/suggest-caption` — `publicaciones:crear`. Sin `postId` (la publicación no existe todavía, es
+  para `/posts/new`); las imágenes van como data URL base64, no URLs de Cloudinary (los archivos son
+  locales en ese punto del flujo).
+
+**CTA retirado del todo (2026-08-19)**: `analyze-post` ya no devuelve `ctaAnalysis`, `improve-post` ya no
+devuelve `suggestedCta` ni acepta `action: 'cta'` (`ImprovePostAction` quedó en `mejorar`/`variantes`/
+`hashtags`/`adaptar`) — decisión explícita, no una limitación técnica. Los system prompts de OpenRouter ya
+no piden esos campos.
+
+**UI de IA en `posts-front`** (rediseñado 2026-08-19): ya no son diálogos modales — `/posts/[id]`
+(`AnalyzePostDialog`/`ImprovePostDialog`, retirados) usa `AiAssistantSection` (`Accordion` de MUI con tabs
+"Analizar"/"Mejorar") debajo de la card principal; `/posts/new` (`SuggestCaptionDialog`, retirado) usa
+`SuggestCaptionPanel` en una sección inline (`Collapse`) que se abre/cierra con el mismo botón "Sugerir con
+IA", debajo del campo "Contenido" — en ambos casos, en la misma pantalla que el formulario, para poder
+comparar/editar sin que un modal tape el contenido. **Ninguno dispara la petición a OpenRouter solo al
+abrirse** — "Analizar" (antes auto-disparaba al expandir) ahora requiere el botón "Analizar publicación"
+también, mismo criterio que ya tenían "Mejorar"/"Sugerir" (nunca gastar una llamada sin que el usuario la
+pida explícitamente). Visibilidad sigue el
+estado del post, no solo el permiso: "Analizar" y "Mejorar" solo aparecen mientras la publicación sigue en
+el flujo de revisión (nunca en estados post-publicación) y solo a quien la tiene "en su cancha" en ese
+momento (Diseñador en `borrador`/`rechazado` → CM en `en_revision` → Cliente en `aprobado` → CM en
+`rechazado_cliente`) — mismo criterio de ownership por status que ya usan `canEditNow`/los botones de
+aprobar-rechazar existentes, no una regla nueva. **El CM ya no necesita rechazar la publicación primero
+para poder editarla/mejorarla con IA mientras la tiene en `en_revision`** (fricción real reportada,
+corregida 2026-08-19): `posts.service.ts.updatePost` ahora permite `EN_REVISION` además de
+`BORRADOR`/`RECHAZADO`/`RECHAZADO_CLIENTE`, solo para el CM (mismo criterio que ya aplicaba a
+`RECHAZADO_CLIENTE` — el status no cambia, es edición aparte de aprobar/rechazar). Media (adjuntar/quitar
+archivos) sigue restringida a `borrador`/`rechazado` únicamente, sin cambios. De paso se corrigió un bug
+real preexistente: el botón "Editar" solo se mostraba con `canEditNow`, nunca con `canEditRechazadoCliente`
+— el CM no tenía forma de entrar al formulario de edición durante `rechazado_cliente` pese a que esa lógica
+(nota para el Diseñador, "Guardar y reenviar al Cliente") ya existía asumiendo que sí se podía.
+
+**Modelo**: `OPENROUTER_MODEL` es 100% configurable por env var (ver `.env` de `ai-service`, sin valor
+hardcodeado en código) — el catálogo de modelos gratis (`:free`) de OpenRouter cambia seguido, verificar el
+vigente en `openrouter.ai/models` antes de asumir que el que está en `.env.example` sigue existiendo.
+
+**Bug real encontrado y corregido en vivo (2026-08-18)**: el circuit breaker (`createCircuitBreaker` de
+`@repo/backend-commons`) solo envolvía el `fetch()` inicial, no el `response.json()` posterior — `fetch()`
+resuelve en cuanto llegan los headers, no cuando termina de bajar el body, así que una respuesta lenta
+podía colgarse minutos sin que el timeout configurado cortara nada. Mismo hallazgo aplicado también a
+`core-service/src/integrations/ayrshare/ayrshare.service.ts` (`publish`/`getAnalytics`/`getAccountMetrics`)
+— un post quedó marcado `error` a los 60.0s exactos mientras Ayrshare seguía publicando de verdad en
+segundo plano. En ambos servicios, `fetch()`+`response.json()` ahora van juntos dentro de la misma acción
+del breaker.
 
 ## Estado real del código — léase antes de asumir que algo "ya funciona" (actualizado 2026-08-14)
 
-El proyecto dejó de ser un scaffold: los 4 servicios de backend y la mayoría del frontend (login,
-publicaciones, campañas, métricas/score, notificaciones en vivo, Alexa Skill) están conectados de punta a
-punta. Lo mock/stub es ahora la excepción puntual, no la regla — detalle exhaustivo en
-`.claude/INVENTORY.md` §0; resumen abajo.
+El proyecto dejó de ser un scaffold: los 5 servicios de backend (el 5º, `ai-service`, agregado el
+2026-08-18) y la mayoría del frontend (login, publicaciones, campañas, métricas/score, notificaciones en
+vivo, Alexa Skill, IA generativa) están conectados de punta a punta. Lo mock/stub es ahora la excepción
+puntual, no la regla — detalle exhaustivo en `.claude/INVENTORY.md` §0; resumen abajo.
 
 - **Los 4 servicios de backend tienen dominio real conectado**, incluido `alexa-service`: sus módulos
   `campaigns`/`ideas` **ya no son stubs** — `ideas` es dueño único de ese dominio en todo el sistema
@@ -61,8 +133,11 @@ punta. Lo mock/stub es ahora la excepción puntual, no la regla — detalle exha
   controller HTTP (`GET /brands/:id/score[-history]`, `/campaigns/:id/metrics[-history]`, con refresh
   manual). Notificaciones son reales de punta a punta, incluido un stream SSE en vivo
   (`GET me/notifications/stream`).
-- **Sigue faltando de verdad**: generación de ideas con IA (`fetchContentIdeas`, bloqueada sin
-  `ANTHROPIC_API_KEY` de pago), generación real de reportes (`POST /reports` solo registra la solicitud,
+- **IA generativa real, vía OpenRouter** (`ai-service`, ver sección propia arriba): generación de ideas,
+  análisis de publicaciones, mejora de captions y sugerencia de descripciones — los 4 conectados de punta a
+  punta en `posts-front`/`brands-front`. `fetchContentIdeas` (la voz de Alexa) sigue siendo la única puerta
+  de IA sin conectar, ver sección "Alexa Skill" arriba.
+- **Sigue faltando de verdad**: generación real de reportes (`POST /reports` solo registra la solicitud,
   `fileUrl` queda `null`), y un puñado de rutas/componentes frontend puntuales que siguen mock pese a que
   el backend ya existe (`admin-front` `/users`/`/roles`/`/audit-log`, `auth-front` registro/activación,
   `brands-front` `/profile/calendar` y el árbol legacy `/brands/[id]/{metrics,score,reports,calendar}`,
@@ -71,7 +146,9 @@ punta. Lo mock/stub es ahora la excepción puntual, no la regla — detalle exha
 - **El gateway ya proxea de verdad**: `/api/auth/*`, `/api/me/*`, `/api/admin/*` → `AUTH_SERVICE_URL`;
   `/api/catalogs/*`, `/api/brands/*`, `/api/campaigns/*`, `/api/cm-team/*`, `/api/posts/*`,
   `/api/reports/*` → `CORE_SERVICE_URL`; **`/api/ideas/*` → `ALEXA_SERVICE_URL`** (no core-service — el
-  dominio de ideas se mudó entero ahí, ver arriba). `main.ts` crea la app con `{ bodyParser: false }` —
+  dominio de ideas se mudó entero ahí, ver arriba); **`/api/ai/*` → `AI_SERVICE_URL`** (agregado
+  2026-08-18, sin bug conocido de env var faltante en `docker-compose.yml` — sí se agregó ahí, a diferencia
+  de `ALEXA_SERVICE_URL`, ver el bug de abajo). `main.ts` crea la app con `{ bodyParser: false }` —
   necesario para que `http-proxy-middleware` reciba el stream del body sin consumir (si Nest lo parseara
   antes, los POST/PATCH llegarían vacíos al servicio destino). Montado con
   `app.use(createProxyMiddleware(...))` **sin** pasar el path como argumento de `app.use()` — Express
@@ -146,7 +223,7 @@ pnpm seed                      # carga datos demo (packages/seed)
 
 pnpm dev                       # todo (backend + fronts) vía turbo
 pnpm dev:infra                  # docker compose up -d (alias)
-pnpm dev:backend                # solo los 3 microservicios + gateway
+pnpm dev:backend                # solo los 4 microservicios + gateway
 pnpm dev:web                    # solo web-shell
 pnpm dev:frontend               # web-shell + los 5 microfrontends
 
@@ -156,7 +233,7 @@ pnpm lint                      # turbo run lint
 ```
 
 - No hay `jest.config.js` ni `.eslintrc` explícitos en el repo — `test`/`lint` corren `jest`/`eslint` con configuración por defecto de cada paquete cuando existan. `apps/frontend/*` no tienen script `lint` propio todavía; no asumas que `pnpm lint` cubre todo.
-- Para correr un solo servicio backend: `pnpm --filter @repo/auth-service dev` (o `test`/`build`). Nombres de paquete backend: `@repo/auth-service`, `@repo/core-service`, `@repo/alexa-service`, y el gateway (sin nombre `@repo/` explícito, revisar `apps/backend/gateway/package.json`).
+- Para correr un solo servicio backend: `pnpm --filter @repo/auth-service dev` (o `test`/`build`). Nombres de paquete backend: `@repo/auth-service`, `@repo/core-service`, `@repo/alexa-service`, `@repo/ai-service`, y el gateway (sin nombre `@repo/` explícito, revisar `apps/backend/gateway/package.json`).
 - Para un solo frontend: `pnpm --filter @repo/web-shell dev` (equivalentes: `admin-front`, `analytics-front`, `auth-front`, `brands-front`, `posts-front` — cada uno con su propio puerto fijo, ver abajo).
 - Tests de integración backend viven en `apps/backend/test/*.spec.ts` (no dentro de cada servicio) y usan `apps/backend/test/helpers/auth.helper.ts` (JWT de prueba por rol) y `db.helper.ts` (limpieza de tablas). Paquete propio `@repo/backend-integration-tests` (`jest`+`ts-jest`, agregado 2026-07-27 — antes no existía ni `package.json` ahí, los specs no se ejecutaban nunca): `pnpm --filter @repo/backend-integration-tests test` (necesita `docker compose up -d postgres`). Tests e2e cross-servicio en `apps/e2e/src/*.e2e.spec.ts` (paquete `@repo/e2e`, usa `supertest`) siguen siendo placeholder.
 - `docker compose --profile full up -d --build` levanta el stack completo containerizado (todos los servicios + fronts); el modo diario (`docker compose up -d`, sin profile) solo levanta `postgres` + `adminer` y se espera correr el resto con `pnpm dev` en el host.
@@ -175,6 +252,7 @@ pnpm lint                      # turbo run lint
 | auth-service                | 3001   |
 | core-service               | 3002   |
 | alexa-service               | 3004   |
+| ai-service                    | 3005   |
 | postgres (host)                   | 5433   |
 | adminer                              | 8080   |
 
@@ -186,13 +264,13 @@ pnpm lint                      # turbo run lint
 
 `apps/backend/`
 - `gateway/` — único punto de entrada HTTP externo (puerto 4000). Usa `http-proxy-middleware` para enrutar a cada servicio; también aplica `CorrelationIdMiddleware` (propaga `X-Request-ID`) a todas las rutas.
-- `services/{auth,core,alexa}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill. **Ideas de contenido (`ContentIdea`) se mudó entera a `alexa-service`** (antes vivía en `core-service`) — `alexa-service` no tiene una base de datos propia que migre, pero **sí tiene su propio `prisma/schema.prisma`** (solo el modelo `ContentIdea`) con acceso directo de lectura/escritura a la misma base física de `core-service` (`gestor_redes_core`), nunca corre `prisma migrate` desde ahí (core-service sigue siendo el dueño de esa migración). Para todo lo demás (campañas, marcas, métricas, score, account-linking) `alexa-service` sí es un BFF puro por HTTP contra `core-service`/`auth-service`. `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **desde 2026-07-23 cada uno con su propio `prisma/schema.prisma` y su propia base de datos** (`gestor_redes_auth`/`gestor_redes_core`, ver `docs/base/modelo2.txt`) — ya no hay schema ni BD compartida entre ellos. Cada uno genera su Prisma Client con `output` propio (`node_modules/.prisma-client`, ver comentario en su `schema.prisma`) para evitar que pnpm resuelva ambos al mismo folder por compartir versión de `@prisma/client`.
-- `commons/` — **desde el 2026-08-16 (`c867e24`), de nuevo un paquete workspace real** (`@repo/backend-commons`, `package.json`+`tsconfig.json`+`dist/`, un único barrel `src/index.ts` sin subpaths — la resolución clásica de módulos que usa `tsconfig.base.json` de backend no resuelve de forma confiable un `exports` map con subpaths). Antes de esa fecha había quedado huérfano (nada lo importaba; ver histórico más abajo) — hoy `auth-service`, `core-service` y `alexa-service` lo declaran como dependencia y lo importan de verdad (`import { X } from '@repo/backend-commons'`), ya no por path relativo. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases, 2026-07-23):
-  - `guards/` — `JwtAuthGuard` (reescrito al revivir el paquete: ya **no** usa passport-jwt, verifica RS256 contra el JWKS remoto de `auth-service` vía `jose`) + `TokenDenylistService`, compartidos entre `core-service` y `alexa-service` (verificadores idénticos, sin firmar nunca); `auth-service` mantiene su propia copia local (`src/guards/jwt-auth.guard.ts`) porque es el emisor del JWT, no un verificador remoto — esa no se comparte. `PermissionGuard` sí se comparte entre los 3 servicios (antes se duplicaba localmente en cada uno, criterio abandonado con este commit). `BrandAccessGuard` sigue sin vivir aquí — sigue en `core-service/src/guards/`, ver nota de `brandIds` arriba.
-  - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)` — compartidos entre los 3 servicios
+- `services/{auth,core,alexa,ai}-service/` — un microservicio NestJS por dominio. `core-service` fusiona lo que antes eran brands/content/analytics-service (marcas, campañas, publicaciones, medios, métricas, score, reportes) en un solo servicio; `alexa-service` es el BFF de la Alexa Skill. **Ideas de contenido (`ContentIdea`) se mudó entera a `alexa-service`** (antes vivía en `core-service`) — `alexa-service` no tiene una base de datos propia que migre, pero **sí tiene su propio `prisma/schema.prisma`** (solo el modelo `ContentIdea`) con acceso directo de lectura/escritura a la misma base física de `core-service` (`gestor_redes_core`), nunca corre `prisma migrate` desde ahí (core-service sigue siendo el dueño de esa migración). Para todo lo demás (campañas, marcas, métricas, score, account-linking) `alexa-service` sí es un BFF puro por HTTP contra `core-service`/`auth-service`. `auth-service` y `core-service` cada uno con su propio `main.ts`/puerto/Dockerfile/`package.json`, y **desde 2026-07-23 cada uno con su propio `prisma/schema.prisma` y su propia base de datos** (`gestor_redes_auth`/`gestor_redes_core`, ver `docs/base/modelo2.txt`) — ya no hay schema ni BD compartida entre ellos. Cada uno genera su Prisma Client con `output` propio (`node_modules/.prisma-client`, ver comentario en su `schema.prisma`) para evitar que pnpm resuelva ambos al mismo folder por compartir versión de `@prisma/client`. `ai-service` (agregado 2026-08-18) es el único de los 5 **sin base de datos propia** (stateless, no persiste nada de lo que genera con OpenRouter) — un solo dominio flat `src/ai/` (sin `modules/`, homologado a propósito con el resto), ver sección "AI Service" más arriba para el detalle de endpoints/permisos.
+- `commons/` — **desde el 2026-08-16 (`c867e24`), de nuevo un paquete workspace real** (`@repo/backend-commons`, `package.json`+`tsconfig.json`+`dist/`, un único barrel `src/index.ts` sin subpaths — la resolución clásica de módulos que usa `tsconfig.base.json` de backend no resuelve de forma confiable un `exports` map con subpaths). Antes de esa fecha había quedado huérfano (nada lo importaba; ver histórico más abajo) — hoy `auth-service`, `core-service`, `alexa-service` y `ai-service` (este último desde 2026-08-18) lo declaran como dependencia y lo importan de verdad (`import { X } from '@repo/backend-commons'`), ya no por path relativo. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases, 2026-07-23):
+  - `guards/` — `JwtAuthGuard` (reescrito al revivir el paquete: ya **no** usa passport-jwt, verifica RS256 contra el JWKS remoto de `auth-service` vía `jose`) + `TokenDenylistService`, compartidos entre `core-service`, `alexa-service` y `ai-service` (verificadores idénticos, sin firmar nunca); `auth-service` mantiene su propia copia local (`src/guards/jwt-auth.guard.ts`) porque es el emisor del JWT, no un verificador remoto — esa no se comparte. `PermissionGuard` sí se comparte entre esos mismos 4 servicios (antes se duplicaba localmente en cada uno, criterio abandonado con el commit `c867e24`). `BrandAccessGuard` sigue sin vivir aquí — sigue en `core-service/src/guards/`, ver nota de `brandIds` arriba.
+  - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)` — compartidos entre esos mismos 4 servicios
   - `interceptors/` — `LoggingInterceptor` (exportado, pero sin importadores reales todavía — ningún `main.ts` lo registra global). `AuditInterceptor` (el TODO histórico de escribir en `audit_log`) **no** se migró al revivir el paquete — ese TODO sigue sin implementarse en ninguna parte del sistema.
   - `filters/` — `HttpExceptionFilter` (exportado, mismo caso que `LoggingInterceptor`: sin registrar globalmente todavía)
-  - `circuit-breaker/` — factory de `opossum` para llamadas REST entre servicios (ADR-0003, sin mensajería async); esta versión ya trae el fix de import CommonJS (`import CircuitBreaker = require('opossum')`, `opossum` es CJS puro) que antes solo tenía la copia local de `core-service` — usado por `AyrshareService`/`NotificationsClient`
+  - `circuit-breaker/` — factory de `opossum` para llamadas REST entre servicios (ADR-0003, sin mensajería async); esta versión ya trae el fix de import CommonJS (`import CircuitBreaker = require('opossum')`, `opossum` es CJS puro) que antes solo tenía la copia local de `core-service` — usado por `AyrshareService`/`NotificationsClient`/`ai-service`'s `OpenRouterClient`. **Ojo con un gotcha real (2026-08-18)**: envolver solo el `fetch()` en el breaker no basta — `fetch()` resuelve en cuanto llegan los headers, no cuando termina de bajar el body, así que el `response.json()` posterior queda sin protección de timeout si se hace fuera de la acción del breaker (causó un post marcado `error` en `core-service` mientras Ayrshare seguía publicando de verdad en segundo plano). `fetch()`+`response.json()` deben ir juntos dentro de la misma acción.
   - `types/` — enums compartidos (`Roles`, `Modules`, `Actions`) y `JwtPayload`. `PostStatus` **no** se migró — `core-service` mantiene su propia copia local con los 11 valores reales (la vieja versión de `commons/` solo tenía 6, desactualizada)
 
 Convenciones (`.agents/backend.md`, `agents/conventions.md`):

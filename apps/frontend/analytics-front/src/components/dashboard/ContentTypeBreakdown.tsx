@@ -37,7 +37,7 @@ export function ContentTypeBreakdown() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Tipo de contenido publicado</Typography>
+      <Typography variant="subtitle1" fontWeight={700} mb={2}>Tipo de contenido publicado (campañas en Bananagram)</Typography>
       <ResponsiveContainer width="100%" height={240}>
         <PieChart>
           <Pie data={data} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={80} label={(entry) => `${entry.label} (${entry.count})`}>

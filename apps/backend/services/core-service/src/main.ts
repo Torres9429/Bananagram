@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { AppModule } from './app.module';
@@ -7,7 +7,10 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.setGlobalPrefix('api');
+  // /health fuera del prefijo 'api' — mismo criterio que el /health del
+  // gateway y de auth-service (ver sus main.ts): lo consultan herramientas
+  // de infra (Docker healthcheck), no un cliente de la API real.
+  app.setGlobalPrefix('api', { exclude: [{ path: 'health', method: RequestMethod.GET }] });
 
   const config = new DocumentBuilder()
     .setTitle('core-service')

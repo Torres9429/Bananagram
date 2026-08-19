@@ -7,6 +7,7 @@ import { metricsApi } from './api/metrics.api';
 import { cmTeamApi } from './api/cm-team.api';
 import { postsApi } from './api/posts.api';
 import { ideasApi } from './api/ideas.api';
+import { aiApi } from './api/ai.api';
 import { selectedBrandReducer } from './selectedBrand.slice';
 
 export const store = configureStore({
@@ -23,6 +24,7 @@ export const store = configureStore({
     [cmTeamApi.reducerPath]: cmTeamApi.reducer,
     [postsApi.reducerPath]: postsApi.reducer,
     [ideasApi.reducerPath]: ideasApi.reducer,
+    [aiApi.reducerPath]: aiApi.reducer,
   },
   middleware: (gDM) =>
     gDM().concat(
@@ -36,5 +38,6 @@ export const store = configureStore({
       cmTeamApi.middleware,
       postsApi.middleware,
       ideasApi.middleware,
+      aiApi.middleware,
     ),
 });

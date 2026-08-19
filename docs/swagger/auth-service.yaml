@@ -1,5 +1,12 @@
 openapi: 3.0.0
 paths:
+  /health:
+    get:
+      operationId: HealthController_health
+      parameters: []
+      responses:
+        '200':
+          description: ''
   /api/auth/register:
     post:
       operationId: AuthController_register
@@ -63,6 +70,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - auth
       security:
@@ -80,6 +91,10 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - auth
   /api/auth/password-reset/confirm:
@@ -92,6 +107,32 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PasswordResetConfirmDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+  /api/auth/link-code:
+    post:
+      operationId: AuthController_createLinkCode
+      parameters: []
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+      security:
+        - bearer: []
+  /api/auth/link-code/redeem:
+    post:
+      operationId: AuthController_redeemLinkCode
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemLinkCodeDto'
       responses:
         '201':
           description: ''
@@ -120,6 +161,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - admin
       security:
@@ -136,6 +181,10 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - admin
       security:
@@ -152,6 +201,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - admin
       security:
@@ -173,6 +226,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - admin
       security:
@@ -210,6 +267,10 @@ paths:
       responses:
         '201':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - admin
       security:
@@ -231,6 +292,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - admin
       security:
@@ -241,6 +306,28 @@ paths:
       parameters: []
       responses:
         '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+    post:
+      operationId: RolesController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleDto'
+      responses:
+        '201':
           description: ''
       tags:
         - admin
@@ -258,6 +345,10 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - admin
       security:
@@ -319,10 +410,67 @@ paths:
       responses:
         '200':
           description: ''
+          content:
+            application/json:
+              schema:
+                type: object
       tags:
         - profile
       security:
         - bearer: []
+  /api/me/notifications:
+    get:
+      operationId: NotificationsController_listMine
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - notifications
+      security:
+        - bearer: []
+  /api/me/notifications/{id}/read:
+    patch:
+      operationId: NotificationsController_markRead
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - notifications
+      security:
+        - bearer: []
+  /api/me/notifications/stream:
+    get:
+      operationId: NotificationsController_streamNotifications
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - notifications
+      security:
+        - bearer: []
+  /api/internal/notifications:
+    post:
+      operationId: InternalNotificationsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNotificationDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - internal
 info:
   title: auth-service
   description: Autenticación, usuarios, roles y privilegios
@@ -344,8 +492,10 @@ components:
           type: string
         password:
           type: string
+          minLength: 6
         name:
           type: string
+          minLength: 1
         avatarUrl:
           type: string
         roleName:
@@ -374,6 +524,7 @@ components:
           type: string
         password:
           type: string
+          minLength: 6
       required:
         - email
         - password
@@ -398,9 +549,17 @@ components:
           type: string
         newPassword:
           type: string
+          minLength: 6
       required:
         - token
         - newPassword
+    RedeemLinkCodeDto:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+        - code
     CreateUserDto:
       type: object
       properties:
@@ -408,6 +567,7 @@ components:
           type: string
         password:
           type: string
+          minLength: 6
         roleName:
           type: string
       required:
@@ -432,6 +592,14 @@ components:
           type: string
       required:
         - roleId
+    CreateRoleDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+      required:
+        - name
     UpdateRolePermissionDto:
       type: object
       properties:
@@ -450,6 +618,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         avatarUrl:
           type: string
         categoryIds:
@@ -462,3 +631,16 @@ components:
             type: string
       required:
         - name
+    CreateNotificationDto:
+      type: object
+      properties:
+        userId:
+          type: string
+        type:
+          type: string
+          minLength: 1
+        payload:
+          type: object
+      required:
+        - userId
+        - type
