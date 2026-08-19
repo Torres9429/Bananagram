@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { AiServiceClient, CampaignRecommendations } from '../integrations/ai-service/ai-service.client';
 
 type Campaign = { id: string; name: string; brandId: string; [key: string]: unknown };
 
@@ -41,6 +42,8 @@ export type EnrichedCampaign = {
 @Injectable()
 export class CampaignsService {
   private readonly coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
+
+  constructor(private readonly aiService: AiServiceClient) {}
 
   // fetchCampaigns real: el Lambda espera cada campaña ya compuesta con
   // score/reach/engagement/followers/topNetwork/topPost (Fase P3) — no el
@@ -103,6 +106,34 @@ export class CampaignsService {
 
   async fetchCampaignMetrics(authHeader: string, campaignId: string): Promise<unknown> {
     return this.getJson(`/api/campaigns/${campaignId}/metrics`, authHeader);
+  }
+
+  // GetIdeaRecommendationsIntent — arma el resumen agregado que ai-service
+  // necesita (campaignName + summary de metrics ya reales) y le pide
+  // recomendaciones cualitativas. Mismo cálculo de engagement que
+  // enrichCampaign de arriba (nunca combinar tasas de redes distintas, este
+  // es un resumen agregado a propósito, no por red).
+  async fetchCampaignRecommendations(authHeader: string, campaignId: string): Promise<CampaignRecommendations> {
+    const [campaign, metrics] = await Promise.all([
+      this.fetchCampaign(authHeader, campaignId),
+      this.getJson<CampaignMetrics>(`/api/campaigns/${campaignId}/metrics`, authHeader),
+    ]);
+
+    const engagementRate =
+      metrics.summary.reach > 0
+        ? Math.round((metrics.summary.interactions / metrics.summary.reach) * 100 * 100) / 100
+        : null;
+
+    return this.aiService.campaignRecommendations(
+      {
+        campaignName: campaign.name,
+        totalPosts: metrics.summary.posts,
+        reach: metrics.summary.reach,
+        interactions: metrics.summary.interactions,
+        engagementRate,
+      },
+      authHeader,
+    );
   }
 
   // Reenvía el mismo Bearer del caller — core-service valida permiso +

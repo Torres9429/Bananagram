@@ -19,4 +19,5 @@
 
 - DATABASE_URL
 - JWT_SECRET
-- ANTHROPIC_API_KEY
+- OPENROUTER_API_KEY (ai-service, agregado 2026-08-18 — reemplaza al ANTHROPIC_API_KEY planeado
+  originalmente, nunca se llegó a usar)

@@ -14,8 +14,10 @@ import { ReportsModule } from './reports/reports.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { CronModule } from './cron/cron.module';
 import { ScoreModule } from './score/score.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     // Necesario para MetricsCronService/AccountMetricsCronService (@Cron) y

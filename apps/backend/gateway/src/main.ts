@@ -47,6 +47,7 @@ async function bootstrap() {
   const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
   const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
   const alexaServiceUrl = process.env.ALEXA_SERVICE_URL || 'http://localhost:3004';
+  const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:3005';
 
   // Montados sin path en app.use() a propósito: si se pasa un path como
   // primer argumento (app.use('/api/auth', middleware)), Express recorta
@@ -92,6 +93,10 @@ async function bootstrap() {
   app.use(
     createProxyMiddleware({ pathFilter: '/api/ideas', target: alexaServiceUrl, changeOrigin: true }),
   );
+  // AI Service — único punto del backend que habla con OpenRouter. El
+  // frontend nunca lo llama directo, solo vía este proxy (mismo patrón que
+  // el resto de las entradas de esta tabla).
+  app.use(createProxyMiddleware({ pathFilter: '/api/ai', target: aiServiceUrl, changeOrigin: true }));
 
   await app.listen(4000);
   console.log('🚀 API Gateway corriendo en puerto 4000');

@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { authReducer, authApi, catalogsApi, notificationsApi } from '@repo/ui/state';
 import { postsApi } from './api/posts.api';
 import { campaignsApi } from './api/campaigns.api';
+import { aiApi } from './api/ai.api';
 
 // notificationsApi: TopBar (con NotificationBell) se monta en AppShell de
 // esta zona — sin esta pieza, useNotifications() truena en runtime
@@ -15,7 +16,15 @@ export const store = configureStore({
     [notificationsApi.reducerPath]: notificationsApi.reducer,
     [postsApi.reducerPath]: postsApi.reducer,
     [campaignsApi.reducerPath]: campaignsApi.reducer,
+    [aiApi.reducerPath]: aiApi.reducer,
   },
   middleware: (gDM) =>
-    gDM().concat(authApi.middleware, catalogsApi.middleware, notificationsApi.middleware, postsApi.middleware, campaignsApi.middleware),
+    gDM().concat(
+      authApi.middleware,
+      catalogsApi.middleware,
+      notificationsApi.middleware,
+      postsApi.middleware,
+      campaignsApi.middleware,
+      aiApi.middleware,
+    ),
 });

@@ -31,4 +31,12 @@ export class CampaignsController {
   getMetrics(@Param('id', ParseUUIDPipe) id: string, @Headers('authorization') authHeader: string) {
     return this.campaigns.fetchCampaignMetrics(authHeader, id);
   }
+
+  // GetIdeaRecommendationsIntent — sin PermissionGuard propio, mismo
+  // criterio que el resto de este controller: ai-service ya exige
+  // campanas:ver sobre el mismo Bearer reenviado.
+  @Get(':id/recommendations')
+  getRecommendations(@Param('id', ParseUUIDPipe) id: string, @Headers('authorization') authHeader: string) {
+    return this.campaigns.fetchCampaignRecommendations(authHeader, id);
+  }
 }

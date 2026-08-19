@@ -16,6 +16,7 @@ declare -A SERVICES=(
   [auth-service]=3001
   [core-service]=3002
   [alexa-service]=3004
+  [ai-service]=3005
 )
 
 mkdir -p docs/swagger

@@ -7,6 +7,7 @@ import { CurrentUser } from '@repo/backend-commons';
 import { IdeasService } from './ideas.service';
 import { CreateIdeaDto } from './dto/create-idea.dto';
 import { UpdateIdeaDto } from './dto/update-idea.dto';
+import { GenerateIdeasDto } from './dto/generate-ideas.dto';
 
 type Claims = { sub: string; roles: string[] };
 
@@ -43,6 +44,16 @@ export class IdeasController {
   @RequirePermission('campanas', 'crear')
   create(@Body() dto: CreateIdeaDto, @CurrentUser() user: Claims, @Headers('authorization') authHeader: string) {
     return this.ideas.createIdea(dto, user, authHeader);
+  }
+
+  // GenerateContentIdeasIntent — genera ideas nuevas vía ai-service, no las
+  // guarda (el Lambda decide cuál guardar después con POST /ideas). Mismo
+  // permiso que crear una idea a mano — generar es, conceptualmente, la
+  // misma capacidad de "aportar contenido nuevo a esta campaña".
+  @Post('generate')
+  @RequirePermission('campanas', 'crear')
+  generate(@Body() dto: GenerateIdeasDto, @Headers('authorization') authHeader: string) {
+    return this.ideas.generateIdeas(dto, authHeader);
   }
 
   @Patch(':id')

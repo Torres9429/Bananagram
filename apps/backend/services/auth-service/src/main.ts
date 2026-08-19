@@ -10,8 +10,14 @@ async function bootstrap() {
   // .well-known/jwks.json queda fuera del prefijo 'api': es una ruta estándar
   // que se espera en la raíz del origen, y core-service/alexa-service/gateway
   // la consultan directo por HTTP (nunca a través del proxy del gateway).
+  // /health también queda fuera — mismo criterio que el /health del gateway
+  // (src/health/health.controller.ts): lo consultan herramientas de infra
+  // (Docker healthcheck), no un cliente de la API real.
   app.setGlobalPrefix('api', {
-    exclude: [{ path: '.well-known/jwks.json', method: RequestMethod.GET }],
+    exclude: [
+      { path: '.well-known/jwks.json', method: RequestMethod.GET },
+      { path: 'health', method: RequestMethod.GET },
+    ],
   });
 
   const config = new DocumentBuilder()
