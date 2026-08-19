@@ -23,16 +23,13 @@
                     "name": "LogoutIntent",
                     "slots": [],
                     "samples": [
-                        "cerrar sesión",
                         "cerrar sesion",
                         "desvincula mi cuenta",
                         "salir de mi cuenta",
                         "cambiar de usuario",
                         "desconectar mi cuenta",
-                        "sal de mi cuenta",
-                        "desconéctame",
-                        "ya no quiero estar conectado",
-                        "quiero cerrar mi sesión"
+                        "cierra sesion",
+                        "salir"
                     ]
                 },
                 {
@@ -45,14 +42,15 @@
                     ],
                     "samples": [
                         "vincula mi cuenta",
-                        "vincula mi cuenta con el código {linkCode}",
-                        "mi código es {linkCode}",
+                        "vincula mi cuenta con el codigo {linkCode}",
+                        "mi codigo es {linkCode}",
                         "conecta mi cuenta",
-                        "el código es {linkCode}",
-                        "quiero entrar",
-                        "necesito vincularme",
-                        "vamos a vincular mi cuenta",
-                        "quiero iniciar sesión"
+                        "el codigo es {linkCode}",
+                        "codigo {linkCode}",
+                        "entra con {linkCode}",
+                        "entra con el codigo {linkCode}",
+                        "inicia sesion",
+                        "inicia sesion con {linkCode}"
                     ]
                 },
                 {
@@ -64,10 +62,8 @@
                         "muestrame las campañas activas",
                         "lista mis campañas",
                         "que campañas tengo",
-                        "que campañas manejo",
                         "dime mis campañas",
-                        "cuáles campañas hay",
-                        "qué campañas llevo"
+                        "mis campañas"
                     ]
                 },
                 {
@@ -84,10 +80,9 @@
                         "abrir campaña {campaignName}",
                         "quiero revisar {campaignName}",
                         "selecciona {campaignName}",
-                        "métete a {campaignName}",
                         "entra a {campaignName}",
-                        "quiero entrar a {campaignName}",
-                        "vamos a {campaignName}"
+                        "entra a la campaña {campaignName}",
+                        "abre {campaignName}"
                     ]
                 },
                 {
@@ -96,16 +91,11 @@
                     "samples": [
                         "cual es el engagement",
                         "cuanto alcance tiene esta campaña",
-                        "como esta funcionando la campaña ",
+                        "como esta funcionando la campaña",
                         "dame las metricas",
                         "como va esta campaña",
                         "dime las metricas",
-                        "metricas",
-                        "como va la campaña",
-                        "cómo vamos",
-                        "qué tal la campaña",
-                        "cómo está la campaña",
-                        "cómo va todo"
+                        "metricas"
                     ]
                 },
                 {
@@ -124,12 +114,9 @@
                         "el mejor post de {networkName} esta {dateRange}",
                         "cual tuvo mas likes",
                         "cual fue el mejor post en {networkName}",
-                        "que publicación funciono mejor",
+                        "que publicacion funciono mejor",
                         "cual fue la mejor publicacion",
-                        "cuál es el post estrella",
-                        "qué publicación pegó más",
-                        "cuál fue la publicación top",
-                        "cuál pegó mejor"
+                        "mejor publicacion"
                     ]
                 },
                 {
@@ -151,10 +138,10 @@
                         "genera contenido para esta campaña",
                         "que puedo publicar",
                         "dame ideas de contenido",
-                        "tira ideas",
-                        "échame ideas",
-                        "se te ocurre algo",
-                        "dame ideas"
+                        "dame ideas",
+                        "genera ideas",
+                        "generar ideas",
+                        "dime ideas"
                     ]
                 },
                 {
@@ -170,10 +157,9 @@
                             "samples": [
                                 "guardala como {ideaTitle}",
                                 "guarda como {ideaTitle}",
-                                "con el título {ideaTitle}",
+                                "con el titulo {ideaTitle}",
                                 "ponle de nombre {ideaTitle}",
                                 "llama a la idea {ideaTitle}"
-
                             ]
                         }
                     ],
@@ -183,14 +169,7 @@
                         "almacena {ideaNumber}",
                         "guarda la numero {ideaNumber}",
                         "quiero guardar la idea {ideaNumber}",
-                        "guarda la opcion {ideaNumber}",
-                        "quedate con la {ideaNumber}",
-                        "esa, la {ideaNumber}",
-                        "me quedo con la {ideaNumber}",
-                        "la {ideaNumber} me gusta",
-                        "la ideaNumero {ideaNumber}",
-                        "la idea {ideaNumber}",
-                        "la {ideaNumber}"
+                        "guarda la opcion {ideaNumber}"
                     ]
                 },
                 {
@@ -207,12 +186,8 @@
                                 "guardala como {ideaTitle}",
                                 "guarda como {ideaTitle}",
                                 "ponle {ideaTitle}",
-                                "el título es {ideaTitle}",
-                                "se llama {ideaTitle}",
-                                "llamala {ideaTitle}",
-                                "que se llame {ideaTitle}",
-                                "ponle de nombre {ideaTitle}",
-                                "llama a la idea {ideaTitle}"
+                                "el titulo es {ideaTitle}",
+                                "se llama {ideaTitle}"
                             ]
                         }
                     ],
@@ -222,12 +197,7 @@
                         "anota una idea",
                         "quiero registrar una nota",
                         "quiero guardar algo",
-                        "guarda {ideaText}",
-                        "se me ocurrio algo",
-                        "quiero anotar algo",
-                        "tengo algo que decir",
-                        "me acaba de surgir una idea", 
-                        "guarda esto"
+                        "guarda {ideaText}"
                     ]
                 },
                 {
@@ -236,16 +206,9 @@
                     "samples": [
                         "que ideas tengo guardadas",
                         "leeme mis ideas",
-                        "muéstrame mis notas",
+                        "muestrame mis notas",
                         "cuales son mis ideas",
-                        "cuantas ideas llevo guardadas",
-                        "que llevo guardado",
-                        "que tengo anotado",
-                        "dime lo que llevo",
-                        "que ideas llevo",
-                        "quiero ver mis ideas",
-                        "ver mis ideas",
-                        "que ideas tengo"
+                        "cuantas ideas llevo guardadas"
                     ]
                 },
                 {
@@ -261,11 +224,7 @@
                         "elimina la {ideaTitle}",
                         "elimina {ideaTitle}",
                         "borra la idea {ideaTitle}",
-                        "borra {ideaTitle}",
-                        "borrame {ideaTitle}",
-                        "ya no quiero {ideaTitle}",
-                        "quita {ideaTitle}",
-                        "tira {ideaTitle}"
+                        "borra {ideaTitle}"
                     ]
                 },
                 {
@@ -282,13 +241,7 @@
                         "regresar a mis campañas",
                         "cambia a {campaignName}",
                         "quiero ver otra campaña",
-                        "pasemos a {campaignName}",
-                        "vamonos a otra campaña",
-                        "quiero otra campaña",
-                        "brinca a {campaignName}",
-                        "salte a {campaignName}",
-                        "entra a {campaignName}",
-                        "quiero entrar a {campaignName}"
+                        "pasemos a {campaignName}"
                     ]
                 },
                 {
@@ -297,14 +250,10 @@
                     "samples": [
                         "dame recomendaciones",
                         "como mejoro esta campaña",
-                        "que debería cambiar",
+                        "que deberia cambiar",
                         "que me recomiendas",
                         "dame consejos para esta campaña",
-                        "como mejoro el engagement",
-                        "que me sugieres",
-                        "dame tips",
-                        "cómo la mejoro",
-                        "dame consejos"
+                        "como mejoro el engagement"
                     ]
                 },
                 {
@@ -316,11 +265,7 @@
                         "que hemos visto hasta ahora",
                         "como estamos",
                         "dame el panorama general",
-                        "resumen rapido",
-                        "resumen",
-                        "cuentame todo",
-                        "ponme al día",
-                        "qué ha pasado"
+                        "resumen rapido"
                     ]
                 },
                 {
@@ -333,10 +278,7 @@
                         "por supuesto",
                         "hazlo",
                         "de acuerdo",
-                        "confirmo",
-                        "va",
-                        "orale",
-                        "sale"
+                        "confirmo"
                     ]
                 },
                 {
@@ -347,10 +289,7 @@
                         "no gracias",
                         "mejor no",
                         "negativo",
-                        "descarta",
-                        "para nada",
-                        "mejor no le muevas",
-                        "asi esta bien"
+                        "descarta"
                     ]
                 },
                 {

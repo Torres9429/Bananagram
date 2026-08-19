@@ -57,9 +57,23 @@ mejorar una publicación existente. Nunca inventes datos de la marca que no se t
 adicionales a "improved").`;
 
 const IDEAS_SYSTEM_PROMPT = `Eres un asistente de marketing de redes sociales para Bananagram. Generas ideas
-de publicaciones nuevas a partir del contexto de una marca/campaña. Responde ÚNICAMENTE con un objeto JSON
-válido, sin texto adicional, sin backticks, con exactamente esta forma: {"ideas": [{"title": string,
-"concept": string, "hook": string, "suggestedFormat": string, "callToAction": string}]}.`;
+de publicaciones nuevas a partir del contexto de una marca/campaña. Uno de los consumidores de esta
+respuesta es una skill de voz (Alexa) que lee "hook" y "concept" en voz alta — por eso deben ser CORTOS y
+CONCRETOS, tipo pitch rápido, nunca un párrafo explicativo largo.
+
+Reglas de longitud (estrictas, no las excedas):
+- "concept": una sola frase corta (máximo 15 palabras), formato + idea concreta, no una explicación de por
+  qué funcionaría. Ejemplos de buen estilo: "Video de 3 segundos mostrando el producto en acción", "Reto de
+  baile de 15 segundos con el hashtag de la marca", "Carrusel de 5 tips rápidos sobre el tema". Ejemplo de
+  mal estilo (demasiado largo, evítalo): "Un video dinámico y estético que muestra el proceso creativo detrás
+  de la campaña, conectando emocionalmente con la audiencia a través de una narrativa inspiradora sobre..."
+- "hook": una frase corta (máximo 12 palabras) que se pueda leer de corrido sin sonar como un párrafo.
+- "suggestedFormat": 2 a 4 palabras (ej. "Reel de 15s", "Carrusel de 5 fotos", "Video reto").
+- "callToAction": una frase corta y directa (máximo 10 palabras).
+
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backticks, con exactamente esta
+forma: {"ideas": [{"title": string, "concept": string, "hook": string, "suggestedFormat": string,
+"callToAction": string}]}.`;
 
 const CAMPAIGN_RECOMMENDATIONS_SYSTEM_PROMPT = `Eres un asistente de marketing de redes sociales para
 Bananagram. Se te da un resumen de métricas reales de una campaña (posts, alcance, interacciones, tasa de
@@ -96,10 +110,21 @@ export class AiService {
       `Genera exactamente ${quantity} ideas.`,
     ].filter(Boolean);
 
-    const content = await this.openRouter.chatCompletion([
-      { role: 'system', content: IDEAS_SYSTEM_PROMPT },
-      { role: 'user', content: lines.join('\n') },
-    ]);
+    // maxTokens tiene que cubrir el bloque de razonamiento obligatorio del
+    // modelo MÁS la respuesta real — verificado en vivo que ese razonamiento
+    // es VARIABLE (576-864 tokens en corridas reales, no un tamaño fijo), así
+    // que ni siquiera un tope generoso garantiza no truncar en una corrida
+    // con más razonamiento de lo normal (ver OpenRouterClient.chatCompletion
+    // para el detalle completo). Esto no acelera la respuesta (el
+    // razonamiento manda igual, ~9s típico) — es solo contención de
+    // truncamiento mientras se decide si vale la pena cambiar de modelo.
+    const content = await this.openRouter.chatCompletion(
+      [
+        { role: 'system', content: IDEAS_SYSTEM_PROMPT },
+        { role: 'user', content: lines.join('\n') },
+      ],
+      { maxTokens: 1500 },
+    );
 
     const parsed = parseJsonResponse<{ ideas?: unknown }>(content);
     if (!Array.isArray(parsed.ideas) || parsed.ideas.length === 0) {
@@ -240,10 +265,14 @@ export class AiService {
       dto.additionalContext && `Contexto adicional: ${dto.additionalContext}`,
     ].filter(Boolean);
 
-    const content = await this.openRouter.chatCompletion([
-      { role: 'system', content: CAMPAIGN_RECOMMENDATIONS_SYSTEM_PROMPT },
-      { role: 'user', content: lines.join('\n') },
-    ]);
+    // Mismo criterio que generateIdeas — ver comentario ahí.
+    const content = await this.openRouter.chatCompletion(
+      [
+        { role: 'system', content: CAMPAIGN_RECOMMENDATIONS_SYSTEM_PROMPT },
+        { role: 'user', content: lines.join('\n') },
+      ],
+      { maxTokens: 1300 },
+    );
 
     const parsed = parseJsonResponse<Partial<CampaignRecommendationsResult>>(content);
     if (
