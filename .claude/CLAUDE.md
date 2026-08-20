@@ -117,6 +117,28 @@ podía colgarse minutos sin que el timeout configurado cortara nada. Mismo halla
 segundo plano. En ambos servicios, `fetch()`+`response.json()` ahora van juntos dentro de la misma acción
 del breaker.
 
+**Bug real encontrado y corregido en vivo (2026-08-19)**: `main.ts` creaba la app sin configurar el límite
+del body parser — el default de Express/`body-parser` (100kb) rechazaba cualquier imagen adjunta a
+`POST ai/suggest-caption` con `PayloadTooLargeError: request entity too large`, aunque `SuggestCaptionDto.
+images` ya declaraba soportar hasta 3 imágenes de ~3MB cada una (`@MaxLength(3_000_000)`) — el transporte
+nunca coincidió con lo que el propio DTO decía aceptar. Fix: `app.useBodyParser('json', { limit: '12mb' })`
+en `main.ts` (Nest 10, API soportada — no hace falta desactivar+reemplazar el parser default a mano). **El
+cap de 3MB por imagen resultó ser insuficiente para fotos reales de celular** (confirmado el mismo día con
+una foto real de un usuario) — subido a `@MaxLength(8_000_000)` (~6MB de binario real por imagen) y el
+límite del body parser a `28mb` para dar margen sobre 3 imágenes a ese tamaño.
+Además, ninguna de las 5 DTOs de `ai-service` tenía mensajes `message:` en español en sus decoradores de
+`class-validator` — cualquier error de validación (no solo el de payload) llegaba al frontend en inglés.
+Las 5 DTOs (`suggest-caption`, `analyze-post`, `improve-post`, `generate-ideas`, `campaign-recommendations`)
+ahora tienen mensajes en español en todos sus decoradores. Nuevo `PayloadTooLargeFilter`
+(`src/common/payload-too-large.filter.ts`, registrado como `APP_FILTER` en `app.module.ts`) traduce
+específicamente el error de `raw-body` (detectado por `err.type === 'entity.too.large'`, no por texto) a un
+413 con mensaje en español — **extiende `BaseExceptionFilter` y delega con `super.catch()`** para cualquier
+otro error (nunca `throw exception`: eso NO reengancha con el manejo de excepciones de Nest y tumbó el
+proceso entero en el primer error de validación normal durante el desarrollo de este fix — por eso se
+registra vía `APP_FILTER`, no `app.useGlobalFilters(new ...)`: `BaseExceptionFilter` necesita
+`HttpAdapterHost` inyectado por Nest para que `super.catch()` funcione, y una instancia creada a mano con
+`new` nunca pasa por el contenedor de DI).
+
 ## Estado real del código — léase antes de asumir que algo "ya funciona" (actualizado 2026-08-14)
 
 El proyecto dejó de ser un scaffold: los 5 servicios de backend (el 5º, `ai-service`, agregado el
@@ -268,7 +290,7 @@ pnpm lint                      # turbo run lint
 - `commons/` — **desde el 2026-08-16 (`c867e24`), de nuevo un paquete workspace real** (`@repo/backend-commons`, `package.json`+`tsconfig.json`+`dist/`, un único barrel `src/index.ts` sin subpaths — la resolución clásica de módulos que usa `tsconfig.base.json` de backend no resuelve de forma confiable un `exports` map con subpaths). Antes de esa fecha había quedado huérfano (nada lo importaba; ver histórico más abajo) — hoy `auth-service`, `core-service`, `alexa-service` y `ai-service` (este último desde 2026-08-18) lo declaran como dependencia y lo importan de verdad (`import { X } from '@repo/backend-commons'`), ya no por path relativo. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases, 2026-07-23):
   - `guards/` — `JwtAuthGuard` (reescrito al revivir el paquete: ya **no** usa passport-jwt, verifica RS256 contra el JWKS remoto de `auth-service` vía `jose`) + `TokenDenylistService`, compartidos entre `core-service`, `alexa-service` y `ai-service` (verificadores idénticos, sin firmar nunca); `auth-service` mantiene su propia copia local (`src/guards/jwt-auth.guard.ts`) porque es el emisor del JWT, no un verificador remoto — esa no se comparte. `PermissionGuard` sí se comparte entre esos mismos 4 servicios (antes se duplicaba localmente en cada uno, criterio abandonado con el commit `c867e24`). `BrandAccessGuard` sigue sin vivir aquí — sigue en `core-service/src/guards/`, ver nota de `brandIds` arriba.
   - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)` — compartidos entre esos mismos 4 servicios
-  - `interceptors/` — `LoggingInterceptor` (exportado, pero sin importadores reales todavía — ningún `main.ts` lo registra global). `AuditInterceptor` (el TODO histórico de escribir en `audit_log`) **no** se migró al revivir el paquete — ese TODO sigue sin implementarse en ninguna parte del sistema.
+  - `interceptors/` — `LoggingInterceptor` (exportado, pero sin importadores reales todavía — ningún `main.ts` lo registra global). `AuditInterceptor` **sí está implementado y registrado** en `auth-service`/`core-service` (`app.useGlobalInterceptors(new AuditInterceptor(writeAuditEntry))`, ver sus `main.ts`) — agnóstico de Prisma a propósito (cada servicio inyecta su propia función de escritura contra su propio cliente), audita todo método mutante (`POST/PUT/PATCH/DELETE`), redacta claves sensibles (`password/token/secret/apikey/privatekey`) antes de guardar el body de respuesta. **Bug real corregido en vivo (2026-08-19)**: `AuditEntryInput.recordId` siempre fue `string | null` (a propósito — no toda acción mutante tiene un recordId natural, ej. `POST /auth/login`), pero `AuditLog.recordId` en ambos `schema.prisma` era `String` no-nullable — cualquier acción sin `:id` en la ruta ni `.id` en la respuesta fallaba en silencio al escribir (atrapado y solo logueado como `WARN`, nunca rompía la request real, pero el audit trail quedaba vacío; en `auth-service` esto significaba que **ningún** login se auditaba nunca). Ambos schemas pasaron a `recordId String?` (migración `audit_log_record_id_nullable` en los 2 servicios).
   - `filters/` — `HttpExceptionFilter` (exportado, mismo caso que `LoggingInterceptor`: sin registrar globalmente todavía)
   - `circuit-breaker/` — factory de `opossum` para llamadas REST entre servicios (ADR-0003, sin mensajería async); esta versión ya trae el fix de import CommonJS (`import CircuitBreaker = require('opossum')`, `opossum` es CJS puro) que antes solo tenía la copia local de `core-service` — usado por `AyrshareService`/`NotificationsClient`/`ai-service`'s `OpenRouterClient`. **Ojo con un gotcha real (2026-08-18)**: envolver solo el `fetch()` en el breaker no basta — `fetch()` resuelve en cuanto llegan los headers, no cuando termina de bajar el body, así que el `response.json()` posterior queda sin protección de timeout si se hace fuera de la acción del breaker (causó un post marcado `error` en `core-service` mientras Ayrshare seguía publicando de verdad en segundo plano). `fetch()`+`response.json()` deben ir juntos dentro de la misma acción.
   - `types/` — enums compartidos (`Roles`, `Modules`, `Actions`) y `JwtPayload`. `PostStatus` **no** se migró — `core-service` mantiene su propia copia local con los 11 valores reales (la vieja versión de `commons/` solo tenía 6, desactualizada)

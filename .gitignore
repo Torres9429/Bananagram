@@ -21,3 +21,8 @@ keys/*
 
 /*.sql
 
+# Backups de BD (pg_dump) — contienen datos reales de usuarios/marcas/etc.,
+# nunca deben viajar en el repo.
+/backups/
+#agregar solo los .sql de esa carpeta
+/backups/*.sql
