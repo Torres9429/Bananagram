@@ -21,6 +21,12 @@ RUN pnpm install --frozen-lockfile
 # turbo.json's "build": {"dependsOn": ["^build"]} resolves that from the
 # workspace dependency graph, plain pnpm --filter doesn't. ----
 FROM deps AS builder
+# Baked into the browser bundle at build time (Next.js inlines NEXT_PUBLIC_*
+# vars during `next build`, not at container runtime) — must be the
+# public-facing gateway URL, not a Docker-network hostname. See
+# apps/frontend/commons/src/config/zone-urls.ts.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm exec turbo run build --filter=@repo/auth-front
 
 # ---- runtime: copy the whole built workspace (symlinked node_modules included) ----
