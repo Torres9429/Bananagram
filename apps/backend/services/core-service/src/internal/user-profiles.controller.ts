@@ -1,22 +1,37 @@
-import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { InternalAuthGuard } from '@repo/backend-commons';
 import { prisma } from '../prisma/client';
+import { CloudinaryService, type UploadableFile } from '../cloudinary/cloudinary.service';
 import { UpsertUserProfileDto } from './dto/upsert-user-profile.dto';
 
-// Sin JwtAuthGuard a propósito: es tráfico servicio-a-servicio (auth-service
-// → core-service tras un registro), no de un usuario final con Bearer token.
-// No se expone vía gateway (no hay regla /api/internal/* en su proxy), solo
-// alcanzable en la red interna donde corren los microservicios.
+// Tráfico servicio-a-servicio (auth-service → core-service tras un
+// registro), no de un usuario final con Bearer token — por eso no lleva
+// JwtAuthGuard, sino InternalAuthGuard (secreto compartido por header,
+// X-Internal-Token). No se expone vía gateway (no hay regla /api/internal/*
+// en su proxy), pero eso NO bastaba como protección real: el puerto de este
+// servicio se publica al host, así que sin este guard era alcanzable sin
+// ninguna autenticación desde fuera del contenedor.
 @ApiTags('internal')
+@UseGuards(InternalAuthGuard)
 @Controller('internal/user-profiles')
 export class UserProfilesController {
-  // Usado por auth-service al canjear un LinkCode (Alexa Skill) para
-  // devolver el nombre para mostrar junto a los tokens — ese dato solo vive
-  // aquí (UserProfile.name), auth-service no lo tiene. null si el perfil
-  // todavía no existe (best-effort del lado de quien llama).
+  constructor(private readonly cloudinary: CloudinaryService) {}
+
+  // Usado por auth-service al canjear un LinkCode (Alexa Skill, solo lee
+  // .name) y por ProfileController's GET me/profile (StaffProfileSection,
+  // necesita categories/specialties para precargar el formulario — de ahí
+  // el include, antes ausente aquí aunque el upsert de abajo sí lo
+  // devolvía). null si el perfil todavía no existe (best-effort del lado de
+  // quien llama).
   @Get(':userId')
   async getByUserId(@Param('userId') userId: string) {
-    return prisma.userProfile.findUnique({ where: { userId } });
+    return prisma.userProfile.findUnique({
+      where: { userId },
+      include: { categories: true, specialties: true },
+    });
   }
 
   @Post()
@@ -87,5 +102,20 @@ export class UserProfilesController {
         include: { categories: true, specialties: true },
       });
     });
+  }
+
+  // Sube la imagen a Cloudinary y devuelve la URL — a propósito NO toca
+  // UserProfile.avatarUrl acá (no exige que el perfil ya exista, evita el
+  // caso raro de "subiste una foto pero el perfil todavía no tiene nombre/
+  // categorías"). El caller (ProfileController.uploadAvatar) le pasa esa URL
+  // de vuelta al frontend, que la incluye en el siguiente PATCH me/profile
+  // (mismo POST /internal/user-profiles de arriba) junto con el resto del
+  // formulario — una sola operación de guardado, no dos fuentes de verdad.
+  @Post(':userId/avatar')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5_000_000 } }))
+  async uploadAvatar(@UploadedFile() file: UploadableFile) {
+    if (!file) throw new BadRequestException('Falta el archivo de imagen');
+    const result = await this.cloudinary.uploadFile(file, 'bananagram/avatars');
+    return { avatarUrl: result.secure_url };
   }
 }

@@ -1,5 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '@repo/backend-commons';
 import { PermissionGuard } from '@repo/backend-commons';
 import { BrandAccessGuard } from '../guards/brand-access.guard';
@@ -8,6 +10,7 @@ import { CurrentUser } from '@repo/backend-commons';
 import { BrandsService } from './brands.service';
 import { SocialAccountsService } from '../social-accounts/social-accounts.service';
 import { AccountMetricsCronService } from '../cron/account-metrics-cron.service';
+import { CloudinaryService, type UploadableFile } from '../cloudinary/cloudinary.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
 import { CreateConnectUrlDto } from './dto/create-connect-url.dto';
@@ -21,6 +24,7 @@ export class BrandsController {
     private readonly brands: BrandsService,
     private readonly socialAccounts: SocialAccountsService,
     private readonly accountMetricsCron: AccountMetricsCronService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   @Get()
@@ -42,6 +46,22 @@ export class BrandsController {
     return this.brands.createBrand(dto, user);
   }
 
+  // Sube el logo ANTES de que la marca exista (formulario de creación, no
+  // hay :id todavía) — por eso no puede ser :id/logo ni llevar
+  // BrandAccessGuard (nada que verificar ownership todavía). Se gatea con
+  // el mismo permiso que crear la marca en sí (marcas:crear), no marcas:editar.
+  // Ruta de 2 segmentos ('brands/logo') — no colisiona con POST :id/logo
+  // (3 segmentos) ni con ningún otro verbo sobre brands/:id.
+  @Post('logo')
+  @ApiConsumes('multipart/form-data')
+  @RequirePermission('marcas', 'crear')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5_000_000 } }))
+  async uploadLogoForNewBrand(@UploadedFile() file: UploadableFile) {
+    if (!file) throw new BadRequestException('Falta el archivo de imagen');
+    const result = await this.cloudinary.uploadFile(file, 'bananagram/brands');
+    return { logoUrl: result.secure_url };
+  }
+
   @Patch(':id')
   @RequirePermission('marcas', 'editar')
   @UseGuards(BrandAccessGuard)
@@ -54,6 +74,22 @@ export class BrandsController {
   @UseGuards(BrandAccessGuard)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.brands.removeBrand(id);
+  }
+
+  // Sube el logo a Cloudinary y devuelve la URL — a propósito NO toca
+  // Brand.logoUrl acá (mismo criterio que internal/user-profiles/:id/avatar
+  // en auth-service/core-service: una sola operación de guardado). El
+  // frontend incluye la URL devuelta en el siguiente PATCH :id junto con el
+  // resto del formulario de "Editar perfil".
+  @Post(':id/logo')
+  @ApiConsumes('multipart/form-data')
+  @RequirePermission('marcas', 'editar')
+  @UseGuards(BrandAccessGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5_000_000 } }))
+  async uploadLogo(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: UploadableFile) {
+    if (!file) throw new BadRequestException('Falta el archivo de imagen');
+    const result = await this.cloudinary.uploadFile(file, 'bananagram/brands');
+    return { logoUrl: result.secure_url };
   }
 
   @Post(':id/connect-url')

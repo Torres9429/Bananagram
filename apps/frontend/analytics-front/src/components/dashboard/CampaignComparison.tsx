@@ -6,7 +6,7 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MenuItem from '@mui/material/MenuItem';
-import { EmptyState, LabeledSelect } from '@repo/ui/ui';
+import { EmptyState, LabeledSelect, ChartTitle } from '@repo/ui/ui';
 import { scopedMetrics } from '../../lib/analytics/real-metrics';
 import { useSelectedNetwork } from './useSelectedNetwork';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
@@ -17,6 +17,14 @@ const ROWS: { key: 'reach' | 'engagementRate' | 'posts' | 'interactions'; label:
   { key: 'posts', label: 'Publicaciones' },
   { key: 'interactions', label: 'Interacciones' },
 ];
+
+// engagementRate es el único campo de ScopedMetrics que puede ser null (sin
+// alcance conocido) — el resto siempre es number. `?? 0` lo colapsaría a
+// "0% de engagement", indistinguible de un 0 real (bug real encontrado en
+// auditoría, no fabricar datos).
+function formatRow(value: number | null, unit?: string): string {
+  return value === null ? '—' : `${value}${unit ?? ''}`;
+}
 
 /**
  * Compara 2 campañas lado a lado — datos reales (Fase Q). "Top de campaña"
@@ -46,7 +54,11 @@ export function CampaignComparison() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparación entre campañas</Typography>
+      <ChartTitle
+        title="Comparación entre campañas"
+        description="Compara alcance, engagement, publicaciones e interacciones entre 2 campañas."
+        info="'—' significa que no hay dato de alcance disponible para esa campaña/red (no es un 0 real). El Score Digital no se compara aquí porque es a nivel de marca, no de campaña."
+      />
 
       <Grid container spacing={2} mb={2}>
         <Grid item xs={12} sm={6}>
@@ -66,19 +78,26 @@ export function CampaignComparison() {
       ) : (
         <>
           <Stack gap={1.5} mb={2}>
+            {/* Bug real (2026-08-20): xs={4} apretaba value/label/value en 3
+                columnas de ~30% en celular — números grandes (alcance,
+                interacciones de 6-7 dígitos) se envolvían en varias líneas
+                de forma despareja entre columna A y B. xs={12} apila las 3
+                en filas propias por debajo de 600px (mismo patrón A/label/B,
+                solo vertical); sm={4} mantiene las 3 columnas de siempre a
+                partir de tablet. */}
             {ROWS.map((row) => (
-              <Grid container spacing={2} key={row.key} alignItems="center">
-                <Grid item xs={4}>
+              <Grid container spacing={{ xs: 0.5, sm: 2 }} key={row.key} alignItems="center">
+                <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
                   <Typography variant="body2" fontWeight={700} sx={{ color: 'primary.contrastTextMuted' }}>
-                    {metricsA[row.key] ?? 0}{row.unit ?? ''}
+                    {formatRow(metricsA[row.key], row.unit)}
                   </Typography>
                 </Grid>
-                <Grid item xs={4} textAlign="center">
+                <Grid item xs={12} sm={4} sx={{ textAlign: 'center' }}>
                   <Typography variant="caption" color="text.secondary">{row.label}</Typography>
                 </Grid>
-                <Grid item xs={4} textAlign="right">
+                <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'center', sm: 'right' } }}>
                   <Typography variant="body2" fontWeight={700} sx={{ color: '#1565C0' }}>
-                    {metricsB[row.key] ?? 0}{row.unit ?? ''}
+                    {formatRow(metricsB[row.key], row.unit)}
                   </Typography>
                 </Grid>
               </Grid>
@@ -89,7 +108,7 @@ export function CampaignComparison() {
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" fontWeight={700} mb={1}>Top de {campaignA.name}</Typography>
               {campaignA.topPost ? (
-                <Typography variant="caption" color="text.secondary">• {campaignA.topPost.network} ({campaignA.topPost.engagementRate}%)</Typography>
+                <Typography variant="caption" color="text.secondary">• {campaignA.topPost.contentSnippet || 'Sin contenido'} — {campaignA.topPost.network} ({campaignA.topPost.engagementRate}%)</Typography>
               ) : (
                 <Typography variant="caption" color="text.secondary">Sin post destacado todavía.</Typography>
               )}
@@ -97,7 +116,7 @@ export function CampaignComparison() {
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" fontWeight={700} mb={1}>Top de {campaignB.name}</Typography>
               {campaignB.topPost ? (
-                <Typography variant="caption" color="text.secondary">• {campaignB.topPost.network} ({campaignB.topPost.engagementRate}%)</Typography>
+                <Typography variant="caption" color="text.secondary">• {campaignB.topPost.contentSnippet || 'Sin contenido'} — {campaignB.topPost.network} ({campaignB.topPost.engagementRate}%)</Typography>
               ) : (
                 <Typography variant="caption" color="text.secondary">Sin post destacado todavía.</Typography>
               )}

@@ -1,16 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
+import Avatar from '@mui/material/Avatar';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import TextField from '@mui/material/TextField';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import { FormDialog, LabeledField, LabeledSelect } from '@repo/ui/ui';
+import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
+import { FormDialog, LabeledField, LabeledSelect, useToast } from '@repo/ui/ui';
 import { useListCategoriesQuery } from '@repo/ui/state';
-import { useCreateBrandMutation } from '../store/api/brands.api';
+import { getInitials } from '@repo/ui/utils';
+import { useCreateBrandMutation, useUploadLogoForNewBrandMutation } from '../store/api/brands.api';
 import { BRAND_TYPE_OPTIONS } from '../lib/mock-data';
 
 interface CreateBrandDialogProps {
@@ -50,7 +56,26 @@ export function CreateBrandDialog({ open, onClose }: CreateBrandDialogProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [createBrand, { isLoading: isCreating }] = useCreateBrandMutation();
+  const [uploadLogo, { isLoading: isUploadingLogo }] = useUploadLogoForNewBrandMutation();
   const { data: categories = [] } = useListCategoriesQuery();
+  const { showSuccess, showError } = useToast();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // Sube el logo de inmediato (mejor feedback), pero la marca en sí recién
+  // se crea al confirmar el formulario — mismo patrón que el logo/avatar en
+  // StaffProfileSection/ClientSection.
+  async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const { logoUrl: uploadedUrl } = await uploadLogo(file).unwrap();
+      setLogoUrl(uploadedUrl);
+      showSuccess('Logo listo.');
+    } catch {
+      showError('No se pudo subir el logo.');
+    }
+  }
 
   function handleNameChange(value: string) {
     setName(value);
@@ -115,6 +140,35 @@ export function CreateBrandDialog({ open, onClose }: CreateBrandDialogProps) {
       {step === 'form' ? (
         <>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <Stack direction="row" alignItems="center" gap={2} sx={{ mb: 2.5 }}>
+            <Box sx={{ position: 'relative' }}>
+              <Avatar
+                src={logoUrl || undefined}
+                sx={{ width: 56, height: 56, bgcolor: primaryColor || '#616161', color: '#fff', fontWeight: 700 }}
+              >
+                {getInitials(name || 'M').toUpperCase()}
+              </Avatar>
+              <IconButton
+                size="small"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={isUploadingLogo}
+                aria-label="Subir logo"
+                sx={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '&:hover': { bgcolor: 'primary.light' },
+                }}
+              >
+                {isUploadingLogo ? <CircularProgress size={14} /> : <PhotoCameraOutlinedIcon fontSize="small" />}
+              </IconButton>
+              <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoChange} />
+            </Box>
+            <Typography variant="caption" color="text.secondary">Logo de la marca (opcional)</Typography>
+          </Stack>
           <LabeledField
             label="Nombre"
             placeholder="Ej. Café Aurora"
@@ -155,18 +209,31 @@ export function CreateBrandDialog({ open, onClose }: CreateBrandDialogProps) {
               <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
             ))}
           </LabeledSelect>
-          <LabeledField
-            label="Logo — URL (opcional)"
-            placeholder="https://…"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-          />
-          <LabeledField
-            label="Color primario (opcional)"
-            placeholder="#E0A800"
-            value={primaryColor}
-            onChange={(e) => setPrimaryColor(e.target.value)}
-          />
+          <Box sx={{ mb: 2.5 }}>
+            <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 500, fontSize: 14 }}>
+              Color primario (opcional)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+              Fondo del avatar mientras no haya logo — se ve reflejado arriba al elegirlo.
+            </Typography>
+            <Stack direction="row" gap={1} alignItems="center">
+              <Box
+                component="input"
+                type="color"
+                value={primaryColor || '#616161'}
+                onChange={(e) => setPrimaryColor((e.target as HTMLInputElement).value)}
+                sx={{ width: 44, height: 44, p: 0, border: '1px solid', borderColor: 'divider', borderRadius: 2, cursor: 'pointer', bgcolor: 'transparent' }}
+              />
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="#E0A800"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                sx={{ flex: 1 }}
+              />
+            </Stack>
+          </Box>
         </>
       ) : (
         <Stack gap={2}>

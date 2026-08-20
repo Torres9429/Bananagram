@@ -8,11 +8,12 @@ import MenuItem from '@mui/material/MenuItem';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
-import { EmptyState, LabeledSelect } from '@repo/ui/ui';
+import { EmptyState, LabeledSelect, ChartTitle } from '@repo/ui/ui';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useGetCampaignMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useDateRangeParams } from './useDateRangeParams';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useSelectedNetwork } from './useSelectedNetwork';
 
 const DAY_LABELS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
@@ -28,12 +29,14 @@ const DAY_LABELS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viern
 export function InsightsPanel() {
   const campaigns = useFilteredCampaigns();
   const range = useDateRangeParams();
+  const networkCode = useSelectedNetwork();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const activeCampaignId = campaignId ?? campaigns[0]?.campaignId ?? null;
   const activeCampaign = campaigns.find((c) => c.campaignId === activeCampaignId);
 
+  // networkCode agregado 2026-08-20 — mismo bug/fix que EngagementChart.
   const { data: history } = useGetCampaignMetricsHistoryQuery(
-    activeCampaignId ? { campaignId: activeCampaignId, range } : ({} as never),
+    activeCampaignId ? { campaignId: activeCampaignId, range, networkCode: networkCode ?? undefined } : ({} as never),
     { skip: !activeCampaignId },
   );
 
@@ -83,7 +86,12 @@ export function InsightsPanel() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={1}>Insights automáticos</Typography>
+      <ChartTitle
+        title="Insights automáticos"
+        description="Recomendaciones generadas a partir de tus propios datos: mejor hora, mejor red, tendencia de alcance."
+        info="Se calculan solo con datos ya capturados: mejor hora de publicar (según interacciones por hora), red con mejor engagement, y variación de alcance de los últimos 7 días contra los 7 anteriores. Se necesitan al menos 2 semanas de historial."
+        mb={1}
+      />
       {campaigns.length > 1 && (
         <LabeledSelect label="Campaña" value={activeCampaignId ?? ''} onChange={(e) => setCampaignId((e.target.value as string) || null)} sx={{ mb: 2, maxWidth: 280 }}>
           {campaigns.map((c) => <MenuItem key={c.campaignId} value={c.campaignId}>{c.name}</MenuItem>)}

@@ -14,6 +14,13 @@
 //   auditoría) — no se inventa ninguna combinación para este módulo. Se
 //   deja como decisión aparte, no se toca el módulo ni sus permisos ya
 //   asignados en el seed.
+// - ideas: agregado 2026-08-20 — módulo real desde 2026-08-19 (separado de
+//   campanas:crear específicamente para que Diseñador pudiera generar ideas
+//   sin necesitar permiso de campañas), con backing real en
+//   alexa-service/src/ideas/ideas.controller.ts (ver/crear) y
+//   ai-service/src/ai/ai.controller.ts (POST ai/generate-ideas, crear). No
+//   estaba en la auditoría original del 2026-08-17 porque el módulo no
+//   existía todavía en esa fecha.
 //
 // No agregar combinaciones nuevas aquí sin volver a verificar contra un
 // @RequirePermission real — este archivo existe justamente para evitar que
@@ -23,6 +30,7 @@ export const VALID_MODULE_ACTIONS: Record<string, string[]> = {
   marcas: ['ver', 'crear', 'editar', 'eliminar'],
   publicaciones: ['ver', 'crear', 'editar', 'aprobar', 'rechazar'],
   campanas: ['ver', 'crear', 'editar', 'aprobar', 'rechazar', 'asignar'],
+  ideas: ['ver', 'crear'],
   metricas: ['ver', 'exportar'],
   score: ['ver'],
   reportes: ['ver', 'exportar'],

@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { authReducer, authApi, catalogsApi, notificationsApi } from '@repo/ui/state';
+import { authReducer, authApi, catalogsApi, notificationsApi, profileApi } from '@repo/ui/state';
 import { campaignsApi } from './api/campaigns.api';
 import { brandsApi } from './api/brands.api';
 import { socialAccountsApi } from './api/social-accounts.api';
@@ -17,6 +17,7 @@ export const store = configureStore({
     [authApi.reducerPath]: authApi.reducer,
     [catalogsApi.reducerPath]: catalogsApi.reducer,
     [notificationsApi.reducerPath]: notificationsApi.reducer,
+    [profileApi.reducerPath]: profileApi.reducer,
     [campaignsApi.reducerPath]: campaignsApi.reducer,
     [brandsApi.reducerPath]: brandsApi.reducer,
     [socialAccountsApi.reducerPath]: socialAccountsApi.reducer,
@@ -31,6 +32,7 @@ export const store = configureStore({
       authApi.middleware,
       catalogsApi.middleware,
       notificationsApi.middleware,
+      profileApi.middleware,
       campaignsApi.middleware,
       brandsApi.middleware,
       socialAccountsApi.middleware,

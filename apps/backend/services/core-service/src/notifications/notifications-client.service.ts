@@ -28,7 +28,7 @@ export class NotificationsClient {
     const breaker = createCircuitBreaker(async () =>
       fetch(`${baseUrl}/api/internal/notifications`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_SERVICE_SECRET ?? '' },
         body: JSON.stringify({ userId, type, payload: payload ?? {} }),
       }),
     );

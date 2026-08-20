@@ -1,6 +1,6 @@
 import { AppRole } from '@repo/ui/types';
 import type { SocialNetwork } from '@repo/ui/types';
-import type { MockUser, MockAuditEntry, MockCatalogItem, Module, Action, PrivilegeMap } from '../interfaces/interface';
+import type { MockUser, MockCatalogItem, Module, Action, PrivilegeMap } from '../interfaces/interface';
 
 // El Admin solo crea cuentas operativas (CM y Diseñador).
 // El Cliente se auto-registra públicamente.
@@ -23,14 +23,6 @@ export const MOCK_USERS: MockUser[] = [
   { id: 'u4', name: 'Rocío Rodríguez', email: 'rocio.rodriguez@zaramx.com', role: AppRole.CLIENTE, status: 'active', lastLogin: 'Ayer 16:20' },
   { id: 'u5', name: 'Marco Sosa', email: 'marco.sosa@bananagram.com', role: AppRole.ADMINISTRADOR, status: 'active', lastLogin: 'Hace 3 días' },
   { id: 'u6', name: 'Diego Ferman', email: 'diego.ferman@bananagram.com', role: AppRole.COMMUNITY_MANAGER, status: 'pending', lastLogin: 'Nunca' },
-];
-
-export const MOCK_AUDIT_LOG: MockAuditEntry[] = [
-  { id: 'a1', actor: 'Rocío Rodríguez', action: 'Rechazó publicación', entity: 'Post p2 — Reel Nike 30 seg', createdAt: '2026-06-25T16:45:00.000Z' },
-  { id: 'a2', actor: 'Ana García', action: 'Envió a revisión', entity: 'Post p2 — Reel Nike 30 seg', createdAt: '2026-06-25T14:30:00.000Z' },
-  { id: 'a3', actor: 'Alexa Delgado', action: 'Creó borrador', entity: 'Post p2 — Reel Nike 30 seg', createdAt: '2026-06-25T10:00:00.000Z' },
-  { id: 'a4', actor: 'Marco Sosa', action: 'Editó permisos del rol', entity: 'Rol CM', createdAt: '2026-06-24T11:15:00.000Z' },
-  { id: 'a5', actor: 'Marco Sosa', action: 'Creó usuario', entity: 'Diego Ferman', createdAt: '2026-06-20T09:30:00.000Z' },
 ];
 
 export const MOCK_CATEGORIES: MockCatalogItem[] = [

@@ -17,14 +17,18 @@ export class CloudinaryService {
       cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
       api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
       api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
+      // Default del SDK es 60s — corto para fotos reales de celular en una
+      // conexión lenta (reportado en vivo, 2026-08-19). 120s da margen sin
+      // dejarlo colgado indefinidamente si Cloudinary de verdad no responde.
+      timeout: 120000,
     });
   }
 
-  async uploadFile(file: UploadableFile): Promise<any> {
+  async uploadFile(file: UploadableFile, folder: string = 'bananagram/posts'): Promise<any> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'bananagram/posts',
+          folder,
           resource_type: 'auto',
         },
         (error, result) => {

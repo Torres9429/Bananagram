@@ -12,6 +12,12 @@ export interface RegisterRequest {
   name: string;
   email: string;
   password: string;
+  // 'cliente' | 'cm' | 'disenador' — RegisterDto real del backend (nombres
+  // cortos, no los slugs largos de AppRole). categoryIds/specialtyIds
+  // quedan fuera a propósito: el catálogo real solo es accesible ya
+  // autenticado (catalogos:ver), no durante un registro anónimo — se
+  // completan después vía PATCH /me/profile, no en este paso.
+  roleName: 'cliente' | 'cm' | 'disenador';
 }
 
 export interface AuthResponse {
@@ -39,7 +45,9 @@ export const authApi = createApi({
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (body) => ({ url: 'auth/login', method: 'POST', body }),
     }),
-    register: builder.mutation<void, RegisterRequest>({
+    // El backend devuelve tokens reales (issueTokens(user)), igual que login
+    // — antes tipado como void, nunca se había conectado a un caller real.
+    register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (body) => ({ url: 'auth/register', method: 'POST', body }),
     }),
     // Respaldados por PasswordResetToken en modelo.txt — el backend busca el
@@ -66,6 +74,14 @@ export const authApi = createApi({
     createLinkCode: builder.mutation<{ code: string; expiresAt: string }, void>({
       query: () => ({ url: 'auth/link-code', method: 'POST' }),
     }),
+    // Antes "logout" solo borraba las cookies locales — nunca llamaba al
+    // backend real (auth.service.ts.logout revoca el jti actual en la
+    // denylist Y todos los refresh tokens del usuario). Sin esto, un access
+    // token capturado seguía siendo válido hasta su expiración natural
+    // (15 min) tras un "logout" (auditoría final, hallazgo cross-cutting).
+    logout: builder.mutation<void, void>({
+      query: () => ({ url: 'auth/logout', method: 'POST' }),
+    }),
   }),
 });
 
@@ -75,4 +91,5 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useCreateLinkCodeMutation,
+  useLogoutMutation,
 } = authApi;

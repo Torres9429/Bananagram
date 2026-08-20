@@ -7,7 +7,8 @@ import type { ReactNode } from 'react';
 interface WidgetCardProps {
   icon: ReactNode;
   label: string;
-  value: string | number;
+  /** null = sin permiso/sin dato, se muestra como '—' (mismo criterio que MetricCard) */
+  value: string | number | null;
   /** Color de fondo del ícono — por defecto usa primary-light */
   iconBg?: string;
   iconColor?: string;
@@ -40,7 +41,7 @@ export function WidgetCard({
           {icon}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h5" fontWeight={700} noWrap>{value}</Typography>
+          <Typography variant="h5" fontWeight={700} noWrap>{value === null ? '—' : value}</Typography>
           <Typography variant="caption" color="text.secondary">{label}</Typography>
           {addon && <Box sx={{ mt: 0.75 }}>{addon}</Box>}
         </Box>

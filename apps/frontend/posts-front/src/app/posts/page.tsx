@@ -65,7 +65,7 @@ function PostsListContent() {
   const hasActiveFilters = filter !== 'all' || !!campaignFilter;
 
   const { data: campaigns = [] } = useListCampaignsQuery();
-  const { data: posts = [] } = useListPostsQuery({
+  const { data: posts = [], isFetching: isLoadingPosts } = useListPostsQuery({
     status: filter === 'all' ? undefined : filter,
     campaignId: campaignFilter ?? undefined,
   });
@@ -250,6 +250,7 @@ function PostsListContent() {
         onRowClick={(post) => router.push(`/posts/${post.id}`)}
         pagination
         initialPageSize={10}
+        isLoading={isLoadingPosts}
         emptyMessage="No hay publicaciones para estos filtros."
       />
       </Box>

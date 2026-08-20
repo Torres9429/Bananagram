@@ -1,12 +1,14 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useDispatch } from 'react-redux';
 import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { selectNetwork } from '../../store/analyticsFilters.slice';
+import type { SocialNetworkCode } from '../../lib/analytics/types';
 
 const METRICS: { key: 'likes' | 'comments' | 'shares' | 'views' | 'reach'; label: string }[] = [
   { key: 'likes', label: 'Likes' },
@@ -21,6 +23,7 @@ const METRICS: { key: 'likes' | 'comments' | 'shares' | 'views' | 'reach'; label
 // tiene escalas muy distintas — alcance en miles, comentarios en decenas —
 // sin normalizar, un radar sin escalar haría invisibles las métricas chicas).
 export function NetworkRadarComparison() {
+  const dispatch = useDispatch();
   const campaigns = useFilteredCampaigns();
 
   const { data, networkCodes } = useMemo(() => {
@@ -58,17 +61,26 @@ export function NetworkRadarComparison() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Comparativa de redes (radar)</Typography>
-      <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-        Cada métrica normalizada 0-100 contra la red que más tiene — para comparar forma, no volumen absoluto.
-      </Typography>
+      <ChartTitle
+        title="Comparativa de redes (forma)"
+        description="En qué se destaca cada red — no son cantidades reales, es una comparación relativa."
+        info="Cada eje va de 0 a 100: 100 = la red con más de esa métrica en el periodo mostrado, el resto se calcula en proporción a esa. Ej. si Instagram tiene 100 en 'Likes' y TikTok tiene 40, TikTok tuvo el 40% de los likes de Instagram — no 40 likes reales. Sirve para ver la forma/perfil de cada red, no el volumen total."
+      />
       <ResponsiveContainer width="100%" height={300}>
         <RadarChart data={data}>
           <PolarGrid stroke="#E8E8E8" />
           <PolarAngleAxis dataKey="metric" tick={{ fontSize: 12 }} />
           <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 10 }} />
-          <RechartsTooltip />
-          <Legend />
+          {/* Antes mostraba el número normalizado pelado (ej. "85") — un
+              usuario viendo el eje "Likes" leía eso como 85 likes reales, no
+              como "85/100 relativo a la red que más tiene" (reportado en
+              vivo, confusión real). El texto de arriba lo explica una vez,
+              pero el tooltip interactivo es lo que de verdad se lee al pasar
+              el mouse — así que la aclaración va ahí también. */}
+          <RechartsTooltip formatter={(value: number) => [`${value}/100`, undefined]} />
+          {/* Click en la leyenda filtra por esa red — mismo drill que
+              NetworkComparison, la relación real es SocialAccount.socialNetworkCode. */}
+          <Legend onClick={(entry) => dispatch(selectNetwork(entry.dataKey as SocialNetworkCode))} wrapperStyle={{ cursor: 'pointer' }} />
           {networkCodes.map((code) => (
             <Radar
               key={code}
@@ -77,6 +89,8 @@ export function NetworkRadarComparison() {
               stroke={NETWORK_DISPLAY[code as keyof typeof NETWORK_DISPLAY]?.color ?? '#9E9E9E'}
               fill={NETWORK_DISPLAY[code as keyof typeof NETWORK_DISPLAY]?.color ?? '#9E9E9E'}
               fillOpacity={0.15}
+              onClick={() => dispatch(selectNetwork(code as SocialNetworkCode))}
+              style={{ cursor: 'pointer' }}
             />
           ))}
         </RadarChart>

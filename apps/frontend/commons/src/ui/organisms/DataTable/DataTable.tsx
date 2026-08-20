@@ -10,6 +10,7 @@ import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import TablePagination from '@mui/material/TablePagination';
 import Typography from '@mui/material/Typography';
+import Skeleton from '@mui/material/Skeleton';
 
 export interface DataTableColumn<T> {
   key: string;
@@ -34,6 +35,13 @@ interface DataTableProps<T> {
   // está pensado para vaciar una pantalla completa (título h6 + py:8), demasiado
   // grande para una fila de tabla — este es un estado compacto propio de DataTable.
   emptyMessage?: string;
+  // Antes DataTable no tenía ningún concepto de "cargando" — comparaba
+  // rows.length===0 directo, así que toda tabla mostraba emptyMessage
+  // durante el fetch inicial (rows arranca en [] antes de que la query
+  // resuelva) y "parpadeaba" a los datos reales después. Cada pantalla había
+  // ido inventando su propio parche (ej. emptyMessage={isLoading?'Cargando…':...},
+  // solo texto, sin loader visual real) — se centraliza acá una sola vez.
+  isLoading?: boolean;
 }
 
 export function DataTable<T>({
@@ -45,6 +53,7 @@ export function DataTable<T>({
   initialPageSize = 10,
   pageSizeOptions = [10, 25, 50],
   emptyMessage = 'No hay registros para mostrar.',
+  isLoading = false,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(initialPageSize);
@@ -90,7 +99,20 @@ export function DataTable<T>({
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.length === 0 ? (
+          {isLoading ? (
+            // Filas fantasma en vez de un mensaje o spinner centrado — ocupan
+            // el mismo espacio que las filas reales van a ocupar, así la
+            // tabla no "salta" de tamaño cuando los datos llegan.
+            Array.from({ length: Math.min(initialPageSize, 5) }).map((_, i) => (
+              <TableRow key={`skeleton-${i}`}>
+                {columns.map((col) => (
+                  <TableCell key={col.key} align={col.align} sx={{ width: col.width }}>
+                    <Skeleton variant="text" sx={{ fontSize: '0.875rem' }} />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length} align="center" sx={{ py: 5, borderBottom: 0 }}>
                 <Typography variant="body2" color="text.secondary">{emptyMessage}</Typography>

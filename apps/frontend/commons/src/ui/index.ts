@@ -9,6 +9,7 @@ export * from './atoms/PrimaryButton/PrimaryButton';
 
 // Molecules
 export * from './molecules/WidgetCard/WidgetCard';
+export * from './molecules/ChartTitle/ChartTitle';
 export * from './molecules/MetricCard/MetricCard';
 export * from './molecules/TrendCard/TrendCard';
 export * from './molecules/InsightCard/InsightCard';

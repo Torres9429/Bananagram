@@ -11,6 +11,7 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Skeleton from '@mui/material/Skeleton';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
@@ -46,24 +47,32 @@ export default function PostsApprovalPage() {
   const router = useRouter();
   const user = useSelector(selectUser);
   const { showSuccess, showError } = useToast();
-  const { can, canAny } = usePermissions();
+  const { can } = usePermissions();
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
 
   const roles = user?.roles ?? [];
   const isCm = roles.includes('community_manager');
   const isDesigner = roles.includes('disenador');
   const isClient = roles.includes('cliente');
-  // Aprobar/Rechazar es la acción protegida — se gatea por permiso, no por
-  // rol. El resto de esta pantalla (a quién le toca ver qué cola, reenviar a
-  // revisión) sigue siendo lógica de negocio por rol, sin tocar.
-  const canReviewPublicaciones = canAny('publicaciones', ['aprobar', 'rechazar']);
+  // Antes: canReviewPublicaciones = canAny('publicaciones',['aprobar','rechazar'])
+  // decidía si mostrar la sección "Para revisar" (cola en_revision, etapa del
+  // CM) — pero Cliente también tiene aprobar/rechazar reales, solo que para
+  // SU etapa (aprobado→programar). Con el flag compartido, un Cliente veía
+  // la cola de revisión del CM (auditoría final, bug de granularidad real).
+  // "Para revisar" es específicamente la etapa del CM (en_revision→aprobado
+  // en la máquina de estados), así que se gatea por isCm, no por el permiso
+  // compartido. Aprobar/Rechazar dentro de esa sección se sigue gateando por
+  // can('publicaciones','aprobar'/'rechazar') a nivel de botón (ya estaba
+  // bien). El resto de esta pantalla (a quién le toca ver qué cola, reenviar
+  // a revisión) sigue siendo lógica de negocio por rol, sin tocar.
+  const canReviewPublicaciones = isCm;
 
   const { data: campaigns = [] } = useListCampaignsQuery();
-  const { data: draftPosts = [] } = useListPostsQuery({ status: 'borrador' });
-  const { data: reviewPosts = [] } = useListPostsQuery({ status: 'en_revision' });
-  const { data: clientRejectedPosts = [] } = useListPostsQuery({ status: 'rechazado_cliente' });
-  const { data: pendingClientPosts = [] } = useListPostsQuery({ status: 'aprobado' });
-  const { data: rejectedPosts = [] } = useListPostsQuery({ status: 'rechazado' });
+  const { data: draftPosts = [], isFetching: loadingDrafts } = useListPostsQuery({ status: 'borrador' });
+  const { data: reviewPosts = [], isFetching: loadingReview } = useListPostsQuery({ status: 'en_revision' });
+  const { data: clientRejectedPosts = [], isFetching: loadingClientRejected } = useListPostsQuery({ status: 'rechazado_cliente' });
+  const { data: pendingClientPosts = [], isFetching: loadingPendingClient } = useListPostsQuery({ status: 'aprobado' });
+  const { data: rejectedPosts = [], isFetching: loadingRejected } = useListPostsQuery({ status: 'rechazado' });
 
   const [submitForReview] = useSubmitForReviewMutation();
   const [approvePost] = useApprovePostMutation();
@@ -141,6 +150,20 @@ export default function PostsApprovalPage() {
     );
   }
 
+  // Antes cada una de las 5 secciones comparaba solo posts.length===0 — como
+  // el default de useListPostsQuery es [], el mensaje "Sin publicaciones..."
+  // aparecía primero y luego "parpadeaba" a los datos reales una vez
+  // resueltas las queries. Un bloque de skeletons por sección evita eso.
+  function PostListSkeleton() {
+    return (
+      <Stack gap={2} mb={3}>
+        {[0, 1].map((i) => (
+          <Skeleton key={i} variant="rounded" height={92} sx={{ borderRadius: 3 }} />
+        ))}
+      </Stack>
+    );
+  }
+
   const viewButton = (id: string) => (
     <Button
       size="small"
@@ -170,40 +193,43 @@ export default function PostsApprovalPage() {
           <Alert severity="info" sx={{ mb: 2 }}>
             Revisa el trabajo de tus Diseñadores antes de enviarlo al Cliente.
           </Alert>
-          {reviewPosts.length === 0 && (
+          {loadingReview ? (
+            <PostListSkeleton />
+          ) : reviewPosts.length === 0 ? (
             <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones para revisar.</Typography>
+          ) : (
+            reviewPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                actions={
+                  <>
+                    {viewButton(post.id)}
+                    {can('publicaciones', 'rechazar') && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => { e.stopPropagation(); setRejectTargetId(post.id); }}
+                        sx={{ color: '#C62828', borderColor: '#C62828' }}
+                      >
+                        Rechazar
+                      </Button>
+                    )}
+                    {can('publicaciones', 'aprobar') && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={(e) => { e.stopPropagation(); handleApprove(post.id); }}
+                        sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
+                      >
+                        Aprobar
+                      </Button>
+                    )}
+                  </>
+                }
+              />
+            ))
           )}
-          {reviewPosts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              actions={
-                <>
-                  {viewButton(post.id)}
-                  {can('publicaciones', 'rechazar') && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={(e) => { e.stopPropagation(); setRejectTargetId(post.id); }}
-                      sx={{ color: '#C62828', borderColor: '#C62828' }}
-                    >
-                      Rechazar
-                    </Button>
-                  )}
-                  {can('publicaciones', 'aprobar') && (
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={(e) => { e.stopPropagation(); handleApprove(post.id); }}
-                      sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
-                    >
-                      Aprobar
-                    </Button>
-                  )}
-                </>
-              }
-            />
-          ))}
         </>
       )}
 
@@ -213,12 +239,15 @@ export default function PostsApprovalPage() {
           <Alert severity="warning" sx={{ mb: 2 }}>
             El Cliente pidió correcciones — entra al detalle para editarla tú o regresarla al Diseñador.
           </Alert>
-          {clientRejectedPosts.length === 0 && (
+          {loadingClientRejected ? (
+            <PostListSkeleton />
+          ) : clientRejectedPosts.length === 0 ? (
             <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones rechazadas por el Cliente.</Typography>
+          ) : (
+            clientRejectedPosts.map((post) => (
+              <PostCard key={post.id} post={post} actions={viewButton(post.id)} />
+            ))
           )}
-          {clientRejectedPosts.map((post) => (
-            <PostCard key={post.id} post={post} actions={viewButton(post.id)} />
-          ))}
         </>
       )}
 
@@ -226,17 +255,20 @@ export default function PostsApprovalPage() {
       <Alert severity="success" sx={{ mb: 2 }}>
         Ya pasaron la revisión del CM y esperan aprobación del Cliente (programar o rechazar, desde el detalle).
       </Alert>
-      {pendingClientPosts.length === 0 && (
+      {loadingPendingClient ? (
+        <PostListSkeleton />
+      ) : pendingClientPosts.length === 0 ? (
         <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones esperando al Cliente.</Typography>
+      ) : (
+        pendingClientPosts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            statusChip={<Chip size="small" label="En espera del cliente" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />}
+            actions={viewButton(post.id)}
+          />
+        ))
       )}
-      {pendingClientPosts.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          statusChip={<Chip size="small" label="En espera del cliente" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />}
-          actions={viewButton(post.id)}
-        />
-      ))}
 
       {(isDesigner || isCm) && (
         <>
@@ -244,46 +276,52 @@ export default function PostsApprovalPage() {
           <Alert severity="error" sx={{ mb: 2 }}>
             El CM pidió correcciones. Edítalas y reenvíalas a revisión.
           </Alert>
-          {rejectedPosts.length === 0 && (
+          {loadingRejected ? (
+            <PostListSkeleton />
+          ) : rejectedPosts.length === 0 ? (
             <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones rechazadas.</Typography>
+          ) : (
+            rejectedPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                actions={
+                  <>
+                    {viewButton(post.id)}
+                    <PrimaryButton size="small" onClick={(e) => { e.stopPropagation(); handleSubmitForReview(post.id); }}>
+                      Reenviar a revisión →
+                    </PrimaryButton>
+                  </>
+                }
+              />
+            ))
           )}
-          {rejectedPosts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              actions={
-                <>
-                  {viewButton(post.id)}
-                  <PrimaryButton size="small" onClick={(e) => { e.stopPropagation(); handleSubmitForReview(post.id); }}>
-                    Reenviar a revisión →
-                  </PrimaryButton>
-                </>
-              }
-            />
-          ))}
         </>
       )}
 
       {(isDesigner || isCm || isClient) && (
         <>
           <Typography variant="subtitle1" mt={4} mb={2}>Borradores</Typography>
-          {draftPosts.length === 0 && (
+          {loadingDrafts ? (
+            <PostListSkeleton />
+          ) : draftPosts.length === 0 ? (
             <Typography variant="body2" color="text.secondary" mb={3}>Sin borradores pendientes.</Typography>
+          ) : (
+            draftPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                actions={
+                  <>
+                    {viewButton(post.id)}
+                    <PrimaryButton size="small" onClick={(e) => { e.stopPropagation(); handleSubmitForReview(post.id); }}>
+                      Enviar a revisión →
+                    </PrimaryButton>
+                  </>
+                }
+              />
+            ))
           )}
-          {draftPosts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              actions={
-                <>
-                  {viewButton(post.id)}
-                  <PrimaryButton size="small" onClick={(e) => { e.stopPropagation(); handleSubmitForReview(post.id); }}>
-                    Enviar a revisión →
-                  </PrimaryButton>
-                </>
-              }
-            />
-          ))}
         </>
       )}
       </Box>

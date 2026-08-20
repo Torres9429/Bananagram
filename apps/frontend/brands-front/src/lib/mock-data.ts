@@ -43,12 +43,11 @@ export function getSocialAccountsByProfile(brandId: string): SocialAccount[] {
   return getSocialAccountsByBrand(brandId);
 }
 
-export const MOCK_CATEGORIES = ['Moda', 'Deportes', 'Tecnología', 'Entretenimiento', 'Gastronomía', 'Salud', 'Educación', 'Arte'];
-
-// MOCK_CATEGORIES es un catálogo plano de strings (sin ids propios) — un
-// MockProfile.categoryId válido es uno de estos mismos strings, así que
-// "resolver el nombre" es una operación identidad; se deja como función para
-// no acoplar los call-sites a ese detalle si el catálogo gana ids reales.
+// MockProfile.categoryId (marca, no perfil de CM/Diseñador — ese ya usa el
+// catálogo real, ver StaffProfileSection) es un string plano sin id propio,
+// así que "resolver el nombre" es una operación identidad; se deja como
+// función para no acoplar los call-sites a ese detalle si el catálogo gana
+// ids reales.
 export function getCategoryName(categoryId: string): string {
   return categoryId;
 }
@@ -154,9 +153,6 @@ export function getCurrentClientProfile(userEmail?: string | null): MockProfile 
 export function getCampaignSocialAccounts(campaignId: string): SocialAccount[] {
   return getSocialAccountsForCampaign(campaignId);
 }
-
-// Especialidades disponibles para el perfil de CM/Diseñador.
-export const MOCK_SPECIALTIES = ['Diseño gráfico', 'Copywriting', 'Video y edición', 'Fotografía', 'Paid media', 'SEO/SEM', 'Animación'];
 
 // Diseñadores disponibles en el sistema (perfil_completo = true, disponibilidad = disponible).
 // Solo estos aparecen en el listado del CM al armar su equipo.

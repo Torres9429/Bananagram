@@ -588,12 +588,14 @@ model MetricSyncRun {
   @@map("metric_sync_runs")
 }
 
-// Score = (Consistencia×0.30) + (Engagement×0.40) + (Frecuencia×0.30) — ver
-// CLAUDE.md sobre la discrepancia entre la fórmula documentada (3 factores)
-// y la implementada hoy en score.service.ts (4 factores, incluye
-// Cobertura×0.20) — confirmar con el usuario cuál es la vigente antes de
-// tocar el cálculo real.
-// `coverage` es informativa: NO entra al cálculo ponderado del score.
+// Fórmula REAL implementada (score.service.ts): Score = Consistencia×0.30 +
+// Engagement×0.40 + Cobertura×0.20 + Frecuencia×0.10 — 4 factores, no 3.
+// (Corregido en la auditoría de Métricas, B10: este comentario decía antes
+// "coverage es informativa, NO entra al cálculo ponderado", lo cual
+// contradecía directamente el código real — `coverage` SÍ pondera ×0.20.
+// La fórmula de 3 factores (sin Cobertura) que aparece en documentación de
+// producto más antigua está superada por esta, confirmar con el usuario
+// solo si se quiere CAMBIAR el cálculo, no para saber cuál corre hoy.)
 model BrandScore {
   id      String @id @default(uuid())
   brandId String
@@ -633,7 +635,12 @@ model Report {
 model AuditLog {
   id          BigInt  @id @default(autoincrement())
   tableName   String
-  recordId    String
+  // Nullable (2026-08-19): mismo fix que auth-service/prisma/schema.prisma —
+  // AuditInterceptor (commons/) ya declaraba recordId: string | null a
+  // propósito (no toda acción mutante tiene un recordId natural), pero el
+  // schema lo exigía non-null, así que cualquier POST/PATCH/DELETE sin :id
+  // en la ruta ni un .id en la respuesta fallaba en silencio al auditar.
+  recordId    String?
   action      String
   before      Json?
   after       Json?

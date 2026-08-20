@@ -11,6 +11,7 @@ import { NotificationBell } from '../../molecules/NotificationBell/NotificationB
 import { logout } from '../../../state/auth.slice';
 import { deleteCookieToken, deleteRefreshCookieToken } from '../../../session/cookieSession';
 import { ZONE_URLS } from '../../../config/zone-urls';
+import { useLogoutMutation } from '../../../api/auth.api';
 
 interface TopBarProps {
   title?: string;
@@ -22,8 +23,20 @@ interface TopBarProps {
 // comportamiento visible de ninguna.
 export function TopBar({ title = 'Gestor de Redes', color }: TopBarProps) {
   const dispatch = useDispatch();
+  const [logoutRequest] = useLogoutMutation();
 
-  function handleLogout() {
+  // Antes solo borraba cookies locales — POST auth/logout es real y revoca
+  // el jti actual + todos los refresh tokens del usuario en el servidor
+  // (auditoría final, hallazgo cross-cutting). Best-effort a propósito: si
+  // el backend no responde, la limpieza local y la redirección deben pasar
+  // igual — el usuario nunca debe quedar atrapado en la sesión por una
+  // falla de red al cerrar sesión.
+  async function handleLogout() {
+    try {
+      await logoutRequest().unwrap();
+    } catch {
+      // silencioso a propósito — ver comentario arriba
+    }
     deleteCookieToken();
     deleteRefreshCookieToken();
     dispatch(logout());

@@ -1,6 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Role } from '@repo/backend-commons';
 import { prisma } from '../prisma/client';
 import { getAyrshareConfig, getAyrshareErrorMessage } from '../brands/ayrshare.util';
+import { getAccountMapperForNetwork } from '../integrations/ayrshare/mappers/account-metrics-mapper.registry';
+import { RawMetricsResponse } from '../integrations/ayrshare/mappers/mapper.interface';
 
 export interface AccountNetworkSummary {
   networkCode: string;
@@ -51,11 +54,12 @@ type AyrshareDeactivateResponse =
 // Shape confirmada en vivo contra POST /analytics/social: los datos vienen
 // un nivel más anidados de lo que se asumió originalmente
 // (payload[code].analytics.followersCount, no payload[code].followersCount)
-// — no es una restricción de plan, era un bug de lectura.
-type AyrshareAnalyticsResponse = Record<
-  string,
-  { analytics?: { followersCount?: number; followers?: number } } | undefined
->;
+// — no es una restricción de plan, era un bug de lectura. El objeto interno
+// se deja como Record<string, unknown> (no un shape fijo con
+// followersCount/followers) porque cada red usa nombres de campo distintos
+// — ver account-metrics-mapper.registry.ts (TikTok expone `followerCount`,
+// singular, no `followersCount` ni `followers`).
+type AyrshareAnalyticsResponse = Record<string, { analytics?: Record<string, unknown> } | undefined>;
 
 @Injectable()
 export class SocialAccountsService {
@@ -74,7 +78,7 @@ export class SocialAccountsService {
   // score.service.ts.assertIsBrandOwnerOrAdmin: solo dueño o Administrador,
   // nunca CM ni Diseñador aunque tengan acceso a alguna campaña de la marca.
   async assertIsBrandOwnerOrAdmin(brandId: string, user: CurrentUser): Promise<void> {
-    if (user.roles.includes('administrador')) return;
+    if (user.roles.includes(Role.ADMINISTRADOR)) return;
     const brand = await prisma.brand.findFirst({ where: { id: brandId, deletedAt: null }, select: { ownerId: true } });
     if (!brand) throw new NotFoundException(`Brand ${brandId} no existe`);
     if (brand.ownerId !== user.sub) {
@@ -89,7 +93,12 @@ export class SocialAccountsService {
         capturedAt: { gte: from, lte: to },
       },
       include: { socialAccount: { include: { socialNetwork: true } } },
-      orderBy: { capturedAt: 'asc' },
+      // "id" como desempate secundario: sin lock entre el cron y un refresh
+      // manual (ver account-metrics-cron.service.ts), dos snapshots podrían
+      // compartir el mismo capturedAt exacto — sin un segundo criterio, el
+      // orden entre ellos (y por lo tanto cuál "gana" en getAccountMetricsSummary's
+      // reduce de más abajo) sería no determinístico (auditoría B3/N).
+      orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
     });
   }
 
@@ -111,7 +120,12 @@ export class SocialAccountsService {
         capturedAt: { gte: from, lte: to },
       },
       include: { socialAccount: { include: { socialNetwork: true } } },
-      orderBy: { capturedAt: 'asc' },
+      // "id" como desempate secundario: sin lock entre el cron y un refresh
+      // manual (ver account-metrics-cron.service.ts), dos snapshots podrían
+      // compartir el mismo capturedAt exacto — sin un segundo criterio, el
+      // orden entre ellos (y por lo tanto cuál "gana" en getAccountMetricsSummary's
+      // reduce de más abajo) sería no determinístico (auditoría B3/N).
+      orderBy: [{ capturedAt: 'asc' }, { id: 'asc' }],
     });
 
     const latestByAccount = new Map<string, (typeof snapshots)[number]>();
@@ -319,6 +333,15 @@ export class SocialAccountsService {
   // (plan de Ayrshare sin analíticas, red no soportada, shape distinto al
   // esperado, etc.) se ignora por completo — nunca debe tumbar el resto del
   // sync, que sí es el dato crítico (qué cuentas están conectadas).
+  //
+  // Bug real (2026-08-20): antes leía followersCount/followers a mano para
+  // TODAS las redes por igual — funcionaba por casualidad en Instagram/
+  // Facebook (sí usan ese nombre) pero TikTok expone `followerCount`
+  // (singular, sin "s"), así que esta cuenta siempre quedaba en el default
+  // de Prisma (0), aunque `/metrics` (que ya usa el mapper por red correcto,
+  // ver account-metrics-mapper.registry.ts) mostrara el número real. Se
+  // reusa el mismo mapper por red en vez de duplicar la lista de nombres de
+  // campo por segunda vez.
   private async fetchFollowerCounts(profileKey: string, codes: string[]): Promise<Map<string, number>> {
     const result = new Map<string, number>();
     if (!codes.length) return result;
@@ -342,10 +365,21 @@ export class SocialAccountsService {
 
       const payload = (await response.json()) as AyrshareAnalyticsResponse;
       for (const code of codes) {
-        const followers = payload[code]?.analytics?.followersCount ?? payload[code]?.analytics?.followers;
-        if (typeof followers === 'number' && Number.isFinite(followers)) {
-          result.set(code, followers);
+        const analytics = payload[code]?.analytics;
+        if (!analytics) continue;
+
+        let followers: number | null = null;
+        try {
+          followers = getAccountMapperForNetwork(code)(analytics as RawMetricsResponse).followers;
+        } catch {
+          // Red sin mapper registrado todavía (ver accountMapperRegistry) —
+          // fallback al nombre de campo más común en vez de perder el dato.
+          const fallback = analytics as { followersCount?: unknown; followers?: unknown };
+          const raw = fallback.followersCount ?? fallback.followers;
+          followers = typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
         }
+
+        if (followers !== null) result.set(code, followers);
       }
     } catch (error) {
       this.logger.warn(`Error consultando analíticas de Ayrshare, se deja el valor de seguidores anterior: ${error}`);

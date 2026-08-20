@@ -13,6 +13,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Alert from '@mui/material/Alert';
 import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
+import { formatDateRange } from '@repo/ui/utils';
 import { useListCampaignsQuery, useAcceptCampaignMutation, useRejectCampaignMutation } from '../../store/api/campaigns.api';
 import { useListMyBrandsQuery } from '../../store/api/brands.api';
 import { CreateCampaignDialog } from '../../components/CreateCampaignDialog';
@@ -123,7 +124,7 @@ export default function MyCampaignsPage() {
                   <Box>
                     <Typography variant="body1" fontWeight={700}>{c.name}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}
+                      {formatDateRange(c.startDate, c.endDate)}
                       {c.objective ? ` · ${c.objective}` : ''}
                     </Typography>
                   </Box>
@@ -169,7 +170,7 @@ export default function MyCampaignsPage() {
               >
                 <Box>
                   <Typography variant="body1" fontWeight={600}>{c.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                  <Typography variant="caption" color="text.secondary">{formatDateRange(c.startDate, c.endDate)}</Typography>
                 </Box>
                 <Stack direction="row" gap={1} alignItems="center">
                   {c.cmStatus === 'rechazada' && (

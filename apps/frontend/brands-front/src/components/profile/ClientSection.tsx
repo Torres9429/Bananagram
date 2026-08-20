@@ -14,20 +14,26 @@ import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import Skeleton from '@mui/material/Skeleton';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast, usePermissions } from '@repo/ui/ui';
+import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, ScoreGauge, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser, useListCategoriesQuery } from '@repo/ui/state';
-import { getInitials } from '@repo/ui/utils';
+import { getInitials, formatDateRange } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CreateBrandDialog } from '../CreateBrandDialog';
-import { useUpdateBrandMutation, useCreateConnectUrlMutation } from '../../store/api/brands.api';
+import { useUpdateBrandMutation, useCreateConnectUrlMutation, useUploadLogoMutation } from '../../store/api/brands.api';
 import { useListCampaignsQuery } from '../../store/api/campaigns.api';
+import { useGetBrandScoreQuery, useRefreshBrandAccountMetricsMutation } from '../../store/api/metrics.api';
 import {
   useListSocialAccountsQuery,
   useSyncSocialAccountsMutation,
@@ -57,10 +63,11 @@ const SOCIAL_NETWORK_COLORS: Record<string, string> = {
 // esta misma sección (§A.1 — el tipo nunca bifurca flujo).
 //
 // Identidad del Hero (nombre/tipo/categoría/logo/color), redes sociales y
-// campañas ya son datos reales. El score digital sigue sin backend
-// (score.service.ts existe pero no tiene controller, ver CLAUDE.md "Sigue
-// faltando por completo") así que se muestra un placeholder honesto en vez
-// de un número inventado.
+// campañas ya son datos reales. El score digital TAMBIÉN es real —
+// GET brands/:id/score (ScoreController) existe desde hace tiempo y ya lo
+// consume analytics-front (ScoreExplanationPanel), pero esta sección nunca
+// lo llamaba: mostraba "Aún no disponible" hardcodeado pese a tener el
+// permiso score:ver ya gateando el bloque (hallazgo real, reportado en vivo).
 export function ClientSection() {
   const router = useRouter();
   const user = useSelector(selectUser);
@@ -76,6 +83,13 @@ export function ClientSection() {
   const { data: categories = [] } = useListCategoriesQuery();
   const categoryName = categories.find((c) => c.id === realBrand?.categoryId)?.name;
 
+  // Score real (GET brands/:id/score) — antes esta sección nunca lo pedía,
+  // ver comentario arriba. skip también por permiso: el backend ya exige
+  // score:ver (403 si no), esto solo evita la llamada innecesaria.
+  const { data: score, isFetching: isLoadingScore } = useGetBrandScoreQuery(realBrandId ?? '', {
+    skip: !realBrandId || !can('score', 'ver'),
+  });
+
   const { data: allCampaigns = [] } = useListCampaignsQuery();
   const campaigns = realBrandId ? allCampaigns.filter((c) => c.brandId === realBrandId) : [];
 
@@ -86,6 +100,8 @@ export function ClientSection() {
     { skip: !realBrandId },
   );
   const [syncSocialAccounts, { isLoading: isSyncing }] = useSyncSocialAccountsMutation();
+  const [refreshBrandAccountMetrics, { isLoading: isRefreshingMetrics }] = useRefreshBrandAccountMetricsMutation();
+  const isSyncingAll = isSyncing || isRefreshingMetrics;
   const [createConnectUrl] = useCreateConnectUrlMutation();
   const [disconnectSocialAccount, { isLoading: isDisconnecting }] = useDisconnectSocialAccountMutation();
   const { showSuccess, showError, showInfo } = useToast();
@@ -93,8 +109,17 @@ export function ClientSection() {
   async function handleSync() {
     if (!realBrandId) return;
     try {
-      await syncSocialAccounts(realBrandId).unwrap();
-      showSuccess('Cuentas sincronizadas con Ayrshare.');
+      // syncSocialAccounts: qué redes están conectadas + seguidores (GET
+      // /user de Ayrshare). refreshBrandAccountMetrics: likes/comments/
+      // shares/views/reach reales (antes este botón nunca los tocaba —
+      // hallazgo real, reportado en vivo: "por más que sincronizo siguen
+      // saliendo menos cosas"). Se corren juntas porque para el usuario
+      // "Sincronizar" es una sola acción, no dos con nombres distintos.
+      await Promise.all([
+        syncSocialAccounts(realBrandId).unwrap(),
+        refreshBrandAccountMetrics(realBrandId).unwrap(),
+      ]);
+      showSuccess('Cuentas y métricas sincronizadas con Ayrshare.');
     } catch {
       showError('No se pudo sincronizar con Ayrshare.');
     }
@@ -183,12 +208,30 @@ export function ClientSection() {
   }
 
   const [updateBrand, { isLoading: isSavingProfile }] = useUpdateBrandMutation();
+  const [uploadLogo, { isLoading: isUploadingLogo }] = useUploadLogoMutation();
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
   const [editProfileType, setEditProfileType] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState('');
+
+  // Sube el logo de inmediato (mejor feedback), pero no lo persiste en
+  // Brand.logoUrl todavía — eso pasa junto con el resto del formulario en
+  // handleEditProfile, mismo patrón que StaffProfileSection con el avatar.
+  async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !realBrandId) return;
+    try {
+      const { logoUrl } = await uploadLogo({ id: realBrandId, file }).unwrap();
+      setEditLogoUrl(logoUrl);
+      showSuccess('Logo listo — dale "Guardar cambios" para conservarlo.');
+    } catch {
+      showError('No se pudo subir el logo.');
+    }
+  }
 
   function openEditProfile() {
     if (!realBrand) return;
@@ -288,15 +331,21 @@ export function ClientSection() {
               )}
             </Box>
           </Stack>
-          {/* Score digital real: falta el endpoint (score.service.ts existe
-              pero sin controller, ver CLAUDE.md) — se muestra un placeholder
-              en vez de inventar un número. Gateado por score:ver aunque hoy
-              sea solo texto — para no dejarlo sin permiso el día que se
-              conecte a datos reales. */}
+          {/* Score digital real (GET brands/:id/score) — antes placeholder
+              hardcodeado pese a que el endpoint ya existía y funcionaba
+              (analytics-front ya lo usa, ver ScoreExplanationPanel). */}
           {can('score', 'ver') && (
             <Box sx={{ textAlign: 'center', minWidth: 140 }}>
-              <Typography variant="body2" color="text.secondary">Score Digital</Typography>
-              <Typography variant="caption" color="text.secondary">Aún no disponible</Typography>
+              {isLoadingScore && !score ? (
+                <Skeleton variant="circular" width={90} height={90} sx={{ mx: 'auto' }} />
+              ) : score ? (
+                <ScoreGauge score={score.score} classification={score.classification} />
+              ) : (
+                <>
+                  <Typography variant="body2" color="text.secondary">Score Digital</Typography>
+                  <Typography variant="caption" color="text.secondary">Aún no disponible</Typography>
+                </>
+              )}
             </Box>
           )}
         </Stack>
@@ -369,10 +418,10 @@ export function ClientSection() {
                 variant="outlined"
                 startIcon={<SyncOutlinedIcon />}
                 onClick={handleSync}
-                disabled={!realBrandId || isSyncing}
+                disabled={!realBrandId || isSyncingAll}
                 sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
               >
-                {isSyncing ? 'Sincronizando…' : 'Sincronizar'}
+                {isSyncingAll ? 'Sincronizando…' : 'Sincronizar'}
               </Button>
             </Stack>
           )}
@@ -474,7 +523,7 @@ export function ClientSection() {
                   >
                     <Box>
                       <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                      <Typography variant="caption" color="text.secondary">{formatDateRange(c.startDate, c.endDate)}</Typography>
                     </Box>
                     <Stack direction="row" gap={1} alignItems="center">
                       {c.cmStatus === 'rechazada' && (
@@ -514,6 +563,35 @@ export function ClientSection() {
         onClose={() => setEditProfileOpen(false)}
         onConfirm={handleEditProfile}
       >
+        <Stack direction="row" alignItems="center" gap={2} sx={{ mb: 2.5 }}>
+          <Box sx={{ position: 'relative' }}>
+            <Avatar
+              src={editLogoUrl || undefined}
+              sx={{ width: 56, height: 56, bgcolor: editColor || '#616161', color: '#fff', fontWeight: 700 }}
+            >
+              {getInitials(editName || 'M').toUpperCase()}
+            </Avatar>
+            <IconButton
+              size="small"
+              onClick={() => logoInputRef.current?.click()}
+              disabled={isUploadingLogo}
+              aria-label="Cambiar logo"
+              sx={{
+                position: 'absolute',
+                bottom: -4,
+                right: -4,
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'primary.light' },
+              }}
+            >
+              {isUploadingLogo ? <CircularProgress size={14} /> : <PhotoCameraOutlinedIcon fontSize="small" />}
+            </IconButton>
+            <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={handleLogoChange} />
+          </Box>
+          <Typography variant="caption" color="text.secondary">Logo de la marca</Typography>
+        </Stack>
         <LabeledField
           label="Nombre"
           placeholder="Nombre visible del perfil"
@@ -543,18 +621,31 @@ export function ClientSection() {
             <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
           ))}
         </LabeledSelect>
-        <LabeledField
-          label="Logo — URL (opcional)"
-          placeholder="https://…"
-          value={editLogoUrl}
-          onChange={(e) => setEditLogoUrl(e.target.value)}
-        />
-        <LabeledField
-          label="Color primario (opcional)"
-          placeholder="#E0A800"
-          value={editColor}
-          onChange={(e) => setEditColor(e.target.value)}
-        />
+        <Box sx={{ mb: 2.5 }}>
+          <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 500, fontSize: 14 }}>
+            Color primario (opcional)
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+            Fondo del avatar mientras no haya logo — se ve reflejado arriba al elegirlo.
+          </Typography>
+          <Stack direction="row" gap={1} alignItems="center">
+            <Box
+              component="input"
+              type="color"
+              value={editColor || '#616161'}
+              onChange={(e) => setEditColor((e.target as HTMLInputElement).value)}
+              sx={{ width: 44, height: 44, p: 0, border: '1px solid', borderColor: 'divider', borderRadius: 2, cursor: 'pointer', bgcolor: 'transparent' }}
+            />
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="#E0A800"
+              value={editColor}
+              onChange={(e) => setEditColor(e.target.value)}
+              sx={{ flex: 1 }}
+            />
+          </Stack>
+        </Box>
       </FormDialog>
 
       <ConfirmDialog

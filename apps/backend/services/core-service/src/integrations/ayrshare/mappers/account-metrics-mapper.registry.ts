@@ -116,3 +116,36 @@ export function getAccountMapperForNetwork(networkCode: string): AccountMetricsM
   }
   return mapper;
 }
+
+// audienceCountry — Instagram/Facebook ya devuelven Record<string,number>
+// (`audienceCountry`, mismo nombre que nuestro campo). TikTok NO: expone
+// `audienceCountries`, un ARRAY `[{percentage, country}]` (confirmado contra
+// documentación oficial de Ayrshare) — se convierte acá a la misma forma
+// Record que ya usa AudienceCountryChart, sin fabricar ningún dato nuevo
+// (percentage real de Ayrshare, solo cambia de forma). X/Twitter no expone
+// demografía en absoluto en este endpoint (confirmado en documentación:
+// "returns profile metadata only") — null real, no un gap.
+export function getAudienceCountryForNetwork(networkCode: string, raw: RawMetricsResponse): Record<string, number> | null {
+  if (networkCode === 'tiktok') {
+    const countries = raw.audienceCountries as { percentage?: number; country?: string }[] | undefined;
+    if (!Array.isArray(countries) || countries.length === 0) return null;
+    const record: Record<string, number> = {};
+    for (const entry of countries) {
+      if (entry?.country && typeof entry.percentage === 'number') record[entry.country] = entry.percentage;
+    }
+    return Object.keys(record).length > 0 ? record : null;
+  }
+  const value = raw.audienceCountry as Record<string, number> | undefined;
+  return value && Object.keys(value).length > 0 ? value : null;
+}
+
+// audienceGenderAge — deliberadamente SIN soporte para TikTok. Ayrshare
+// expone `audienceAges`/`audienceGenders` como 2 arrays PLANOS e
+// INDEPENDIENTES (no un cruce edad×género como sí es `audienceGenderAge` de
+// Instagram) — combinarlos produciría una tabla cruzada inventada (ej.
+// asumir una distribución uniforme entre géneros dentro de cada rango de
+// edad), no un dato real de Ayrshare. Se deja explícitamente sin mapear acá
+// en vez de forzar una equivalencia falsa (regla de la auditoría: "no
+// fuerces equivalencias"). Documentado como pendiente real, no un olvido —
+// para mostrarlo de verdad haría falta un modelo de datos con edad y género
+// como series separadas, no el mismo audienceGenderAge combinado.

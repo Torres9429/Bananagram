@@ -27,7 +27,16 @@ export async function cleanDatabase() {
   await corePrisma.campaignCategory.deleteMany();
   await corePrisma.campaign.deleteMany();
   await corePrisma.media.deleteMany();
+  // Agregado 2026-08-19 (feature de métricas de cuenta): socialAccount.
+  // deleteMany() de abajo rompía por FK contra esta tabla, nunca actualizada
+  // acá cuando se agregó el modelo — bloqueaba el test suite entero.
+  await corePrisma.socialAccountMetricSnapshot.deleteMany();
   await corePrisma.socialAccount.deleteMany();
+  // Mismo gap que socialAccountMetricSnapshot arriba — brandScore/report
+  // nunca se agregaron acá, rompían brand.deleteMany() por FK en cuanto
+  // algún spec o uso real generaba una fila en cualquiera de las 2.
+  await corePrisma.brandScore.deleteMany();
+  await corePrisma.report.deleteMany();
   await corePrisma.brand.deleteMany();
   // UserProfileCategory/Specialty antes que UserProfile (FK) — antes de esta
   // fase se quedaban huérfanas cada vez que cleanDatabase() borraba el User

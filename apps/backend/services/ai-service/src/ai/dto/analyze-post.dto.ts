@@ -10,14 +10,14 @@ import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-valid
 // de pertenencia que ya usa GET /posts/:id en core-service.
 export class AnalyzePostDto {
   @ApiProperty()
-  @IsUUID()
+  @IsUUID(undefined, { message: 'postId debe ser un identificador válido' })
   postId!: string;
 
   @ApiPropertyOptional({ description: 'Instrucción adicional para el análisis (ej. "enfócate en el CTA")' })
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(300)
+  @IsString({ message: 'La instrucción adicional debe ser texto' })
+  @IsNotEmpty({ message: 'La instrucción adicional no puede estar vacía' })
+  @MaxLength(300, { message: 'La instrucción adicional es demasiado larga (máximo 300 caracteres)' })
   additionalContext?: string;
 }

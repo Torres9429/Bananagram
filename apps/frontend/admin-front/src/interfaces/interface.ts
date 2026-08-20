@@ -11,14 +11,6 @@ export interface MockUser {
   lastLogin: string;
 }
 
-export interface MockAuditEntry {
-  id: string;
-  actor: string;
-  action: string;
-  entity: string;
-  createdAt: string;
-}
-
 export interface MockCatalogItem {
   id: string;
   name: string;

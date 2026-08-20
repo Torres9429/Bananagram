@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../node_modules/.prisma-client';
 import { prisma } from '../prisma/client';
+import { getDayOfWeekInTimezone, getHourInTimezone } from '../common/timezone.util';
 
 type LatestMetricRow = {
   postSocialAccountId: string;
@@ -12,6 +13,12 @@ type LatestMetricRow = {
   raw: unknown;
 };
 
+// Mismo criterio que posts.service.ts.snippet() (no exportado ahí, se
+// duplica el helper trivial en vez de exportarlo entre módulos por esto solo).
+function snippet(content: string): string {
+  return content.length > 60 ? `${content.slice(0, 60)}…` : content;
+}
+
 // Campos específicos de red que NUNCA se normalizaron como columna a
 // propósito (docs/backend/auditoria-integracion-ayrshare.md §7: "solo
 // Instagram lo expone de forma clara" para saves, inconsistentes entre
@@ -19,11 +26,32 @@ type LatestMetricRow = {
 // mismo, sin tocar schema ni mappers, defensivo (raw puede no tener el
 // campo — para esa red, o para capturas viejas anteriores a que Ayrshare
 // empezara a mandarlo).
+// Bug real (2026-08-20): PostMetric.raw guarda la respuesta cruda de
+// Ayrshare tal cual (ver ayrshare.service.ts.getAnalytics) — el shape real
+// confirmado en vivo anida savedCount/profileVisitsCount/followsCount
+// DENTRO de raw.analytics, nunca en la raíz de raw (mismo nivel que
+// postUrl/lastUpdated). Esta función solo miraba la raíz, así que
+// "Métricas específicas de la red" salía vacía SIEMPRE aunque el dato sí
+// estuviera guardado — no era una limitación real de Ayrshare, era leer el
+// campo en el lugar equivocado.
 function extractRawField(raw: unknown, key: string): number | null {
   if (!raw || typeof raw !== 'object') return null;
-  const value = (raw as Record<string, unknown>)[key];
+  const root = raw as Record<string, unknown>;
+  const analytics = root.analytics && typeof root.analytics === 'object' ? (root.analytics as Record<string, unknown>) : null;
+  const value = analytics?.[key] ?? root[key];
   const num = typeof value === 'string' ? Number(value) : value;
   return typeof num === 'number' && !Number.isNaN(num) ? num : null;
+}
+
+// reach primero, views si la red no lo expone (mismo criterio que
+// engagement.util.ts) — nunca 0 como denominador si en realidad no hay dato.
+// Extraído acá (auditoría B16): estaba reimplementado de forma independiente
+// 4 veces en este mismo archivo (getPostMetrics, rankPostsByEngagement,
+// buildDailySeries, summarizeNetwork) — mismo cálculo, sin ningún cambio de
+// comportamiento al unificarlo.
+function computeEngagementRate(interactions: number, reach: number, views: number): number | null {
+  const denominator = reach > 0 ? reach : views > 0 ? views : null;
+  return denominator ? Math.round((interactions / denominator) * 10000) / 100 : null;
 }
 
 type NetworkGroup = {
@@ -36,6 +64,11 @@ type TopPost = {
   postId: string;
   network: string;
   date: Date | null;
+  // Agregado 2026-08-20: TopContent/ReachEngagementScatter/PostPerformanceChart
+  // solo mostraban el nombre de la CAMPAÑA — dos publicaciones de la misma
+  // campaña salían con la misma etiqueta, sin forma de distinguir cuál es
+  // cuál (pedido explícito del usuario). Recorte corto del caption real.
+  contentSnippet: string;
   engagementRate: number;
   likes: number;
   comments: number;
@@ -52,12 +85,25 @@ type ContentTypeBreakdown = { type: 'imagen' | 'video' | 'carrusel' | 'sin_media
 // nunca promediar engagementRate entre redes con denominador distinto.
 @Injectable()
 export class CampaignMetricsService {
-  async getCampaignMetrics(campaignId: string) {
+  // range: filtro "Desde/Hasta" del dashboard (auditoría B2) — antes este
+  // endpoint (a diferencia de getMetricsHistory, que sí acepta rango) siempre
+  // devolvía el total acumulado de TODA la campaña sin importar el filtro de
+  // periodo activo, así que 9 widgets lo ignoraban en silencio. Acota por
+  // `publishedAt` de cada Post — no intenta recomputar un "delta" del
+  // acumulado de PostMetric dentro de la ventana (cada captura ya es un
+  // total a esa fecha, no un incremento — igual criterio que
+  // buildDailySeries), solo restringe QUÉ publicaciones entran al resumen.
+  async getCampaignMetrics(campaignId: string, range?: { from?: Date; to?: Date }) {
     const campaign = await prisma.campaign.findFirst({ where: { id: campaignId, deletedAt: null } });
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
 
+    const hasRange = !!(range?.from || range?.to);
     const posts = await prisma.post.findMany({
-      where: { campaignId, deletedAt: null },
+      where: {
+        campaignId,
+        deletedAt: null,
+        ...(hasRange ? { publishedAt: { gte: range?.from, lte: range?.to } } : {}),
+      },
       include: {
         socialAccounts: { include: { socialAccount: { include: { socialNetwork: true } } } },
         media: { include: { media: true } },
@@ -162,7 +208,6 @@ export class CampaignMetricsService {
       const views = metric?.views ?? 0;
       const reach = metric?.reach ?? 0;
       const interactions = likes + comments + shares;
-      const denominator = reach > 0 ? reach : views > 0 ? views : null;
       return {
         networkCode: delivery.socialAccount.socialNetwork.code,
         networkName: delivery.socialAccount.socialNetwork.name,
@@ -174,7 +219,7 @@ export class CampaignMetricsService {
         views,
         reach,
         interactions,
-        engagementRate: denominator ? Math.round((interactions / denominator) * 100 * 100) / 100 : null,
+        engagementRate: computeEngagementRate(interactions, reach, views),
       };
     });
 
@@ -194,13 +239,13 @@ export class CampaignMetricsService {
   // getCampaignMetrics() de arriba descarta ese historial a propósito
   // (DISTINCT ON = solo la última captura). Aquí es al revés: se necesita
   // TODO el historial, agrupado por día.
-  async getMetricsHistory(campaignId: string, from?: Date, to?: Date) {
+  async getMetricsHistory(campaignId: string, from?: Date, to?: Date, networkCode?: string) {
     const campaign = await prisma.campaign.findFirst({ where: { id: campaignId, deletedAt: null } });
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
 
     const rangeEnd = to ?? new Date();
-    const series = await this.buildDailySeries(campaignId, from, rangeEnd);
-    const heatmap = await this.buildPostingHeatmap(campaignId);
+    const series = await this.buildDailySeries(campaignId, from, rangeEnd, networkCode);
+    const heatmap = await this.buildPostingHeatmap(campaignId, networkCode);
 
     return { campaignId, series, heatmap };
   }
@@ -212,10 +257,21 @@ export class CampaignMetricsService {
   // recorre en JS (no otra query $queryRaw por día) porque el volumen de
   // este proyecto no lo justifica — mismo criterio que ya usa
   // getCampaignMetrics para el resto de los cálculos.
-  private async buildDailySeries(campaignId: string, from: Date | undefined, rangeEnd: Date) {
+  // networkCode agregado 2026-08-20 (bug real reportado en vivo): esta
+  // función ignoraba por completo el filtro de red — EngagementChart/
+  // TrendAnalysis mostraban la serie de TODA la campaña (todas las redes
+  // mezcladas) sin importar qué tab de red estuviera activa, así que una
+  // campaña sin ninguna publicación en la red seleccionada igual aparecía
+  // con datos (los de sus OTRAS redes). getMetricsHistory ya recibía
+  // networkCode del controller y lo usaba para el heatmap, pero nunca lo
+  // pasaba para acá.
+  private async buildDailySeries(campaignId: string, from: Date | undefined, rangeEnd: Date, networkCode?: string) {
     const rows = await prisma.postMetric.findMany({
       where: {
-        postSocialAccount: { post: { campaignId, deletedAt: null } },
+        postSocialAccount: {
+          post: { campaignId, deletedAt: null },
+          ...(networkCode ? { socialAccount: { socialNetwork: { code: networkCode } } } : {}),
+        },
         capturedAt: { lte: rangeEnd },
       },
       select: { postSocialAccountId: true, likes: true, comments: true, shares: true, views: true, reach: true, capturedAt: true },
@@ -257,8 +313,7 @@ export class CampaignMetricsService {
         totals.reach += row.reach ?? 0;
       }
       const interactions = totals.likes + totals.comments + totals.shares;
-      const denominator = totals.reach > 0 ? totals.reach : totals.views > 0 ? totals.views : null;
-      const engagementRate = denominator ? Math.round((interactions / denominator) * 10000) / 100 : null;
+      const engagementRate = computeEngagementRate(interactions, totals.reach, totals.views);
 
       series.push({ date: day.toISOString().slice(0, 10), ...totals, interactions, engagementRate });
     }
@@ -271,14 +326,27 @@ export class CampaignMetricsService {
   // la ÚLTIMA captura de cada entrega (no la serie diaria) — la pregunta es
   // "qué tan bien funcionan los posts publicados a esta hora", no cómo
   // evolucionó cada uno con el tiempo.
-  private async buildPostingHeatmap(campaignId: string) {
+  // networkCode: filtro de la tab de red (Instagram/Facebook/TikTok/X) —
+  // antes este heatmap solo existía en General, agregado entre TODAS las
+  // redes, así que una campaña publicada solo en 2 de 4 redes conectadas no
+  // tenía forma de ver "¿a qué hora funciona mejor ESTA red en particular?".
+  private async buildPostingHeatmap(campaignId: string, networkCode?: string) {
+    // timezone de la marca dueña de esta campaña (auditoría B18) — antes
+    // usaba UTC fijo, mientras score.service.ts usaba hora local del
+    // servidor para el mismo concepto ("¿a qué hora se publicó esto?"),
+    // criterios inconsistentes dentro del mismo pipeline de métricas.
+    const campaign = await prisma.campaign.findFirst({ where: { id: campaignId }, select: { brand: { select: { timezone: true } } } });
+    const timezone = campaign?.brand.timezone ?? null;
+
     const posts = await prisma.post.findMany({
       where: { campaignId, deletedAt: null, publishedAt: { not: null } },
-      include: { socialAccounts: true },
+      include: { socialAccounts: { include: { socialAccount: { include: { socialNetwork: true } } } } },
     });
 
     const deliveries = posts.flatMap((post) =>
-      post.socialAccounts.map((delivery) => ({ id: delivery.id, publishedAt: post.publishedAt! })),
+      post.socialAccounts
+        .filter((delivery) => !networkCode || delivery.socialAccount.socialNetwork.code === networkCode)
+        .map((delivery) => ({ id: delivery.id, publishedAt: post.publishedAt! })),
     );
     const latestMetrics = await this.getLatestMetrics(deliveries.map((delivery) => delivery.id));
     const metricsByDeliveryId = new Map(latestMetrics.map((metric) => [metric.postSocialAccountId, metric]));
@@ -287,8 +355,8 @@ export class CampaignMetricsService {
     for (const delivery of deliveries) {
       const metric = metricsByDeliveryId.get(delivery.id);
       const interactions = (metric?.likes ?? 0) + (metric?.comments ?? 0) + (metric?.shares ?? 0);
-      const dayOfWeek = delivery.publishedAt.getUTCDay();
-      const hour = delivery.publishedAt.getUTCHours();
+      const dayOfWeek = getDayOfWeekInTimezone(delivery.publishedAt, timezone);
+      const hour = getHourInTimezone(delivery.publishedAt, timezone);
       const key = `${dayOfWeek}-${hour}`;
       const bucket = buckets.get(key) ?? { dayOfWeek, hour, interactions: 0, posts: 0 };
       bucket.interactions += interactions;
@@ -307,7 +375,7 @@ export class CampaignMetricsService {
   private rankPostsByEngagement(
     deliveries: Array<{ id: string; postId: string; socialAccount: { socialNetwork: { code: string } } }>,
     metricsByDeliveryId: Map<string, LatestMetricRow>,
-    postById: Map<string, { publishedAt: Date | null }>,
+    postById: Map<string, { publishedAt: Date | null; content: string }>,
   ): TopPost[] {
     const ranked: TopPost[] = [];
     for (const delivery of deliveries) {
@@ -315,14 +383,16 @@ export class CampaignMetricsService {
       if (!metric) continue;
 
       const interactions = (metric.likes ?? 0) + (metric.comments ?? 0) + (metric.shares ?? 0);
-      const denominator = (metric.reach ?? 0) > 0 ? metric.reach! : (metric.views ?? 0) > 0 ? metric.views! : null;
-      if (!denominator) continue;
+      const engagementRate = computeEngagementRate(interactions, metric.reach ?? 0, metric.views ?? 0);
+      if (engagementRate === null) continue;
 
+      const post = postById.get(delivery.postId);
       ranked.push({
         postId: delivery.postId,
         network: delivery.socialAccount.socialNetwork.code,
-        date: postById.get(delivery.postId)?.publishedAt ?? null,
-        engagementRate: Math.round((interactions / denominator) * 100 * 100) / 100,
+        date: post?.publishedAt ?? null,
+        contentSnippet: snippet(post?.content ?? ''),
+        engagementRate,
         likes: metric.likes ?? 0,
         comments: metric.comments ?? 0,
         shares: metric.shares ?? 0,
@@ -383,11 +453,7 @@ export class CampaignMetricsService {
     const views = this.sum(metrics, 'views');
     const reach = this.sum(metrics, 'reach');
     const interactions = likes + comments + shares;
-
-    // reach primero, views si la red no lo expone (mismo criterio que
-    // engagement.util.ts) — nunca 0 como denominador si en realidad no hay dato.
-    const denominator = reach > 0 ? reach : views > 0 ? views : null;
-    const engagementRate = denominator ? Math.round((interactions / denominator) * 100 * 100) / 100 : null;
+    const engagementRate = computeEngagementRate(interactions, reach, views);
 
     return {
       networkCode: group.networkCode,
@@ -453,7 +519,7 @@ export class CampaignMetricsService {
           "postSocialAccountId", likes, comments, shares, views, reach, raw
         FROM post_metrics
         WHERE "postSocialAccountId" IN (${Prisma.join(postSocialAccountIds)})
-        ORDER BY "postSocialAccountId", "capturedAt" DESC
+        ORDER BY "postSocialAccountId", "capturedAt" DESC, "id" DESC
       `,
     );
   }

@@ -5,7 +5,7 @@ import { prisma } from '../../prisma/client';
 import { getAyrshareConfig, getAyrshareErrorMessage } from '../../brands/ayrshare.util';
 import { computeEngagement } from './engagement.util';
 import { getMapperForNetwork } from './mappers/mapper.registry';
-import { getAccountMapperForNetwork } from './mappers/account-metrics-mapper.registry';
+import { getAccountMapperForNetwork, getAudienceCountryForNetwork } from './mappers/account-metrics-mapper.registry';
 import {
   AccountMetrics,
   AnalyticsContext,
@@ -58,9 +58,13 @@ type AyrsharePublishResponse = {
 // no aquí. audienceGenderAge/audienceCountry confirmados contra la doc
 // oficial + una llamada real (con `quarters` en el body, sin eso Ayrshare ni
 // intenta calcularlos) — en Instagram salieron ausentes porque exige ≥100
-// interacciones en 30 días para liberarlos; en TikTok vienen en un shape de
-// array (audienceAges/audienceCountries), no como Record — no mapeado
-// todavía, queda pendiente como hallazgo aparte.
+// interacciones en 30 días para liberarlos. TikTok expone el equivalente de
+// audienceCountry como array (`audienceCountries`) — ya mapeado a Record vía
+// getAudienceCountryForNetwork (mappers/account-metrics-mapper.registry.ts).
+// audienceGenderAge NO tiene equivalente real en TikTok (llegan
+// audienceAges/audienceGenders como 2 arrays separados, no un cruce
+// edad×género) — se deja sin mapear a propósito, ver comentario en ese mismo
+// archivo.
 type AyrshareAccountAnalyticsResponse = Record<
   string,
   {
@@ -349,27 +353,44 @@ export class AyrshareService implements SocialProvider {
     const mapper = getAccountMapperForNetwork(networkCode);
     const mapped = mapper(analytics);
 
-    // Facebook-específico (2026-08-19): /analytics/social acota por
-    // `quarters` (ver body del fetch de arriba) — para Facebook eso deja
-    // `reactions`/`pageMediaView` casi en 0 cuando las publicaciones reales
-    // son más viejas que esa ventana (confirmado en vivo: reactions.total=0
-    // ahí mismo, mientras /history/facebook mostró 33 posts reales con 189
-    // likes/3 comments/47 shares acumulados desde 2023 — Instagram/TikTok no
-    // tienen este problema porque sus campos de posts/likes ya son acumulados
-    // de toda la cuenta, no acotados por `quarters`). Se enriquece con el
-    // historial completo de posts (fuente única y coherente para Facebook:
-    // todo all-time, no se mezcla con datos acotados por ventana) — si esa
-    // llamada falla, se degrada de vuelta a `mapped` (fetchFacebookHistorySummary
-    // nunca lanza).
+    // Facebook e Instagram: /analytics/social acota `likes`/`comments`/etc.
+    // por `quarters` (ver body del fetch de arriba), y esa ventana es real
+    // del lado de Ayrshare/Meta, no solo del parámetro que mandamos —
+    // confirmado oficialmente para Instagram (likeCount/commentsCount:
+    // ventana de 90 días) y en vivo para Facebook (reactions.total=0 con
+    // `quarters`, mientras /history/facebook mostró 33 posts reales con 189
+    // likes/3 comments/47 shares acumulados desde 2023). TikTok NO tiene este
+    // problema — sus campos son *Total (likeCountTotal, etc.), confirmados
+    // en vivo como lifetime real, no acotados — así que se deja tal cual
+    // viene de `mapped`, sin enriquecer.
+    //
+    // Instagram (2026-08-20, hallazgo real reportado en vivo: "por más que
+    // sincronizo siguen saliendo menos cosas que en la red real"): mismo
+    // enriquecimiento que Facebook, pero SOLO para likes/comments —
+    // confirmado en vivo contra 8 posts reales (incluido un video) que
+    // GET /history/instagram nunca trae shareCount ni viewsCount por post
+    // (esos 2 campos no existen ahí, ni en posts de video) — para esos y
+    // para `posts` (Instagram's `mediaCount` de /analytics/social ya es
+    // lifetime real) se conserva `mapped` tal cual, no se inventan sumando
+    // un campo que no viene en la respuesta.
     const enriched =
       networkCode === 'facebook'
         ? { ...mapped, ...(await this.fetchFacebookHistorySummary(profileKey)) }
-        : mapped;
+        : networkCode === 'instagram'
+          ? { ...mapped, ...(await this.fetchInstagramHistorySummary(profileKey)) }
+          : mapped;
 
     return {
       ...enriched,
+      // audienceGenderAge: sin equivalente real en TikTok (ver comentario en
+      // account-metrics-mapper.registry.ts) — se queda con el read genérico,
+      // que naturalmente da null para esa red porque el campo no existe con
+      // ese nombre en su payload.
       audienceGenderAge: toNullableRecord(analytics.audienceGenderAge),
-      audienceCountry: toNullableRecord(analytics.audienceCountry),
+      // audienceCountry: TikTok SÍ tiene equivalente real, pero como array
+      // (`audienceCountries`) en vez de Record — getAudienceCountryForNetwork
+      // hace esa conversión por red (auditoría K/O).
+      audienceCountry: getAudienceCountryForNetwork(networkCode, analytics),
       source: 'ayrshare',
     };
   }
@@ -378,41 +399,114 @@ export class AyrshareService implements SocialProvider {
   // si Ayrshare falla o cambia de forma, mapped (el baseline de
   // /analytics/social) se usa tal cual, mismo criterio "null > excepción"
   // del resto de este archivo.
+  //
+  // Bug real encontrado en vivo (2026-08-19, reportado por el usuario):
+  // el timeout DEFAULT del circuit breaker (5000ms, ver opossum.factory.ts)
+  // es demasiado ajustado para esta llamada específica — trae hasta 500
+  // posts, más pesada que una consulta típica — y una sola respuesta lenta
+  // de Ayrshare bastaba para que este método devolviera `empty`, que luego
+  // se escribía como snapshot "más reciente" y borraba de la vista el último
+  // dato bueno conocido hasta el siguiente refresh exitoso. Se sube el
+  // timeout a 15s (Ayrshare mismo documenta hasta 500 registros por
+  // request) y se agrega 1 reintento antes de rendirse — reduce la
+  // probabilidad de este falso negativo sin cambiar el comportamiento real
+  // cuando Ayrshare de verdad está caído (después del reintento, sigue
+  // devolviendo `empty`, nunca lanza).
   private async fetchFacebookHistorySummary(
     profileKey: string,
   ): Promise<Pick<AccountMetrics, 'posts' | 'likes' | 'comments' | 'shares' | 'views'>> {
     const { apiKey, baseUrl } = getAyrshareConfig();
     const empty = { posts: null, likes: null, comments: null, shares: null, views: null };
-    try {
-      const breaker = createCircuitBreaker(async () => {
-        const response = await fetch(`${baseUrl}/history/facebook?limit=500`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${apiKey}`, 'Profile-Key': profileKey },
-        });
-        const payload = (await response.json().catch(() => ({}))) as AyrshareHistoryResponse;
-        return { ok: response.ok, payload };
-      });
-      const result = (await breaker.fire()) as { ok: boolean; payload: AyrshareHistoryResponse };
-      if (!result.ok || result.payload.status !== 'success' || !result.payload.posts) {
-        return empty;
+
+    const attempt = async () => {
+      const breaker = createCircuitBreaker(
+        async () => {
+          const response = await fetch(`${baseUrl}/history/facebook?limit=500`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${apiKey}`, 'Profile-Key': profileKey },
+          });
+          const payload = (await response.json().catch(() => ({}))) as AyrshareHistoryResponse;
+          return { ok: response.ok, payload };
+        },
+        { timeout: 15000 },
+      );
+      return (await breaker.fire()) as { ok: boolean; payload: AyrshareHistoryResponse };
+    };
+
+    let result: { ok: boolean; payload: AyrshareHistoryResponse } | null = null;
+    for (let i = 0; i < 2 && !result; i++) {
+      try {
+        result = await attempt();
+      } catch {
+        if (i === 1) return empty;
       }
-      // Sin paginación a propósito: 500 es el límite máximo por request de
-      // Ayrshare y alcanza para el volumen real de este proyecto — si una
-      // cuenta superara 500 publicaciones históricas esto subcontaría en vez
-      // de paginar, limitación conocida y documentada, no resuelta con un
-      // loop todavía (auditoría de métricas, no sobreingeniería para un caso
-      // que no existe hoy en ninguna cuenta real conectada).
-      const posts = result.payload.posts;
-      return {
-        posts: posts.length,
-        likes: posts.reduce((sum, p) => sum + (p.likeCount ?? 0), 0),
-        comments: posts.reduce((sum, p) => sum + (p.commentsCount ?? 0), 0),
-        shares: posts.reduce((sum, p) => sum + (p.sharesCount ?? 0), 0),
-        views: posts.reduce((sum, p) => sum + (p.mediaView ?? 0), 0),
-      };
-    } catch {
+    }
+    if (!result || !result.ok || result.payload.status !== 'success' || !result.payload.posts) {
       return empty;
     }
+
+    // Sin paginación a propósito: 500 es el límite máximo por request de
+    // Ayrshare y alcanza para el volumen real de este proyecto — si una
+    // cuenta superara 500 publicaciones históricas esto subcontaría en vez
+    // de paginar, limitación conocida y documentada, no resuelta con un
+    // loop todavía (auditoría de métricas, no sobreingeniería para un caso
+    // que no existe hoy en ninguna cuenta real conectada).
+    const posts = result.payload.posts;
+    return {
+      posts: posts.length,
+      likes: posts.reduce((sum, p) => sum + (p.likeCount ?? 0), 0),
+      comments: posts.reduce((sum, p) => sum + (p.commentsCount ?? 0), 0),
+      shares: posts.reduce((sum, p) => sum + (p.sharesCount ?? 0), 0),
+      views: posts.reduce((sum, p) => sum + (p.mediaView ?? 0), 0),
+    };
+  }
+
+  // Análogo a fetchFacebookHistorySummary, pero solo para likes/comments —
+  // confirmado en vivo (2026-08-20, 8 posts reales de una cuenta conectada,
+  // incluido un video) que GET /history/instagram nunca trae shareCount ni
+  // viewsCount por post (esos campos no existen en la respuesta para
+  // Instagram, a diferencia de Facebook) — sumar un campo ausente con `?? 0`
+  // habría dado "0 shares/views" siempre, peor que dejar el dato real (aunque
+  // acotado a 90 días) que sí trae /analytics/social para esos 2 campos.
+  // `posts` tampoco se toca: Instagram's `mediaCount` de /analytics/social ya
+  // es lifetime real (a diferencia de likes/comments), re-contar desde el
+  // historial (tope 500) lo subcontaría en una cuenta con más publicaciones.
+  private async fetchInstagramHistorySummary(profileKey: string): Promise<Pick<AccountMetrics, 'likes' | 'comments'>> {
+    const { apiKey, baseUrl } = getAyrshareConfig();
+    const empty = { likes: null, comments: null };
+
+    const attempt = async () => {
+      const breaker = createCircuitBreaker(
+        async () => {
+          const response = await fetch(`${baseUrl}/history/instagram?limit=500`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${apiKey}`, 'Profile-Key': profileKey },
+          });
+          const payload = (await response.json().catch(() => ({}))) as AyrshareHistoryResponse;
+          return { ok: response.ok, payload };
+        },
+        { timeout: 15000 },
+      );
+      return (await breaker.fire()) as { ok: boolean; payload: AyrshareHistoryResponse };
+    };
+
+    let result: { ok: boolean; payload: AyrshareHistoryResponse } | null = null;
+    for (let i = 0; i < 2 && !result; i++) {
+      try {
+        result = await attempt();
+      } catch {
+        if (i === 1) return empty;
+      }
+    }
+    if (!result || !result.ok || result.payload.status !== 'success' || !result.payload.posts) {
+      return empty;
+    }
+
+    const posts = result.payload.posts;
+    return {
+      likes: posts.reduce((sum, p) => sum + (p.likeCount ?? 0), 0),
+      comments: posts.reduce((sum, p) => sum + (p.commentsCount ?? 0), 0),
+    };
   }
 
   // Nunca guarda el body completo de la request/response ni la API key —

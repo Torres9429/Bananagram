@@ -8,17 +8,25 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
+import Skeleton from '@mui/material/Skeleton';
 import { BrandTabs } from '../../../components/BrandTabs';
 import { useGetBrandQuery } from '../../../store/api/brands.api';
 import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
+import { useGetBrandScoreQuery } from '../../../store/api/metrics.api';
 import { CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
+import { formatDateRange } from '@repo/ui/utils';
+import { ScoreGauge, usePermissions } from '@repo/ui/ui';
 
 export default function BrandOverviewPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { can } = usePermissions();
   const { data: brand } = useGetBrandQuery(params.id);
   const { data: allCampaigns = [] } = useListCampaignsQuery();
   const campaigns = brand ? allCampaigns.filter((c) => c.brandId === brand.id) : [];
+  const { data: score, isFetching: isLoadingScore } = useGetBrandScoreQuery(brand?.id ?? '', {
+    skip: !brand?.id || !can('score', 'ver'),
+  });
 
   if (!brand) return null;
 
@@ -27,7 +35,7 @@ export default function BrandOverviewPage() {
       <BrandTabs brandId={brand.id} />
       <Box sx={{ p: 3 }}>
         <Stack direction="row" gap={2} alignItems="center" mb={3}>
-          <Avatar sx={{ bgcolor: brand.primaryColor ?? '#E0A800', width: 56, height: 56, fontWeight: 700, fontSize: 18 }}>
+          <Avatar src={brand.logoUrl ?? undefined} sx={{ bgcolor: brand.primaryColor ?? '#E0A800', width: 56, height: 56, fontWeight: 700, fontSize: 18 }}>
             {brand.name.slice(0, 2).toUpperCase()}
           </Avatar>
           <Box>
@@ -40,10 +48,15 @@ export default function BrandOverviewPage() {
           <Grid item xs={12} md={4}>
             <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, height: '100%' }}>
               <Typography variant="subtitle2" color="text.secondary" mb={1}>Score Digital</Typography>
-              {/* No hay endpoint HTTP para el score todavía (score.service.ts
-                  existe en core-service, sin controller) — no se inventa un
-                  valor, se deja como pendiente explícito. */}
-              <Typography variant="body2" color="text.secondary">Próximamente — el cálculo de score aún no está expuesto por el backend.</Typography>
+              {!can('score', 'ver') ? (
+                <Typography variant="body2" color="text.secondary">Sin permiso para ver el score.</Typography>
+              ) : isLoadingScore && !score ? (
+                <Skeleton variant="circular" width={90} height={90} sx={{ mx: 'auto' }} />
+              ) : score ? (
+                <ScoreGauge score={score.score} classification={score.classification} />
+              ) : (
+                <Typography variant="body2" color="text.secondary">Aún no disponible.</Typography>
+              )}
             </Paper>
           </Grid>
           <Grid item xs={12} md={8}>
@@ -68,7 +81,7 @@ export default function BrandOverviewPage() {
                       >
                         <Box>
                           <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                          <Typography variant="caption" color="text.secondary">{formatDateRange(c.startDate, c.endDate)}</Typography>
                         </Box>
                         <Stack direction="row" gap={1} alignItems="center">
                           {c.cmStatus === 'rechazada' && (

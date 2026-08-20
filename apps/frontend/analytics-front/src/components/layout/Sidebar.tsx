@@ -11,6 +11,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import MicOutlinedIcon from '@mui/icons-material/MicOutlined';
 import { SidebarNav, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { AppRole, AppModule, AppAction } from '@repo/ui/types';
@@ -29,11 +30,24 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // (landings distintos) — la exclusividad se resuelve por el permiso real
   // de marcas más abajo (hasProfileAccess), no por nombre de rol.
   { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
-  // requirePermission: marcas:crear/editar es el permiso real que distingue
-  // "puede poseer/gestionar una marca" — no un proxy de rol; cualquier rol
-  // futuro con ese permiso otorgado ve este ítem, sin tocar código.
-  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.CREATE }, { module: AppModule.BRANDS, action: AppAction.EDIT }] },
-  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }] },
+  // Sin requirePermission a propósito (antes: marcas:crear/editar, sacaba a
+  // CM/Diseñador de este arreglo en permissionVisible ANTES de que
+  // roleAdjusted pudiera re-incluirlos — bug real, "Mi perfil" seguía sin
+  // aparecer pese a que roleAdjusted ya decía `return true`) — la
+  // visibilidad real la decide roleAdjusted más abajo, no este campo.
+  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon /> },
+  // Faltaba en esta zona (solo estaba en brands-front/posts-front/web-shell)
+  // — Cliente/Diseñador lo perdían al navegar a Métricas (hallazgo real,
+  // reportado en vivo). Alexa Skill no tiene módulo propio en el catálogo de
+  // permisos (no existe ningún `alexa:*` real) — el gate es de rol, mismo
+  // criterio que las otras 3 zonas y que el propio backend
+  // (auth.service.ts.createLinkCode). No se inventa un permiso nuevo.
+  { key: 'alexa', label: 'Alexa Skill', href: `${BRANDS_FRONT_URL}/profile/alexa`, icon: <MicOutlinedIcon /> },
+  // Antes sin AppAction.VIEW: un rol nuevo de solo lectura (solo
+  // publicaciones:ver, sin crear/aprobar) nunca veía este ítem pese a poder
+  // listar publicaciones de verdad — mismo hallazgo que el resto del punto 8
+  // (auditoría final).
+  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }, { module: AppModule.POST, action: AppAction.VIEW }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.
@@ -62,9 +76,21 @@ export function Sidebar() {
   // identidades: quien puede crear/editar marcas "es dueño de marca", sin
   // importar su rol.
   const hasProfileAccess = can('marcas', 'crear') || can('marcas', 'editar');
+  // "Mi perfil" ya no es exclusiva de hasProfileAccess (antes: solo
+  // Cliente/Admin la veían) — /profile también renderiza contenido real
+  // para CM/Diseñador (StaffProfileSection), y sin este ítem no tenían
+  // ningún camino de navegación para completar su perfil (hallazgo real,
+  // ver brands-front/Sidebar.tsx para el detalle completo).
+  // Alexa Skill sigue siendo la única excepción documentada: no existe
+  // ningún permiso real para Alexa en el catálogo (confirmado en auditoría),
+  // y el propio backend (auth.service.ts.createLinkCode) también autoriza
+  // por rol hardcodeado, no por permiso — generalizar solo aquí crearía un
+  // desfase con el backend real. No se inventa un permiso `alexa:*` nuevo.
+  const canUseAlexaSkill = (user?.roles ?? []).some((r) => r === AppRole.CLIENTE || r === AppRole.DISENADOR);
   const roleAdjusted = permissionVisible.filter((item) => {
     if (item.key === 'my-campaigns') return !hasProfileAccess;
-    if (item.key === 'my-brand') return hasProfileAccess;
+    if (item.key === 'my-brand') return true;
+    if (item.key === 'alexa') return canUseAlexaSkill;
     return true;
   });
   // Ajuste de UX (no de permisos): Admin no debe operar como usuario de negocio

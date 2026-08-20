@@ -5,11 +5,12 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
-import { EmptyState, ScoreGauge } from '@repo/ui/ui';
+import Skeleton from '@mui/material/Skeleton';
+import { EmptyState, ScoreGauge, ChartTitle } from '@repo/ui/ui';
 import { useGetBrandScoreQuery } from '../../store/api/analytics.api';
 import { totalsByNetwork } from '../../lib/analytics/real-metrics';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useFilteredCampaignsResult } from './useFilteredCampaigns';
 import { useNetworkCodesFilter } from './useNetworkCodesFilter';
 import { useActiveBrandId } from './useActiveBrandId';
 
@@ -22,10 +23,20 @@ import { useActiveBrandId } from './useActiveBrandId';
  * marca, no hay atribución por campaña/post en el modelo de datos actual).
  */
 export function ScoreExplanationPanel() {
-  const campaigns = useFilteredCampaigns();
+  const { campaigns } = useFilteredCampaignsResult();
   const networkCodes = useNetworkCodesFilter();
   const brandId = useActiveBrandId();
-  const { data: score } = useGetBrandScoreQuery(brandId ?? '', { skip: !brandId });
+  const { data: score, isLoading, isFetching } = useGetBrandScoreQuery(brandId ?? '', { skip: !brandId });
+
+  if ((isLoading || isFetching) && !score) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
+        <Skeleton variant="text" width={180} height={28} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={250} sx={{ borderRadius: 2, mb: 2 }} />
+        <Skeleton variant="text" width="65%" height={22} />
+      </Paper>
+    );
+  }
 
   if (!score) {
     return (
@@ -40,7 +51,11 @@ export function ScoreExplanationPanel() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Score explicado</Typography>
+      <ChartTitle
+        title="Score explicado"
+        description="Cómo se compone tu Score Digital: consistencia, engagement y frecuencia de publicación."
+        info="Score = Consistencia×30% + Engagement×40% + Frecuencia×30%. Cobertura se muestra aparte porque es informativa, no pondera en el cálculo. El score es a nivel de marca, no existe una versión por campaña."
+      />
 
       <Grid container spacing={3} mb={2}>
         <Grid item xs={12} sm={4}>
@@ -51,10 +66,15 @@ export function ScoreExplanationPanel() {
               Frecuencia×0.30, ver modelo.txt) — Cobertura se muestra aparte, nunca en pie de
               igualdad con estos, ver docs/frontend-db-alignment.md §1.4. */}
           <Stack gap={1.5}>
+            {/* "(0-100)" en los 3 — antes solo Engagement lo tenía, y
+                Consistencia/Frecuencia mostraban un número pelado (ej. "73")
+                que se puede leer como cualquier cosa (¿%? ¿cantidad real?) —
+                mismo tipo de confusión ya reportada en el radar de
+                comparación de redes. */}
             {[
-              { label: 'Consistencia', value: score.consistency },
+              { label: 'Consistencia (factor del score, 0-100)', value: score.consistency },
               { label: 'Engagement (factor del score, 0-100)', value: score.engagement },
-              { label: 'Frecuencia', value: score.frequency },
+              { label: 'Frecuencia (factor del score, 0-100)', value: score.frequency },
             ].map((component) => (
               <Stack key={component.label}>
                 <Stack direction="row" justifyContent="space-between">
@@ -79,7 +99,7 @@ export function ScoreExplanationPanel() {
 
       <Stack sx={{ p: 1.5, mb: 3, bgcolor: '#FAFAFA', borderRadius: 2 }}>
         <Stack direction="row" justifyContent="space-between">
-          <Typography variant="caption" color="text.secondary">Cobertura (informativa — no pondera en el score)</Typography>
+          <Typography variant="caption" color="text.secondary">Cobertura (0-100, informativa — no pondera en el score)</Typography>
           <Typography variant="caption" fontWeight={700} color="text.secondary">{Math.round(score.coverage * 10) / 10}</Typography>
         </Stack>
         <LinearProgress

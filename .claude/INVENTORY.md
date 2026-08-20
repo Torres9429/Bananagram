@@ -12,8 +12,12 @@ el árbol de archivos correspondiente.
 **Última actualización**: **2026-08-14, reescritura completa** (la versión anterior estaba fechada
 2026-07-19/08-07 y ya no reflejaba el código — casi todo lo que decía "sigue en mock/stub" ya es real), con
 **addendum puntual el 2026-08-18** (agregado `ai-service`, §1.5-bis, y sus 4 endpoints conectados en
-`posts-front`/`brands-front`, §2.5/§2.6 — el resto del documento no se re-verificó en esta pasada). Si
-el código diverge de lo aquí descrito, confía en el código y actualiza este archivo.
+`posts-front`/`brands-front`, §2.5/§2.6), y **otro addendum puntual el 2026-08-20** (solo las secciones que
+mencionaban `AuditInterceptor`/`admin-front` `/users`/`/roles`/`/audit-log`/`DashboardAdmin`/`auth-front`
+`RegisterForm`/gateway `ALEXA_SERVICE_URL` — todas pasaron de mock/pendiente a reales entre el 08-19 y el
+08-20, y quedaron corregidas; **el resto del documento (posts-front, analytics-front §2.6/§2.7, score,
+métricas, etc.) NO se re-verificó en esta pasada** y puede tener drift propio no relacionado con lo de
+arriba). Si el código diverge de lo aquí descrito, confía en el código y actualiza este archivo.
 
 ---
 
@@ -77,15 +81,23 @@ listado exhaustivo abajo para no tener que asumir nada.
 real conectada al backend. Mapa preciso de qué sigue siendo mock, exhaustivo:
 
 - **`auth-front`**: `LoginForm` **ya es real** (llama a `POST auth/login`, con refresh automático y cookies
-  de sesión reales). `RegisterForm`, `ForgotPasswordForm`, `ResetPasswordForm` (el submit; sí lee `?token=`
-  de verdad) y `ActivateForm` **siguen 100% mock** (JWT sin firmar vía `buildTokenFromUser`/mock-users).
+  de sesión reales). **`RegisterForm` ya es real desde 2026-08-19** (llama a `POST auth/register`, login
+  inmediato con los tokens reales; sin campos de categoría/especialidad — se completan después vía
+  `PATCH me/profile`, ya autenticado — decisión explícita del usuario, no un gap). `ForgotPasswordForm`,
+  `ResetPasswordForm` (el submit; sí lee `?token=` de verdad) y `ActivateForm` **siguen mock/huérfanos** —
+  `ActivateForm` ya no tiene ningún enlace real que lo alcance (el copy de `LoginForm` que apuntaba ahí se
+  quitó, porque el flujo de activación por email ya no corresponde a como `admin/users.controller.ts` crea
+  usuarios hoy).
 - **`admin-front`**: `/catalogs/*` (categorías, especialidades, redes sociales) **ya es real** (RTK Query
-  contra `core-service`). `/users`, `/roles`, `/audit-log` **siguen 100% mock** — ninguno llama al
-  `AdminModule` real de `auth-service` que ya existe (`GET/POST/PATCH/DELETE admin/users`,
-  `admin/roles`, ver §1.3); es un hueco de conexión pendiente, no un hueco de backend.
-- **`web-shell`**: dashboards de Cliente/CM/Diseñador **se eliminaron** (solo queda `DashboardAdmin`, real
-  para el admin). Sus 5 slices `store/api/*.ts` (`ai`, `metrics`, `notifications`, `posts`, `reports`) 
-  siguen vacíos y sin registrar (antes eran 7 — `brands`/`campaigns` se borraron directamente).
+  contra `core-service`). **`/users`, `/roles`, `/audit-log` ya son reales desde 2026-08-19** — los 3
+  llaman al `AdminModule` real de `auth-service` (`GET/POST/PATCH/DELETE admin/users`, `admin/roles`,
+  `GET admin/audit-log`, ver §1.3); `CreateUserDialog` ya usa la mutation real, no `useState` local.
+- **`web-shell`**: dashboards de Cliente/CM/Diseñador **se eliminaron** (solo queda `DashboardAdmin`).
+  **`DashboardAdmin` ya usa datos reales desde 2026-08-19** (antes era `MOCK_ADMIN_DASHBOARD`, incluido un
+  `value={4}` literal hardcodeado en "Roles del sistema") — ahora `useListUsersQuery`/`useListRolesQuery`/
+  `useGetAuditLogQuery`/`catalogsApi`, con gate de permiso por sección. Sus slices `store/api/*.ts` (`ai`,
+  `metrics`, `notifications`, `posts`, `reports`) se eliminaron por completo (estaban vacíos y sin
+  registrar) — ya no existen ni como stub.
 - **`brands-front`**: `/profile`, `/profile/alexa`, `/profile/campaigns`, `/my-campaigns`, `/my-team`,
   `/brands`, `/brands/[id]`, `/brands/[id]/campaigns[/:campaignId[/team]]` son **reales**. `/profile/calendar`,
   `/team` (agregado de solo lectura), y todo el árbol legacy `/brands/[id]/{metrics,score,reports,calendar}`
@@ -156,10 +168,12 @@ están en español, idénticos a los del backend, ver §2.1 y §3).
   en profundidad: cada backend re-verifica).
 - `RedisModule`/`RedisService` — wrapper delgado de `ioredis`, compartido por los 2 middlewares de arriba.
 - `CorrelationIdMiddleware` — genera/propaga `X-Request-Id`.
-- **Bug real posible, sin confirmar en vivo (no se ha probado el perfil `full` de Docker completo)**: el
-  override de `docker-compose.yml` para `api-gateway` fija `AUTH_SERVICE_URL`/`CORE_SERVICE_URL` a los
-  nombres de servicio de la red de compose, pero **no** override-ea `ALEXA_SERVICE_URL` — dentro de un
-  contenedor, `/api/ideas` probablemente falla al no poder resolver `localhost:3004`.
+- **Ya corregido (2026-08-19)**: el override de `docker-compose.yml` para `api-gateway` ahora sí incluye
+  `ALEXA_SERVICE_URL: http://alexa-service:3004` junto a `AUTH_SERVICE_URL`/`CORE_SERVICE_URL`/
+  `AI_SERVICE_URL` — `/api/ideas` resuelve dentro del perfil `full`. Aparte, **bug real de build corregido
+  2026-08-20**: los Dockerfiles que usan `pnpm exec turbo run build` no copiaban `turbo.json` al contexto
+  (fallaba con "Could not find turbo.json"), y `.dockerignore` excluía `apps/frontend` del contexto raíz
+  compartido por backend y frontend — ambos ya se corrigieron, ver `.claude/CLAUDE.md`.
 
 ### 1.2 `apps/backend/commons/` — paquete workspace real desde el 2026-08-16 (`c867e24`)
 
@@ -196,11 +210,15 @@ Qué exporta `src/index.ts` y quién lo usa de verdad:
   registra como filtro global. Exportado, no usado — mismo estado funcional que antes de la migración,
   solo que ahora vive en el paquete real en vez de en el directorio huérfano.
 - `interceptors/logging.interceptor.ts` — ídem: migrado a `src/`, **sigue sin uso** en ningún `main.ts`.
-- `interceptors/audit.interceptor.ts` — **no se migró**. El archivo original con el
-  `// TODO: escribir en audit_log` se quedó atrás en `apps/backend/commons/interceptors/audit.interceptor.ts`
-  (fuera de `src/`, no cubierto por el `tsconfig.json` del paquete, no exportado desde `index.ts`) —
-  literalmente huérfano ahora, ni siquiera compila como parte de `@repo/backend-commons`. El TODO en sí
-  sigue sin implementarse en ningún lado del sistema, no solo aquí.
+- `interceptors/audit.interceptor.ts` — **implementado y registrado desde 2026-08-19** (el stub huérfano
+  descrito antes en `apps/backend/commons/interceptors/` — fuera de `src/`, sin exportar — se eliminó).
+  Vive en `src/interceptors/`, exportado desde `index.ts`, registrado vía
+  `app.useGlobalInterceptors(new AuditInterceptor(writeAuditEntry))` en `auth-service`/`core-service`
+  (no `alexa-service`/`ai-service` — ninguno de los 2 es dueño de una tabla `AuditLog`). Audita todo método
+  mutante, redacta `password/token/secret/apikey/privatekey` antes de guardar, y desde 2026-08-20
+  `performedBy` es `req.user?.email` (antes `req.user?.sub`, UUID crudo) con fallback a decodificar el
+  `email` del `accessToken` recién emitido para login/register/refresh (antes `'anonymous'` fijo siempre en
+  esas 3 rutas). Nuevo endpoint de lectura: `GET admin/audit-log` (`auth-service`, `usuarios:ver`).
 - `circuit-breaker/opossum.factory.ts` — migrado con el fix de import CommonJS que antes solo tenía la
   copia local de `core-service` (`import CircuitBreaker = require('opossum')`, porque `opossum` es CJS
   puro y `import ... from 'opossum'` compila con `tsc --noEmit` pero crashea en runtime). La copia local
@@ -860,8 +878,10 @@ proyecto.
 - `app/page.tsx` — igual que antes (lee cookie, redirige server-side), pero decodifica `payload.roles[]`
   (array), no un rol singular.
 - **`components/dashboard/` — se redujo**: `DashboardCliente`/`DashboardCM`/`DashboardDisenador` (que
-  existían sin usarse) **se borraron**, junto con su mock data. Solo queda `DashboardAdmin` (real, la única
-  ruta wireada).
+  existían sin usarse) **se borraron**, junto con su mock data. Solo queda `DashboardAdmin` — desde
+  2026-08-19 con datos reales (`useListUsersQuery`/`useListRolesQuery`/`useGetAuditLogQuery`/`catalogsApi`,
+  gate de permiso por sección; antes era `MOCK_ADMIN_DASHBOARD`, con un `value={4}` literal hardcodeado en
+  "Roles del sistema").
 - `components/layout/Sidebar.tsx` — **ítem "Team" confirmado eliminado** (sin `GroupIcon` huérfano). Ítems
   actuales: `dashboard`, `my-campaigns`, `my-brand`, `posts`, `brands` (legacy), `calendar`, `metrics`,
   `admin`.
@@ -878,9 +898,9 @@ proyecto.
   `CatalogList.tsx`/`SocialNetworkForm.tsx` llaman `useListCategoriesQuery`/`useCreateCategoryMutation`/etc.
   de `@repo/ui/state` (`catalogsApi`), CRUD contra `core-service` de verdad. Contradice versiones previas
   ("sigue usando el componente genérico mock").
-- **`/users`, `/roles`, `/audit-log` — siguen 100% mock**, pese a que el backend real ya existe
-  (`AdminModule` en `auth-service`, ver §1.3) — es un hueco de conexión frontend, no de backend.
-  `CreateUserDialog` sigue escribiendo a `useState` local.
+- **`/users`, `/roles`, `/audit-log` — ya son reales desde 2026-08-19** — los 3 llaman al `AdminModule`
+  real de `auth-service` (`GET/POST/PATCH/DELETE admin/users`, `admin/roles`, `GET admin/audit-log`, ver
+  §1.3). `CreateUserDialog` ya usa la mutation real, no `useState` local.
 - `store/index.ts` registra `authReducer`, `authApi`, `catalogsApi`, `notificationsApi` — RTK Query real en
   uso (no "sin RTK Query local" como decían versiones previas — sí usa slices compartidos con datos reales).
 - **`middleware.ts` real** (mismo patrón que web-shell, ver §2.1).
@@ -894,10 +914,17 @@ proyecto.
   (`admin@bananagram.mx`... **nota**: ese string literal en el código sigue diciendo `admin@bananagram.mx`,
   que ya no es el email real del seed — es `20233tn102@utez.edu.mx`, ver §1.7 — vale la pena corregirlo si
   se toca este archivo).
-- **`RegisterForm`, `ForgotPasswordForm` (el submit), `ActivateForm` — siguen 100% mock** (JWT sin firmar
-  vía `findUserByEmail`/`buildTokenFromUser`). `ForgotPasswordForm` tiene el comentario explícito "Diseño
-  sin backend: no se consume ninguna API todavía", pese a que `useForgotPasswordMutation` ya existe y
-  apunta a un endpoint real.
+- **`RegisterForm` ya es real desde 2026-08-19** — llama a `POST auth/register` (`useRegisterMutation`,
+  antes tipado `void` pese a que el backend devuelve tokens reales), login inmediato con los tokens que
+  devuelve. Sin campos de categoría/especialidad (el catálogo real solo es accesible ya autenticado,
+  `catalogos:ver` — se completan después vía `PATCH me/profile`, decisión explícita del usuario). Selector
+  de rol simple (Cliente/CM/Diseñador) mapeado a los `roleName` cortos que espera `RegisterDto`.
+  `ForgotPasswordForm` (el submit), `ActivateForm` — **siguen mock/huérfanos**: `ForgotPasswordForm` tiene
+  el comentario explícito "Diseño sin backend: no se consume ninguna API todavía", pese a que
+  `useForgotPasswordMutation` ya existe y apunta a un endpoint real. `ActivateForm` ya no tiene ningún
+  enlace real que lo alcance — el copy de `LoginForm` que apuntaba ahí ("¿Eres CM o Diseñador? Activa tu
+  cuenta...") se quitó, porque ese flujo ya no corresponde a como `admin/users.controller.ts` crea usuarios
+  hoy (activos de inmediato, sin activación por email).
 - `ResetPasswordForm` — sí lee `?token=` real de la URL (`useSearchParams`), pero el submit sigue siendo
   solo local.
 - Sin `middleware.ts` (correcto — es el destino de login). `store/index.ts` sin cambios (solo

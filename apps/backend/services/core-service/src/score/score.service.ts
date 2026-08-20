@@ -1,7 +1,9 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../node_modules/.prisma-client';
+import { Role } from '@repo/backend-commons';
 import { prisma } from '../prisma/client';
 import { userHasBrandRelation } from '../guards/brand-relation.util';
+import { getHourInTimezone } from '../common/timezone.util';
 
 type LatestEngagement = { postSocialAccountId: string; engagement: number | null };
 type CurrentUser = { sub: string; roles: string[] };
@@ -19,7 +21,7 @@ export class ScoreService {
   // aunque el permiso estuviera concedido — bug real ya confirmado en el
   // seed, que sí le da `score:ver` a community_manager).
   async assertIsBrandOwnerOrAdmin(brandId: string, user: CurrentUser): Promise<void> {
-    if (user.roles.includes('administrador')) return;
+    if (user.roles.includes(Role.ADMINISTRADOR)) return;
     const brand = await prisma.brand.findFirst({ where: { id: brandId, deletedAt: null }, select: { ownerId: true } });
     if (!brand) throw new NotFoundException(`Brand ${brandId} no existe`);
     if (!(await userHasBrandRelation(brandId, brand.ownerId, user.sub))) {
@@ -58,6 +60,11 @@ export class ScoreService {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
+    // timezone de la marca (auditoría B11) — antes "horario pico" se
+    // calculaba con la hora LOCAL DEL SERVIDOR (Date.getHours()), sin
+    // importar en qué zona horaria estuviera realmente la marca.
+    const brand = await prisma.brand.findFirst({ where: { id: brandId }, select: { timezone: true } });
+
     // Post (Capa 1) ya no es 1:1 con una red — el fan-out multi-red vive en
     // PostSocialAccount (Capa 2), y las métricas cuelgan de ahí (ver
     // docs/base/modelo2.txt). Un post puede publicarse en varias redes.
@@ -68,7 +75,9 @@ export class ScoreService {
 
     // Consistencia (30%): posts en horarios pico / total posts
     const peakHours = [9, 12, 18, 20];
-    const peakPosts = posts.filter(p => p.publishedAt && peakHours.includes(new Date(p.publishedAt).getHours()));
+    const peakPosts = posts.filter(
+      (p) => p.publishedAt && peakHours.includes(getHourInTimezone(new Date(p.publishedAt), brand?.timezone ?? null)),
+    );
     const consistency = posts.length > 0 ? (peakPosts.length / posts.length) * 100 : 0;
 
     // Engagement (40%): promedio de la ÚLTIMA captura por PostSocialAccount,
@@ -114,6 +123,12 @@ export class ScoreService {
 
   // $queryRaw es el único lugar del proyecto donde se justifica SQL nativo
   // (auditoría §22.9) — Prisma no tiene DISTINCT ON nativo en su query builder.
+  // "id" DESC como desempate: sin lock entre el cron y un refresh manual
+  // (ver metrics-cron.service.ts) dos filas podrían compartir el mismo
+  // capturedAt exacto — sin un segundo criterio, Postgres elegiría entre
+  // ellas de forma no determinística. No es "la más reciente" en un sentido
+  // semántico (id es UUID random, no secuencial), pero sí hace la resolución
+  // estable y repetible ante ese empate (auditoría B3/N).
   // Columnas camelCase entre comillas: este schema NO mapea cada campo a
   // snake_case (@@map solo renombra la tabla) — el nombre real de columna
   // es literal "postSocialAccountId"/"capturedAt", no post_social_account_id.
@@ -125,7 +140,7 @@ export class ScoreService {
           "postSocialAccountId", engagement
         FROM post_metrics
         WHERE "postSocialAccountId" IN (${Prisma.join(postSocialAccountIds)})
-        ORDER BY "postSocialAccountId", "capturedAt" DESC
+        ORDER BY "postSocialAccountId", "capturedAt" DESC, "id" DESC
       `,
     );
   }

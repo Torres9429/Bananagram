@@ -10,6 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { PrimaryButton, usePermissions } from '@repo/ui/ui';
+import { formatDateRange } from '@repo/ui/utils';
 import { CreateCampaignDialog } from '../../../components/CreateCampaignDialog';
 import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
 import { useSelectedBrand } from '../../../hooks/useSelectedBrand';
@@ -71,7 +72,7 @@ export default function ProfileCampaignsPage() {
               >
                 <Box>
                   <Typography variant="body1" fontWeight={600}>{c.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                  <Typography variant="caption" color="text.secondary">{formatDateRange(c.startDate, c.endDate)}</Typography>
                 </Box>
                 <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />
               </Stack>

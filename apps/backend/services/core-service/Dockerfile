@@ -12,7 +12,7 @@ WORKDIR /app
 
 # ---- deps: install the full workspace (pnpm needs every package.json to resolve) ----
 FROM base AS deps
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json .npmrc ./
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile

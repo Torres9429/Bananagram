@@ -10,9 +10,11 @@ export * from './decorators/require-permission.decorator';
 export * from './guards/permission.guard';
 export * from './guards/jwt-auth.guard';
 export * from './guards/token-denylist.service';
+export * from './guards/internal-auth.guard';
 
 export * from './filters/http-exception.filter';
 export * from './interceptors/logging.interceptor';
+export * from './interceptors/audit.interceptor';
 export * from './circuit-breaker/opossum.factory';
 
 export * from './types/jwt-payload.type';

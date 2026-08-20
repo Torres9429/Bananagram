@@ -50,19 +50,30 @@ export class CampaignsController {
   // de pertenencia que listCampaigns (server-side, sin reimplementar nada).
   @Get('metrics-summary')
   @RequirePermission('metricas', 'ver')
-  async findAllWithMetrics(@CurrentUser() user: Claims) {
+  async findAllWithMetrics(
+    @CurrentUser() user: Claims,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
     const campaigns = await this.campaigns.listCampaigns(user);
+    const range = from || to ? { from: from ? new Date(from) : undefined, to: to ? new Date(to) : undefined } : undefined;
     return Promise.all(
       campaigns.map(async (campaign: { id: string; name: string; brandId: string }) => {
-        const metrics = await this.campaignMetrics.getCampaignMetrics(campaign.id);
+        const metrics = await this.campaignMetrics.getCampaignMetrics(campaign.id, range);
         return { campaignId: campaign.id, name: campaign.name, brandId: campaign.brandId, ...metrics };
       }),
     );
   }
 
+  // assertCanView agregado (auditoría final, hallazgo real): a diferencia de
+  // cada otra ruta :id de este controller, esta nunca validaba pertenencia —
+  // cualquiera con campanas:ver podía leer cualquier campaña por UUID,
+  // violando el aislamiento multi-tenant por fila (ADR-0001) que el resto
+  // del sistema sí respeta.
   @Get(':id')
   @RequirePermission('campanas', 'ver')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: Claims) {
+    await this.campaigns.assertCanView(id, user);
     return this.campaigns.getCampaign(id);
   }
 
@@ -87,10 +98,11 @@ export class CampaignsController {
     @CurrentUser() user: Claims,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('network') network?: string,
   ) {
     await this.campaigns.getCampaign(id);
     await this.campaigns.assertCanView(id, user);
-    return this.campaignMetrics.getMetricsHistory(id, from ? new Date(from) : undefined, to ? new Date(to) : undefined);
+    return this.campaignMetrics.getMetricsHistory(id, from ? new Date(from) : undefined, to ? new Date(to) : undefined, network);
   }
 
   // Detalle de métricas de UNA publicación puntual de esta campaña — mismo

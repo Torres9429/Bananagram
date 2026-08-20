@@ -64,7 +64,7 @@ export class AuthService {
     try {
       const response = await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_SERVICE_SECRET ?? '' },
         // roleNames en plural: core-service ya soporta multi-rol vía
         // UserProfile.roleNames (String[]) — el registro público solo manda
         // el único rol con el que nace el usuario.
@@ -225,7 +225,9 @@ export class AuthService {
   private async fetchDisplayName(userId: string, fallbackEmail: string): Promise<string> {
     const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
     try {
-      const response = await fetch(`${coreServiceUrl}/api/internal/user-profiles/${userId}`);
+      const response = await fetch(`${coreServiceUrl}/api/internal/user-profiles/${userId}`, {
+        headers: { 'X-Internal-Token': process.env.INTERNAL_SERVICE_SECRET ?? '' },
+      });
       if (!response.ok) return fallbackEmail;
       const profile = (await response.json()) as { name?: string } | null;
       return profile?.name ?? fallbackEmail;

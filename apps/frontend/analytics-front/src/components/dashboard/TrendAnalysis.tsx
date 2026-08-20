@@ -8,6 +8,8 @@ import Typography from '@mui/material/Typography';
 import MenuItem from '@mui/material/MenuItem';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import ToggleButton from '@mui/material/ToggleButton';
+import MuiTooltip from '@mui/material/Tooltip';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
@@ -15,6 +17,7 @@ import { EmptyState, LabeledSelect } from '@repo/ui/ui';
 import { useGetCampaignMetricsHistoryQuery, type CampaignHistoryDay } from '../../store/api/analytics.api';
 import { useDateRangeParams } from './useDateRangeParams';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useSelectedNetwork } from './useSelectedNetwork';
 
 const WINDOWS = [7, 30, 90] as const;
 
@@ -43,12 +46,14 @@ function windowDelta(series: CampaignHistoryDay[], days: number, field: 'reach' 
 export function TrendAnalysis() {
   const campaigns = useFilteredCampaigns();
   const range = useDateRangeParams();
+  const networkCode = useSelectedNetwork();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(30);
   const activeCampaignId = campaignId ?? campaigns[0]?.campaignId ?? null;
 
+  // networkCode agregado 2026-08-20 — mismo bug/fix que EngagementChart.
   const { data: history } = useGetCampaignMetricsHistoryQuery(
-    activeCampaignId ? { campaignId: activeCampaignId, range } : ({} as never),
+    activeCampaignId ? { campaignId: activeCampaignId, range, networkCode: networkCode ?? undefined } : ({} as never),
     { skip: !activeCampaignId },
   );
 
@@ -65,14 +70,27 @@ export function TrendAnalysis() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2}>
-        <Typography variant="subtitle1" fontWeight={700}>Análisis de tendencia</Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={0.5}>
+        <Stack direction="row" alignItems="center" gap={0.5}>
+          <Typography variant="subtitle1" fontWeight={700}>Análisis de tendencia</Typography>
+          <MuiTooltip
+            title="Compara el valor más reciente contra el de hace 7, 30 o 90 días (según el botón elegido). La flecha verde/roja indica si subió o bajó; gris significa cambio menor a 0.5%."
+            arrow
+            placement="top"
+            enterTouchDelay={0}
+          >
+            <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
+          </MuiTooltip>
+        </Stack>
         <ToggleButtonGroup size="small" exclusive value={days} onChange={(_, value) => value && setDays(value)}>
           {WINDOWS.map((w) => (
             <ToggleButton key={w} value={w} sx={{ textTransform: 'none', px: 1.5 }}>{w} días</ToggleButton>
           ))}
         </ToggleButtonGroup>
       </Stack>
+      <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+        Cómo cambió el alcance y las interacciones en los últimos {days} días.
+      </Typography>
       {campaigns.length > 1 && (
         <LabeledSelect label="Campaña" value={activeCampaignId ?? ''} onChange={(e) => setCampaignId((e.target.value as string) || null)} sx={{ mb: 2, maxWidth: 280 }}>
           {campaigns.map((c) => <MenuItem key={c.campaignId} value={c.campaignId}>{c.name}</MenuItem>)}
