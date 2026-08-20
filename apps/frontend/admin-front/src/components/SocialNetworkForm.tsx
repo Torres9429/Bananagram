@@ -83,7 +83,7 @@ export function SocialNetworkForm() {
             </Button>
           )}
         </Stack>
-        <DataTable columns={columns} rows={list} getRowKey={(item) => item.id} emptyMessage={isFetching ? 'Cargando…' : 'Sin redes sociales registradas.'} />
+        <DataTable columns={columns} rows={list} getRowKey={(item) => item.id} isLoading={isFetching} emptyMessage="Sin redes sociales registradas." />
       </Box>
 
       <FormDialog

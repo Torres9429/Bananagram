@@ -102,7 +102,8 @@ export default function UsersPage() {
             getRowKey={(u) => u.id}
             pagination
             initialPageSize={10}
-            emptyMessage={isLoading ? 'Cargando…' : 'No hay usuarios para mostrar.'}
+            isLoading={isLoading}
+            emptyMessage="No hay usuarios para mostrar."
           />
         )}
       </Box>

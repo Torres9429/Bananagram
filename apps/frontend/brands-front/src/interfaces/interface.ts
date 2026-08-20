@@ -1,5 +1,6 @@
 import type { BrandScore, ProfileType, SocialNetworkCode, SocialAccount, SocialNetworkOption } from '@repo/ui/types';
 import type { SidebarNavItem } from '@repo/ui/ui';
+import type { MyUserProfile } from '@repo/ui/state';
 import type { store } from '../store';
 
 export type { ProfileType, SocialNetworkCode };
@@ -166,14 +167,11 @@ export interface CampaignCardProps {
 }
 
 export interface StaffProfileSectionProps {
-  mockProfile: MockAvailableCM | MockAvailableDesigner | null;
+  // null = perfil real todavía no existe (usuario dado de alta por el
+  // Admin, nunca completó nada) — el formulario arranca en blanco.
+  profile: MyUserProfile | null;
   name: string;
   onNameChange: (name: string) => void;
-}
-
-export interface ProfileHeaderProps {
-  name: string;
-  subtitle: string;
 }
 
 // Resuelve el título del TopBar por ruta exacta (no solo por el primer

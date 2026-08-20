@@ -12,6 +12,7 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
+import Skeleton from '@mui/material/Skeleton';
 import { WidgetCard, PrimaryButton, EmptyState, usePermissions } from '@repo/ui/ui';
 import { ZONE_URLS } from '@repo/ui/config';
 import {
@@ -34,9 +35,9 @@ export function DashboardAdmin() {
   const canRoles = can('privilegios', 'ver');
   const canCatalogs = can('catalogos', 'ver');
 
-  const { data: users = [] } = useListUsersQuery(undefined, { skip: !canUsers });
+  const { data: users = [], isLoading: loadingUsers } = useListUsersQuery(undefined, { skip: !canUsers });
   const { data: roles = [] } = useListRolesQuery(undefined, { skip: !canRoles });
-  const { data: auditLog = [] } = useGetAuditLogQuery(10, { skip: !canUsers });
+  const { data: auditLog = [], isLoading: loadingAuditLog } = useGetAuditLogQuery(10, { skip: !canUsers });
   const { data: categories = [] } = useListCategoriesQuery(undefined, { skip: !canCatalogs });
   const { data: specialties = [] } = useListSpecialtiesQuery(undefined, { skip: !canCatalogs });
   const { data: socialNetworks = [] } = useListSocialNetworksQuery(undefined, { skip: !canCatalogs });
@@ -85,6 +86,12 @@ export function DashboardAdmin() {
             </Stack>
             {!canUsers ? (
               <EmptyState title="Sin permiso" description="No tienes permiso para ver usuarios (usuarios:ver)." />
+            ) : loadingUsers ? (
+              <Stack gap={1.5}>
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} variant="rounded" height={36} sx={{ borderRadius: 2 }} />
+                ))}
+              </Stack>
             ) : (
               <Stack gap={1.5}>
                 {byRole.map((r) => (
@@ -136,6 +143,12 @@ export function DashboardAdmin() {
               </Stack>
               {!canUsers ? (
                 <EmptyState title="Sin permiso" description="No tienes permiso para ver la auditoría (usuarios:ver)." />
+              ) : loadingAuditLog ? (
+                <Stack gap={1.5}>
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} variant="rounded" height={40} sx={{ borderRadius: 2 }} />
+                  ))}
+                </Stack>
               ) : auditLog.length === 0 ? (
                 <EmptyState title="Sin actividad reciente" description="Todavía no hay eventos registrados." />
               ) : (

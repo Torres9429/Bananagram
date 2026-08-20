@@ -12,7 +12,7 @@ import { useGetAuditLogQuery, type AuditLogEntry } from '../../store/api/admin.a
 export default function AuditLogPage() {
   const { can } = usePermissions();
   const canView = can('usuarios', 'ver');
-  const { data: entries = [] } = useGetAuditLogQuery(100, { skip: !canView });
+  const { data: entries = [], isLoading } = useGetAuditLogQuery(100, { skip: !canView });
 
   const columns: DataTableColumn<AuditLogEntry>[] = [
     { key: 'createdAt', header: 'Fecha', width: 160, render: (e) => <Typography variant="caption" color="text.secondary">{formatDate(e.createdAt)}</Typography> },
@@ -36,7 +36,7 @@ export default function AuditLogPage() {
         {!canView ? (
           <EmptyState title="Sin permiso" description="No tienes permiso para ver la auditoría (usuarios:ver)." />
         ) : (
-          <DataTable columns={columns} rows={entries} getRowKey={(e) => e.id} pagination initialPageSize={10} emptyMessage="No hay eventos registrados." />
+          <DataTable columns={columns} rows={entries} getRowKey={(e) => e.id} pagination initialPageSize={10} isLoading={isLoading} emptyMessage="No hay eventos registrados." />
         )}
       </Box>
     </Box>

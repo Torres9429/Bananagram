@@ -11,6 +11,7 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Collapse from '@mui/material/Collapse';
 import MenuItem from '@mui/material/MenuItem';
+import Skeleton from '@mui/material/Skeleton';
 import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
@@ -111,7 +112,7 @@ export default function ProfileCalendarPage() {
   const { data: allCampaigns = [] } = useListCampaignsQuery();
   const campaigns = useMemo(() => allCampaigns.filter((c) => c.brandId === brandId), [allCampaigns, brandId]);
 
-  const { data: posts = [] } = useListPostsByBrandQuery(brandId ?? '', { skip: !brandId });
+  const { data: posts = [], isFetching: loadingPosts } = useListPostsByBrandQuery(brandId ?? '', { skip: !brandId });
   const [approvePost] = useApprovePostMutation();
   const [rejectPost] = useRejectPostMutation();
 
@@ -393,7 +394,9 @@ export default function ProfileCalendarPage() {
             </Stack>
           </Stack>
 
-          {filteredEvents.length === 0 ? (
+          {loadingPosts ? (
+            <Skeleton variant="rounded" sx={{ flex: 1, minHeight: 300, borderRadius: 2 }} />
+          ) : filteredEvents.length === 0 ? (
             <Stack alignItems="center" justifyContent="center" sx={{ flex: 1, minHeight: 0 }} gap={1}>
               <EventAvailableOutlinedIcon sx={{ fontSize: 40, color: '#D0D0D0' }} />
               <Typography variant="body2" color="text.secondary">Sin publicaciones para estos filtros.</Typography>

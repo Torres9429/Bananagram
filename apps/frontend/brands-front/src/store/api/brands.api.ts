@@ -62,6 +62,18 @@ export const brandsApi = createApi({
     createConnectUrl: builder.mutation<{ connectUrl: string }, { id: string; allowedSocial?: string[] }>({
       query: ({ id, allowedSocial }) => ({ url: `brands/${id}/connect-url`, method: 'POST', body: { allowedSocial } }),
     }),
+    // No invalida ['Brand'] a propósito: solo sube el archivo y devuelve la
+    // URL de Cloudinary, no toca Brand.logoUrl todavía — el caller la guarda
+    // en estado local y la incluye en el siguiente updateBrand() junto con
+    // el resto del formulario de "Editar perfil" (mismo patrón que
+    // profileApi.uploadAvatar en commons).
+    uploadLogo: builder.mutation<{ logoUrl: string }, { id: string; file: File }>({
+      query: ({ id, file }) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return { url: `brands/${id}/logo`, method: 'POST', body: formData };
+      },
+    }),
   }),
 });
 
@@ -71,4 +83,5 @@ export const {
   useCreateBrandMutation,
   useUpdateBrandMutation,
   useCreateConnectUrlMutation,
+  useUploadLogoMutation,
 } = brandsApi;

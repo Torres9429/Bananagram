@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Skeleton from '@mui/material/Skeleton';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { EmptyState } from '@repo/ui/ui';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
@@ -32,7 +33,7 @@ function countryLabel(code: string): string {
 export function AudienceCountryChart({ networkCode }: { networkCode?: string } = {}) {
   const brandId = useActiveBrandId();
   const range = useDateRangeParams();
-  const { data: history = [] } = useGetBrandMetricsHistoryQuery(brandId ? { brandId, range } : ({} as never), { skip: !brandId });
+  const { data: history = [], isFetching: loadingHistory } = useGetBrandMetricsHistoryQuery(brandId ? { brandId, range } : ({} as never), { skip: !brandId });
 
   const { data, sourceNetwork } = useMemo(() => {
     const scoped = networkCode ? history.filter((p) => p.socialAccount.socialNetwork.code === networkCode) : history;
@@ -46,6 +47,15 @@ export function AudienceCountryChart({ networkCode }: { networkCode?: string } =
   }, [history, networkCode]);
 
   if (!brandId) return null;
+
+  if (loadingHistory) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
+        <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Países principales de la audiencia</Typography>
+        <Skeleton variant="rounded" height={240} sx={{ borderRadius: 2 }} />
+      </Paper>
+    );
+  }
 
   if (data.length === 0) {
     return (

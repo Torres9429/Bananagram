@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import Alert from '@mui/material/Alert';
+import Skeleton from '@mui/material/Skeleton';
 import { LabeledField } from '@repo/ui/ui';
 import { getInitials } from '@repo/ui/utils';
 import { useListEligibleCMsQuery } from '../store/api/campaigns.api';
@@ -27,7 +28,7 @@ interface CmPickerProps {
 // (ej. para resolver el nombre del seleccionado), no hay doble fetch real.
 export function CmPicker({ categoryIds, value, onChange, skip }: CmPickerProps) {
   const [search, setSearch] = useState('');
-  const { data: eligibleCMs = [] } = useListEligibleCMsQuery(categoryIds, { skip });
+  const { data: eligibleCMs = [], isFetching: loadingCMs } = useListEligibleCMsQuery(categoryIds, { skip });
 
   const recommendedCMs = eligibleCMs.slice(0, RECOMMENDED_COUNT);
   const searchResults = search.trim()
@@ -57,6 +58,16 @@ export function CmPicker({ categoryIds, value, onChange, skip }: CmPickerProps) 
         </Avatar>
         <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>{cm.name}</Typography>
         {active && <Chip size="small" label="Seleccionado" sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600, fontSize: 11 }} />}
+      </Stack>
+    );
+  }
+
+  if (loadingCMs) {
+    return (
+      <Stack gap={1}>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} variant="rounded" height={56} sx={{ borderRadius: 2 }} />
+        ))}
       </Stack>
     );
   }

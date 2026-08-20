@@ -93,7 +93,8 @@ export function CatalogList({ title, kind }: CatalogListProps) {
           columns={columns}
           rows={items}
           getRowKey={(item) => item.id}
-          emptyMessage={isFetching ? 'Cargando…' : `Sin elementos en ${title.toLowerCase()}.`}
+          isLoading={isFetching}
+          emptyMessage={`Sin elementos en ${title.toLowerCase()}.`}
         />
       </Box>
 
