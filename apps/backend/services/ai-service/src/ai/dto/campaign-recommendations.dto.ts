@@ -10,35 +10,35 @@ import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min, MaxLength } fro
 export class CampaignRecommendationsDto {
   @ApiProperty()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
+  @IsString({ message: 'El nombre de la campaña debe ser texto' })
+  @IsNotEmpty({ message: 'Indica el nombre de la campaña' })
+  @MaxLength(200, { message: 'El nombre de la campaña es demasiado largo (máximo 200 caracteres)' })
   campaignName!: string;
 
   @ApiProperty()
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'totalPosts debe ser un número entero' })
+  @Min(0, { message: 'totalPosts no puede ser negativo' })
   totalPosts!: number;
 
   @ApiProperty()
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'reach debe ser un número entero' })
+  @Min(0, { message: 'reach no puede ser negativo' })
   reach!: number;
 
   @ApiProperty()
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'interactions debe ser un número entero' })
+  @Min(0, { message: 'interactions no puede ser negativo' })
   interactions!: number;
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
-  @IsNumber()
+  @IsNumber({}, { message: 'engagementRate debe ser un número' })
   engagementRate?: number | null;
 
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsString()
-  @MaxLength(300)
+  @IsString({ message: 'El contexto adicional debe ser texto' })
+  @MaxLength(300, { message: 'El contexto adicional es demasiado largo (máximo 300 caracteres)' })
   additionalContext?: string;
 }

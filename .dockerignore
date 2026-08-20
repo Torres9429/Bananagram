@@ -1,6 +1,11 @@
-# Backend Docker build context = repo root. Keep this list conservative:
-# excluding something the pnpm install / prisma generate / nest build steps
-# need will fail the build, so when in doubt, don't exclude it.
+# Docker build context = repo root for BOTH backend and frontend images (see
+# docker-compose.yml, todos los servicios usan `context: .`) — pnpm/turbo
+# necesitan ver el workspace completo (apps/backend + apps/frontend +
+# packages) para resolver dependencias compartidas (@repo/ui,
+# @repo/backend-commons) sin importar qué Dockerfile se esté corriendo. Keep
+# this list conservative: excluding something the pnpm install / prisma
+# generate / turbo build steps need will fail the build, so when in doubt,
+# don't exclude it.
 
 .git
 
@@ -17,10 +22,7 @@ node_modules
 # tsconfig.build.tsbuildinfo files) — always force a full compile in images.
 **/*.tsbuildinfo
 
-# Frontend apps are out of scope for backend images.
-apps/frontend
-
-# Misc repo housekeeping not needed to build/run the backend.
+# Misc repo housekeeping not needed to build/run any service.
 docs
 .planning
 .claude

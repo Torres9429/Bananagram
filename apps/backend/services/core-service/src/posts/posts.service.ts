@@ -413,16 +413,37 @@ export class PostsService {
       throw new ForbiddenException('No tienes permiso para editar esta publicación');
     }
 
-    return prisma.post.update({
-      where: { id: postId },
-      data: {
-        content: dto.content?.trim(),
-        instructions: dto.instructions?.trim() || undefined,
-      },
-      include: {
-        socialNetworks: { include: { socialNetwork: true } },
-        media: { include: { media: true }, orderBy: { order: 'asc' } },
-      },
+    if (dto.socialNetworkIds?.length) {
+      const validNetworks = await prisma.socialNetwork.findMany({
+        where: { id: { in: dto.socialNetworkIds }, deletedAt: null },
+        select: { id: true },
+      });
+      if (validNetworks.length !== dto.socialNetworkIds.length) {
+        throw new BadRequestException('Una o más redes sociales indicadas no son válidas');
+      }
+    }
+
+    return prisma.$transaction(async (tx) => {
+      if (dto.socialNetworkIds?.length) {
+        // skipDuplicates: agregar solo — una red que el post ya tenía no
+        // rompe con un error de PK duplicada, simplemente se ignora.
+        await tx.postSocialNetwork.createMany({
+          data: dto.socialNetworkIds.map((socialNetworkId) => ({ postId, socialNetworkId })),
+          skipDuplicates: true,
+        });
+      }
+
+      return tx.post.update({
+        where: { id: postId },
+        data: {
+          content: dto.content?.trim(),
+          instructions: dto.instructions?.trim() || undefined,
+        },
+        include: {
+          socialNetworks: { include: { socialNetwork: true } },
+          media: { include: { media: true }, orderBy: { order: 'asc' } },
+        },
+      });
     });
   }
 
@@ -491,11 +512,20 @@ export class PostsService {
   }
 
   async cancelPost(postId: string, user: CurrentUser): Promise<any> {
-    const post = await prisma.post.findFirst({ where: { id: postId, deletedAt: null }, include: { campaign: true } });
+    const post = await prisma.post.findFirst({ where: { id: postId, deletedAt: null }, include: { campaign: true, brand: true } });
     if (!post) {
       throw new NotFoundException('La publicación indicada no existe o fue eliminada');
     }
-    if (!user.roles.includes('administrador') && post.campaign.cmId !== user.sub) {
+    // Faltaba el check de brand.ownerId (auditoría final, hallazgo real): a
+    // diferencia de schedulePost/submitPostForReview/updatePost, este método
+    // solo permitía admin o el CM asignado — el Cliente dueño de la marca
+    // (a quien la UI SÍ le muestra el botón "Cancelar programación") recibía
+    // un 403 real al usarlo. Mismo criterio que schedulePost.
+    if (
+      !user.roles.includes('administrador') &&
+      post.campaign.cmId !== user.sub &&
+      post.brand.ownerId !== user.sub
+    ) {
       throw new ForbiddenException('No tienes permiso para cancelar esta publicación');
     }
 
@@ -703,19 +733,40 @@ export class PostsService {
       throw new ForbiddenException('No tienes permiso para adjuntar recursos a esta publicación');
     }
 
-    const uploadedFiles = [] as Array<{
+    type CloudinaryUpload = {
       public_id?: string;
       secure_url?: string;
       url?: string;
       width?: number;
       height?: number;
       duration?: number;
-    }>;
+    };
+    // Inicializado en [] (no solo declarado): si el throw de más abajo (fallo
+    // de subida) dispara antes de la asignación real, el catch de este mismo
+    // método también hace uploadedFiles.map(...) — sin este default sería
+    // undefined.map() ahí, un crash nuevo en vez de propagar el error real.
+    let uploadedFiles: CloudinaryUpload[] = [];
 
     try {
-      for (const file of files) {
-        uploadedFiles.push(await this.cloudinary.uploadFile(file));
+      // Subidas en paralelo (2026-08-19, antes secuenciales con un for...await)
+      // — con varios archivos o fotos reales de celular, subir uno por uno
+      // sumaba varios segundos por archivo y el request completo terminaba
+      // tardando lo suficiente como para toparse con timeouts (reportado en
+      // vivo). allSettled (no Promise.all directo) para poder seguir
+      // limpiando en Cloudinary los archivos que sí terminaron de subir
+      // aunque otro haya fallado — Promise.all descarta los resultados
+      // exitosos apenas uno rechaza, perdiendo esa info para el catch de abajo.
+      const results = await Promise.allSettled(files.map((file) => this.cloudinary.uploadFile(file)));
+      const firstFailure = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (firstFailure) {
+        await Promise.all(
+          results
+            .filter((r): r is PromiseFulfilledResult<CloudinaryUpload> => r.status === 'fulfilled')
+            .map((r) => r.value.public_id && this.cloudinary.deleteFile(r.value.public_id)),
+        );
+        throw firstFailure.reason;
       }
+      uploadedFiles = (results as PromiseFulfilledResult<CloudinaryUpload>[]).map((r) => r.value);
 
       // Bug real (encontrado en vivo con datos reales, ver contentTypeBreakdown
       // de analytics-front): index + 1 se calculaba solo contra el lote que se

@@ -5,7 +5,7 @@ import { prisma } from '../../prisma/client';
 import { getAyrshareConfig, getAyrshareErrorMessage } from '../../brands/ayrshare.util';
 import { computeEngagement } from './engagement.util';
 import { getMapperForNetwork } from './mappers/mapper.registry';
-import { getAccountMapperForNetwork } from './mappers/account-metrics-mapper.registry';
+import { getAccountMapperForNetwork, getAudienceCountryForNetwork } from './mappers/account-metrics-mapper.registry';
 import {
   AccountMetrics,
   AnalyticsContext,
@@ -58,9 +58,13 @@ type AyrsharePublishResponse = {
 // no aquí. audienceGenderAge/audienceCountry confirmados contra la doc
 // oficial + una llamada real (con `quarters` en el body, sin eso Ayrshare ni
 // intenta calcularlos) — en Instagram salieron ausentes porque exige ≥100
-// interacciones en 30 días para liberarlos; en TikTok vienen en un shape de
-// array (audienceAges/audienceCountries), no como Record — no mapeado
-// todavía, queda pendiente como hallazgo aparte.
+// interacciones en 30 días para liberarlos. TikTok expone el equivalente de
+// audienceCountry como array (`audienceCountries`) — ya mapeado a Record vía
+// getAudienceCountryForNetwork (mappers/account-metrics-mapper.registry.ts).
+// audienceGenderAge NO tiene equivalente real en TikTok (llegan
+// audienceAges/audienceGenders como 2 arrays separados, no un cruce
+// edad×género) — se deja sin mapear a propósito, ver comentario en ese mismo
+// archivo.
 type AyrshareAccountAnalyticsResponse = Record<
   string,
   {
@@ -368,8 +372,15 @@ export class AyrshareService implements SocialProvider {
 
     return {
       ...enriched,
+      // audienceGenderAge: sin equivalente real en TikTok (ver comentario en
+      // account-metrics-mapper.registry.ts) — se queda con el read genérico,
+      // que naturalmente da null para esa red porque el campo no existe con
+      // ese nombre en su payload.
       audienceGenderAge: toNullableRecord(analytics.audienceGenderAge),
-      audienceCountry: toNullableRecord(analytics.audienceCountry),
+      // audienceCountry: TikTok SÍ tiene equivalente real, pero como array
+      // (`audienceCountries`) en vez de Record — getAudienceCountryForNetwork
+      // hace esa conversión por red (auditoría K/O).
+      audienceCountry: getAudienceCountryForNetwork(networkCode, analytics),
       source: 'ayrshare',
     };
   }
@@ -378,41 +389,66 @@ export class AyrshareService implements SocialProvider {
   // si Ayrshare falla o cambia de forma, mapped (el baseline de
   // /analytics/social) se usa tal cual, mismo criterio "null > excepción"
   // del resto de este archivo.
+  //
+  // Bug real encontrado en vivo (2026-08-19, reportado por el usuario):
+  // el timeout DEFAULT del circuit breaker (5000ms, ver opossum.factory.ts)
+  // es demasiado ajustado para esta llamada específica — trae hasta 500
+  // posts, más pesada que una consulta típica — y una sola respuesta lenta
+  // de Ayrshare bastaba para que este método devolviera `empty`, que luego
+  // se escribía como snapshot "más reciente" y borraba de la vista el último
+  // dato bueno conocido hasta el siguiente refresh exitoso. Se sube el
+  // timeout a 15s (Ayrshare mismo documenta hasta 500 registros por
+  // request) y se agrega 1 reintento antes de rendirse — reduce la
+  // probabilidad de este falso negativo sin cambiar el comportamiento real
+  // cuando Ayrshare de verdad está caído (después del reintento, sigue
+  // devolviendo `empty`, nunca lanza).
   private async fetchFacebookHistorySummary(
     profileKey: string,
   ): Promise<Pick<AccountMetrics, 'posts' | 'likes' | 'comments' | 'shares' | 'views'>> {
     const { apiKey, baseUrl } = getAyrshareConfig();
     const empty = { posts: null, likes: null, comments: null, shares: null, views: null };
-    try {
-      const breaker = createCircuitBreaker(async () => {
-        const response = await fetch(`${baseUrl}/history/facebook?limit=500`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${apiKey}`, 'Profile-Key': profileKey },
-        });
-        const payload = (await response.json().catch(() => ({}))) as AyrshareHistoryResponse;
-        return { ok: response.ok, payload };
-      });
-      const result = (await breaker.fire()) as { ok: boolean; payload: AyrshareHistoryResponse };
-      if (!result.ok || result.payload.status !== 'success' || !result.payload.posts) {
-        return empty;
+
+    const attempt = async () => {
+      const breaker = createCircuitBreaker(
+        async () => {
+          const response = await fetch(`${baseUrl}/history/facebook?limit=500`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${apiKey}`, 'Profile-Key': profileKey },
+          });
+          const payload = (await response.json().catch(() => ({}))) as AyrshareHistoryResponse;
+          return { ok: response.ok, payload };
+        },
+        { timeout: 15000 },
+      );
+      return (await breaker.fire()) as { ok: boolean; payload: AyrshareHistoryResponse };
+    };
+
+    let result: { ok: boolean; payload: AyrshareHistoryResponse } | null = null;
+    for (let i = 0; i < 2 && !result; i++) {
+      try {
+        result = await attempt();
+      } catch {
+        if (i === 1) return empty;
       }
-      // Sin paginación a propósito: 500 es el límite máximo por request de
-      // Ayrshare y alcanza para el volumen real de este proyecto — si una
-      // cuenta superara 500 publicaciones históricas esto subcontaría en vez
-      // de paginar, limitación conocida y documentada, no resuelta con un
-      // loop todavía (auditoría de métricas, no sobreingeniería para un caso
-      // que no existe hoy en ninguna cuenta real conectada).
-      const posts = result.payload.posts;
-      return {
-        posts: posts.length,
-        likes: posts.reduce((sum, p) => sum + (p.likeCount ?? 0), 0),
-        comments: posts.reduce((sum, p) => sum + (p.commentsCount ?? 0), 0),
-        shares: posts.reduce((sum, p) => sum + (p.sharesCount ?? 0), 0),
-        views: posts.reduce((sum, p) => sum + (p.mediaView ?? 0), 0),
-      };
-    } catch {
+    }
+    if (!result || !result.ok || result.payload.status !== 'success' || !result.payload.posts) {
       return empty;
     }
+
+    // Sin paginación a propósito: 500 es el límite máximo por request de
+    // Ayrshare y alcanza para el volumen real de este proyecto — si una
+    // cuenta superara 500 publicaciones históricas esto subcontaría en vez
+    // de paginar, limitación conocida y documentada, no resuelta con un
+    // loop todavía (auditoría de métricas, no sobreingeniería para un caso
+    // que no existe hoy en ninguna cuenta real conectada).
+    const posts = result.payload.posts;
+    return {
+      posts: posts.length,
+      likes: posts.reduce((sum, p) => sum + (p.likeCount ?? 0), 0),
+      comments: posts.reduce((sum, p) => sum + (p.commentsCount ?? 0), 0),
+      shares: posts.reduce((sum, p) => sum + (p.sharesCount ?? 0), 0),
+      views: posts.reduce((sum, p) => sum + (p.mediaView ?? 0), 0),
+    };
   }
 
   // Nunca guarda el body completo de la request/response ni la API key —

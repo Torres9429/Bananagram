@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Role } from '@repo/backend-commons';
 import { prisma } from '../prisma/client';
 import { ReportFormat } from '../../node_modules/.prisma-client';
 import { userHasBrandRelation } from '../guards/brand-relation.util';
@@ -12,7 +13,7 @@ type CurrentUser = { sub: string; roles: string[] };
 @Injectable()
 export class ReportsService {
   async listReports(user: CurrentUser): Promise<any> {
-    if (user.roles.includes('administrador')) {
+    if (user.roles.includes(Role.ADMINISTRADOR)) {
       return prisma.report.findMany({ orderBy: { createdAt: 'desc' } });
     }
     return prisma.report.findMany({
@@ -32,7 +33,7 @@ export class ReportsService {
   // con el permiso genérico reportes:ver podía leer el reporte de cualquier
   // marca ajena conociendo o adivinando el id (IDOR).
   async getReport(id: string, user: CurrentUser): Promise<any> {
-    const report = user.roles.includes('administrador')
+    const report = user.roles.includes(Role.ADMINISTRADOR)
       ? await prisma.report.findUnique({ where: { id } })
       : await prisma.report.findFirst({
           where: {
@@ -59,7 +60,7 @@ export class ReportsService {
     const brand = await prisma.brand.findFirst({ where: { id: dto.brandId, deletedAt: null } });
     if (!brand) throw new BadRequestException('brandId inválido');
 
-    if (!user.roles.includes('administrador') && !(await userHasBrandRelation(dto.brandId, brand.ownerId, user.sub))) {
+    if (!user.roles.includes(Role.ADMINISTRADOR) && !(await userHasBrandRelation(dto.brandId, brand.ownerId, user.sub))) {
       throw new ForbiddenException('No tienes relación con esta marca — no puedes solicitar reportes de ella');
     }
 

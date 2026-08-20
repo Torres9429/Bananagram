@@ -8,20 +8,51 @@ const SYNC_WINDOW_HOURS = 5; // < 6h del cron — evita duplicar si corre 2 vece
 @Injectable()
 export class MetricsCronService {
   private readonly logger = new Logger(MetricsCronService.name);
+  // Mutex en memoria — el cron automático (@Cron) y el refresh manual
+  // (POST /campaigns/:id/metrics/refresh) llaman al mismo método sobre la
+  // misma instancia singleton de este servicio, dentro del mismo proceso
+  // (no hay despliegue con múltiples réplicas de core-service en este
+  // proyecto) — un booleano de instancia basta para que nunca corran en
+  // paralelo, sin necesitar Redis ni una columna nueva en BD (auditoría §3,
+  // condición de carrera real entre cron y refresh manual).
+  private isRunning = false;
 
   constructor(@Inject(SOCIAL_PROVIDER) private readonly provider: SocialProvider) {}
 
   @Cron('0 */6 * * *') // cada 6 horas
   async generateMetrics(options?: { campaignId?: string; ignoreRecentWindow?: boolean }) {
+    if (this.isRunning) {
+      this.logger.warn('Ya hay una sincronización de métricas de publicación en curso — se omite esta corrida para evitar duplicados');
+      return { processed: 0, failed: 0, skipped: true };
+    }
+    this.isRunning = true;
+    try {
+      return await this.runSync(options);
+    } finally {
+      this.isRunning = false;
+    }
+  }
+
+  private async runSync(options?: { campaignId?: string; ignoreRecentWindow?: boolean }) {
     const syncRun = await prisma.metricSyncRun.create({ data: { status: 'running' } });
 
     // Capa 2 (PostSocialAccount) es la publicación física por red — las
     // métricas cuelgan de ahí, no de Post directo (ver docs/base/modelo2.txt).
+    //
+    // Bug real (2026-08-20): el corte de 7 días aplicaba también al refresh
+    // manual (ignoreRecentWindow) — una publicación con más de 7 días
+    // quedaba excluida de este findMany para siempre, así que "Actualizar"
+    // nunca volvía a traer sus reacciones nuevas de Facebook por más veces
+    // que se le diera clic. El refresh manual SIEMPRE viene acotado a una
+    // sola campaña (ver campaigns.controller.ts) — es un pedido explícito
+    // del usuario de "quiero el dato más nuevo ahora", así que no debe
+    // heredar el recorte por costo que sí tiene sentido para el cron
+    // automático (@Cron, corre sobre TODO el sistema cada 6h).
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
     const postSocialAccounts = await prisma.postSocialAccount.findMany({
       where: {
         status: 'publicado',
-        publishedAt: { gte: sevenDaysAgo },
+        ...(options?.ignoreRecentWindow ? {} : { publishedAt: { gte: sevenDaysAgo } }),
         // options.campaignId acota el refresh manual (POST
         // /campaigns/:id/metrics/refresh) a una sola campaña — el cron
         // automático de arriba sigue corriendo sobre todo el sistema.
@@ -92,9 +123,14 @@ export class MetricsCronService {
       }
     }
 
+    // 'failed' solo cuando NO se procesó nada de verdad (batch total fallido)
+    // — un fallo parcial sigue siendo 'completed' (la mayoría del trabajo
+    // real sí se hizo), pero ya no queda indistinguible de una corrida 100%
+    // exitosa (auditoría B12: antes siempre quedaba 'completed').
+    const status = failed > 0 && processed === 0 && postSocialAccounts.length > 0 ? 'failed' : 'completed';
     await prisma.metricSyncRun.update({
       where: { id: syncRun.id },
-      data: { finishedAt: new Date(), itemsProcessed: processed, itemsFailed: failed, status: 'completed' },
+      data: { finishedAt: new Date(), itemsProcessed: processed, itemsFailed: failed, status },
     });
 
     this.logger.log(`Métricas sincronizadas: ${processed} ok, ${failed} fallidas de ${postSocialAccounts.length} publicaciones por red`);

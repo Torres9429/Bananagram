@@ -1,13 +1,18 @@
-import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { InternalAuthGuard } from '@repo/backend-commons';
 import { prisma } from '../prisma/client';
 import { UpsertUserProfileDto } from './dto/upsert-user-profile.dto';
 
-// Sin JwtAuthGuard a propósito: es tráfico servicio-a-servicio (auth-service
-// → core-service tras un registro), no de un usuario final con Bearer token.
-// No se expone vía gateway (no hay regla /api/internal/* en su proxy), solo
-// alcanzable en la red interna donde corren los microservicios.
+// Tráfico servicio-a-servicio (auth-service → core-service tras un
+// registro), no de un usuario final con Bearer token — por eso no lleva
+// JwtAuthGuard, sino InternalAuthGuard (secreto compartido por header,
+// X-Internal-Token). No se expone vía gateway (no hay regla /api/internal/*
+// en su proxy), pero eso NO bastaba como protección real: el puerto de este
+// servicio se publica al host, así que sin este guard era alcanzable sin
+// ninguna autenticación desde fuera del contenedor.
 @ApiTags('internal')
+@UseGuards(InternalAuthGuard)
 @Controller('internal/user-profiles')
 export class UserProfilesController {
   // Usado por auth-service al canjear un LinkCode (Alexa Skill) para

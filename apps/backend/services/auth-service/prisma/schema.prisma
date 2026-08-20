@@ -193,7 +193,13 @@ model AccountLinkCode {
 model AuditLog {
   id          BigInt  @id @default(autoincrement())
   tableName   String
-  recordId    String
+  // Nullable (2026-08-19): AuditInterceptor (commons/) ya declaraba
+  // recordId: string | null a propósito — no toda acción mutante tiene un
+  // recordId natural (ej. POST /auth/login no crea/modifica ninguna fila
+  // identificable) — pero el schema lo exigía non-null, así que CADA login
+  // fallaba en silencio al escribir audit_log (atrapado y solo logueado como
+  // WARN, nunca rompía el login en sí, pero el audit trail quedaba vacío).
+  recordId    String?
   action      String
   before      Json?
   after       Json?

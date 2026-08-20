@@ -29,7 +29,7 @@ export class ProfileService {
     const coreServiceUrl = process.env.CORE_SERVICE_URL || 'http://localhost:3002';
     const response = await fetch(`${coreServiceUrl}/api/internal/user-profiles`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_SERVICE_SECRET ?? '' },
       body: JSON.stringify({
         userId: user.sub,
         name: dto.name,
