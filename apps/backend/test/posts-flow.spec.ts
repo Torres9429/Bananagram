@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, UnprocessableEntityException }
 import { randomUUID } from 'crypto';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
-import { CloudinaryService, UploadableFile } from '../services/core-service/src/cloudinary/cloudinary.service';
+import { S3Service, UploadableFile } from '../services/core-service/src/storage/s3.service';
 import { PostsModule } from '../services/core-service/src/posts/posts.module';
 import { PostsService } from '../services/core-service/src/posts/posts.service';
 import { prisma as corePrisma } from '../services/core-service/src/prisma/client';
@@ -27,10 +27,10 @@ describe('Posts Flow Integration', () => {
   const cmClaims = { sub: cmUserId, roles: ['community_manager'] };
   const designerClaims = { sub: designerUserId, roles: ['disenador'] };
   const outsiderClaims = { sub: outsiderUserId, roles: ['cliente'] };
-  const cloudinaryMock = {
+  const storageMock = {
     uploadFile: jest.fn(async (file: UploadableFile) => ({
       public_id: `bananagram/posts/${file.originalname}`,
-      secure_url: `https://res.cloudinary.com/demo/${file.originalname}`,
+      secure_url: `https://bananagram-media-test.s3.us-east-1.amazonaws.com/bananagram/posts/${file.originalname}`,
       width: 1200,
       height: 800,
       duration: file.mimetype.startsWith('video/') ? 9 : undefined,
@@ -91,8 +91,8 @@ describe('Posts Flow Integration', () => {
     );
 
     const moduleRef = await Test.createTestingModule({ imports: [PostsModule] })
-      .overrideProvider(CloudinaryService)
-      .useValue(cloudinaryMock)
+      .overrideProvider(S3Service)
+      .useValue(storageMock)
       .compile();
     postsService = moduleRef.get(PostsService);
   }, 30000);

@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtAuthModule } from './auth/jwt-auth.module';
 import { CatalogsModule } from './catalogs/catalogs.module';
-import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { S3Module } from './storage/s3.module';
 import { InternalModule } from './internal/internal.module';
 import { BrandsModule } from './brands/brands.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
@@ -26,7 +26,7 @@ import { HealthController } from './health/health.controller';
     ScheduleModule.forRoot(),
     JwtAuthModule,
     CatalogsModule,
-    CloudinaryModule,
+    S3Module,
     InternalModule,
     BrandsModule,
     SocialAccountsModule,
