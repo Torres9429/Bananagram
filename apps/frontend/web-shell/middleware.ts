@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // arma la respuesta (Next exige middleware.ts en la raíz de cada app, no se
 // puede compartir el archivo en sí).
 import { resolveSessionAction } from '@repo/ui/session-middleware';
-import { ZONE_URLS } from '@repo/ui/config';
 
 // Bloqueo de sesión real (login ya conectado a auth-service, ver
 // LoginForm.tsx/ADR-0004): sin cookie o con JWT expirado (y sin poder
@@ -38,7 +37,17 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  return NextResponse.redirect(new URL('/login', ZONE_URLS.authFront));
+  // Relativo al origen de la propia request (nunca ZONE_URLS.authFront
+  // directo) — /login en el propio web-shell ya se reescribe server-side
+  // hacia auth-front (ver next.config.ts). Bug real encontrado en vivo:
+  // ZONE_URLS.authFront es un valor pensado para el proxy DEL SERVIDOR
+  // (Docker resuelve nombres de servicio entre contenedores, o incluso IPs
+  // privadas entre distintos EC2), pero este redirect lo recibe y lo sigue
+  // el NAVEGADOR del usuario — con esa URL nunca es alcanzable fuera de la
+  // red interna. Pasaba desapercibido en desarrollo local porque el default
+  // (localhost:3012) sí es igual de alcanzable para el navegador que para
+  // el servidor, al correr ambos en la misma máquina.
+  return NextResponse.redirect(new URL('/login', request.url));
 }
 
 export const config = { matcher: ['/((?!api|_next|favicon.ico|public).*)'] };
