@@ -21,7 +21,7 @@ fi
 down_one() {
   local role="$1"
   echo "== down -> $role =="
-  ./scripts/ec2-connect.sh "$role" "cd /home/ubuntu/Bananagram && sudo docker compose -f $(ec2_compose_file_for "$role") down $VOL_FLAG"
+  ./scripts/ec2-connect.sh "$role" "cd $(ec2_repo_path_for "$role") && sudo docker compose -f $(ec2_compose_file_for "$role") down $VOL_FLAG"
 }
 
 if [ "$ROLE" = "all" ]; then

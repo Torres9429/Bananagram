@@ -11,14 +11,13 @@
 # mismo socket y conectan casi instantáneo. Para cerrar esa conexión de fondo (no
 # solo la sesión interactiva), usa ec2-disconnect.sh <rol>.
 #
-# Overrides opcionales: EC2_KEY_PATH=/ruta/a/otra.pem
+# Overrides opcionales: EC2_KEY_PATH=/ruta/a/otra.pem, EC2_USER=otro-usuario
 
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source scripts/lib/ec2-hosts.sh
 
 EC2_KEY_PATH="${EC2_KEY_PATH:-$HOME/Descargas/Bananagram.pem}"
-EC2_USER="${EC2_USER:-ubuntu}"
 
 ROLE="${1:-}"
 if [ -z "$ROLE" ]; then
@@ -29,6 +28,9 @@ ec2_require_valid_role "$ROLE"
 shift
 
 EC2_HOST="$(ec2_host_for "$ROLE")"
+# frontend corre Amazon Linux 2023 (usuario ec2-user) — los otros 3, Ubuntu
+# (usuario ubuntu). EC2_USER en el entorno gana si se pasa explícito.
+EC2_USER="${EC2_USER:-$(ec2_user_for "$ROLE")}"
 CONTROL_SOCKET="$HOME/.ssh/sockets/bananagram-ec2-$ROLE.sock"
 
 if [ ! -f "$EC2_KEY_PATH" ]; then

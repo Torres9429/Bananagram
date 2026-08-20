@@ -11,7 +11,7 @@ source scripts/lib/ec2-hosts.sh
 status_one() {
   local role="$1"
   echo "=== $role ($(ec2_host_for "$role")) ==="
-  ./scripts/ec2-connect.sh "$role" "cd /home/ubuntu/Bananagram && sudo docker compose -f $(ec2_compose_file_for "$role") ps" 2>&1 \
+  ./scripts/ec2-connect.sh "$role" "cd $(ec2_repo_path_for "$role") && sudo docker compose -f $(ec2_compose_file_for "$role") ps" 2>&1 \
     || echo "(no se pudo conectar)"
   echo
 }

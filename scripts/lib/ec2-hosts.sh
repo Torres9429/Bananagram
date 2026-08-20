@@ -19,6 +19,22 @@ ec2_host_for() {
   esac
 }
 
+ec2_user_for() {
+  case "$1" in
+    frontend)     echo "ec2-user" ;; # Amazon Linux 2023
+    core)         echo "ubuntu" ;;
+    auth-gateway) echo "ubuntu" ;;
+    extras)       echo "ubuntu" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Ruta del repo en el servidor — depende del $HOME del usuario SSH de cada
+# rol (ec2-user en Amazon Linux, ubuntu en las 3 instancias Ubuntu).
+ec2_repo_path_for() {
+  echo "/home/$(ec2_user_for "$1")/Bananagram"
+}
+
 ec2_compose_file_for() {
   case "$1" in
     frontend)     echo "docker-compose.frontend.yml" ;;

@@ -36,23 +36,73 @@ la VPC (además de SSH para administración).
 ## Instancias
 
 Todas en la misma VPC/subred (`vpc-04a96969f5f4919f9` / `subnet-0e8952bce6574f1c6`,
-la VPC por defecto de la cuenta), zona `us-east-1a`, AMI Ubuntu Server 26.04 LTS
-(`ami-0b6d9d3d33ba97d99`), key pair `Bananagram`, rol de instancia `LabInstanceProfile`
-en las 3 nuevas (ver "IAM" abajo).
+la VPC por defecto de la cuenta), zona `us-east-1a`, key pair `Bananagram`, rol de
+instancia `LabInstanceProfile` en las 4 (ver "IAM" abajo). `core`, `auth-gateway` y
+`extras` corren Ubuntu Server 26.04 LTS (usuario SSH `ubuntu`); `frontend` corre
+**Amazon Linux 2023** (usuario SSH `ec2-user` — distinto a los otros 3, ver más abajo).
 
-| Rol | Instance ID | IP privada | IP pública (Elastic IP) | Security Group |
-|---|---|---|---|---|
-| frontend | `i-0e76b5dbe04c37f09` | `172.31.2.189` | `52.200.97.70` | `sg-0de779d7e6b62b2c8` (`launch-wizard-1`) |
-| core | `i-0c170003dd9998efb` | `172.31.12.54` | `100.48.200.42` | `sg-0bbd6da8e5c257b54` (`bananagram-core`) |
-| auth-gateway | `i-036ea19fd5b37f93a` | `172.31.1.153` | `44.216.180.59` | `sg-0516ef1cac373501e` (`bananagram-auth-gateway`) |
-| extras | `i-0191fb997dc55991f` | `172.31.4.136` | `52.2.62.9` | `sg-07ad494941ae84cbf` (`bananagram-extras`) |
+| Rol | Instance ID | AMI | IP privada | IP pública (Elastic IP) | Security Group |
+|---|---|---|---|---|---|
+| frontend | `i-0b078b9fc4d4b5b89` | Amazon Linux 2023 (`ami-0db1c5c6dc64eb019`) | `172.31.15.54` | `52.200.97.70` | `sg-0de779d7e6b62b2c8` (`launch-wizard-1`) |
+| core | `i-0c170003dd9998efb` | Ubuntu 26.04 (`ami-0b6d9d3d33ba97d99`) | `172.31.12.54` | `100.48.200.42` | `sg-0bbd6da8e5c257b54` (`bananagram-core`) |
+| auth-gateway | `i-036ea19fd5b37f93a` | Ubuntu 26.04 (`ami-0b6d9d3d33ba97d99`) | `172.31.1.153` | `44.216.180.59` | `sg-0516ef1cac373501e` (`bananagram-auth-gateway`) |
+| extras | `i-0191fb997dc55991f` | Ubuntu 26.04 (`ami-0b6d9d3d33ba97d99`) | `172.31.4.136` | `52.2.62.9` | `sg-07ad494941ae84cbf` (`bananagram-extras`) |
 
-`frontend` es la instancia original del primer intento de un solo EC2 — se reutilizó
-(ya tenía Docker/swap/Elastic IP listos) en vez de crear una 5ª instancia de cero.
+Las 3 instancias de backend (`core`, `auth-gateway`, `extras`) se crearon **por AWS
+CLI desde otra instancia ya viva** (instalando `aws` ahí primero) en vez de repetir el
+wizard de la consola 3 veces — mucho más rápido. Mismo método para recrear `frontend`
+en Amazon Linux (ver abajo).
 
-Las 3 nuevas (`core`, `auth-gateway`, `extras`) se crearon **por AWS CLI desde la
-propia instancia `frontend`** (ya tenía `aws` instalado y el rol del lab con permisos
-de EC2) en vez de repetir el wizard de la consola 3 veces — mucho más rápido.
+### `frontend` se recreó en Amazon Linux 2023 (era Ubuntu)
+
+La instancia original de `frontend` (`i-0e76b5dbe04c37f09`, la del primer intento de
+un solo EC2, reutilizada al principio de la arquitectura multi-EC2) corría Ubuntu. Por
+pedido explícito, se **terminó** y se creó una nueva con Amazon Linux 2023, reusando
+la misma Elastic IP (`52.200.97.70`, `eipalloc-00cb7047bf226b3a1` — se reasocia, no se
+vuelve a crear) y el mismo security group. Pasos (repetibles si hace falta recrearla
+de nuevo):
+
+```bash
+# Desde una instancia con AWS CLI ya instalado (o local, si tienes `aws` configurado):
+aws ec2 terminate-instances --instance-ids i-0e76b5dbe04c37f09
+
+# AMI de Amazon Linux 2023 vigente (el catálogo cambia — verificar antes de asumir
+# que este ID sigue existiendo, igual que con cualquier AMI):
+aws ec2 describe-images --owners amazon \
+  --filters 'Name=name,Values=al2023-ami-2023.*-kernel-*-x86_64' 'Name=state,Values=available' \
+  --query 'sort_by(Images,&CreationDate)[-1].[ImageId,Name]' --output text
+
+aws ec2 run-instances --image-id ami-0db1c5c6dc64eb019 --instance-type t3.small \
+  --key-name Bananagram --subnet-id subnet-0e8952bce6574f1c6 \
+  --security-group-ids sg-0de779d7e6b62b2c8 \
+  --iam-instance-profile Name=LabInstanceProfile \
+  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Bananagram-frontend}]'
+
+# Esperar a que arranque, luego reasociar la Elastic IP existente:
+aws ec2 wait instance-running --instance-ids <nuevo-instance-id>
+aws ec2 associate-address --instance-id <nuevo-instance-id> --allocation-id eipalloc-00cb7047bf226b3a1
+```
+
+Ojo — dos diferencias reales de Amazon Linux 2023 vs. Ubuntu que hay que tener en
+cuenta (ya reflejadas en `scripts/lib/ec2-hosts.sh`, ver sección "Scripts"):
+- Usuario SSH `ec2-user`, no `ubuntu` → `$HOME` es `/home/ec2-user`, no
+  `/home/ubuntu` → la ruta del repo en el servidor cambia también.
+- Nombre del dispositivo raíz para el volumen EBS es `/dev/xvda`, no `/dev/sda1`
+  (Ubuntu). Si se usa el nombre equivocado, `run-instances` lo rechaza.
+- Gestor de paquetes `dnf`, no `apt`. Instalación de Docker en AL2023 es más directa
+  (el paquete `docker` ya está en el repo de Amazon Linux, no hace falta agregar el
+  repositorio oficial de Docker como en Ubuntu): `sudo dnf install -y docker &&
+  sudo systemctl enable --now docker`. El plugin `docker compose` **no** viene
+  empaquetado — se instala a mano como plugin de la CLI:
+  ```bash
+  sudo mkdir -p /usr/local/lib/docker/cli-plugins
+  sudo curl -sSL "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64" \
+    -o /usr/local/lib/docker/cli-plugins/docker-compose
+  sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+  ```
+  Node 20 vía `sudo dnf install -y nodejs20` (el paquete se llama `nodejs20`, no
+  `nodejs`, a diferencia del repositorio de NodeSource que se usa en Ubuntu).
 
 ### Security groups (reglas de entrada)
 
@@ -129,6 +179,45 @@ disponible.
 - Verificado en vivo desde el EC2 `core` con AWS CLI (usando el rol de instancia, sin
   claves estáticas): `aws s3 cp` (subida), lectura pública por URL directa (HTTP 200),
   y `aws s3 rm` (borrado) — los 3 funcionan.
+
+### Probar contra el bucket S3 real desde local (sin desplegar nada)
+
+`S3Service` no tiene nada hardcodeado para EC2 — usa la cadena de credenciales por
+defecto del SDK de AWS, que también funciona en una máquina local con credenciales
+válidas. No hace falta desplegar para probarlo.
+
+1. `apps/backend/services/core-service/.env` (local, el de siempre para
+   `pnpm --filter @repo/core-service dev`) necesita `AWS_REGION=us-east-1` y
+   `S3_BUCKET_NAME=bananagram-media-520580368175` — **sin credenciales acá**, van
+   aparte (paso 2).
+2. Credenciales de la cuenta en `~/.aws/credentials` (formato AWS CLI estándar,
+   fuera del repo):
+   ```ini
+   [default]
+   aws_access_key_id = ...
+   aws_secret_access_key = ...
+   aws_session_token = ...
+   ```
+   Como es AWS Academy Learner Lab, las credenciales son **temporales** — se sacan
+   del panel del lab (Vocareum/Academy, botón "AWS Details" o similar, fuera de la
+   consola de AWS normal) e incluyen `aws_session_token` (no solo access key +
+   secret, a diferencia de credenciales IAM permanentes). Expiran cuando termina o
+   se reinicia la sesión del lab — hay que volver a copiarlas si dejan de funcionar.
+   `~/.aws/config` con `region = us-east-1` también ayuda pero no es estrictamente
+   necesario si `AWS_REGION` ya está en el `.env`.
+3. Verificación rápida sin necesidad de tener `aws` CLI instalado (usa el SDK que ya
+   está en `node_modules` de `core-service`):
+   ```bash
+   node -e "
+   const { S3Client, ListObjectsV2Command } = require('./apps/backend/services/core-service/node_modules/@aws-sdk/client-s3');
+   new S3Client({ region: 'us-east-1' }).send(new ListObjectsV2Command({ Bucket: 'bananagram-media-520580368175', MaxKeys: 5 }))
+     .then(r => console.log('OK,', (r.Contents||[]).length, 'objetos'))
+     .catch(e => console.error('ERROR:', e.name, e.message));
+   "
+   ```
+4. Con eso, correr `core-service` local (`pnpm dev` o el filtro puntual) ya sube/lee/
+   borra contra el bucket real — mismo comportamiento que en el EC2, sin necesidad de
+   credenciales estáticas hardcodeadas ni de tocar el rol de instancia.
 
 ## Cambios de código
 
@@ -208,9 +297,12 @@ nombre de servicio de Compose.
 
 ## Scripts (`scripts/ec2-*.sh`)
 
-Todos leen la lista de instancias de `scripts/lib/ec2-hosts.sh` (única fuente de
-verdad de IPs/compose files/servicios — si una IP cambia, se edita ahí, no en cada
-script).
+Todos leen `scripts/lib/ec2-hosts.sh` — única fuente de verdad de IP, usuario SSH,
+ruta del repo en el servidor, compose file y lista de servicios por rol. Si una IP
+cambia (por ejemplo al recrear una instancia), se edita ahí una sola vez:
+`ec2_host_for`, `ec2_user_for` (`ec2-user` en `frontend`, `ubuntu` en las otras 3),
+`ec2_repo_path_for` (deriva del usuario — `/home/<usuario>/Bananagram`),
+`ec2_compose_file_for`, `ec2_services_for`.
 
 | Script | Qué hace |
 |---|---|
@@ -228,7 +320,46 @@ compilando las 6 apps de Next.js a la vez — la instancia dejó de responder po
 las comprobaciones de estado de AWS quedaron en "Inicializando" más de 10 minutos
 (CPU subiendo sostenido hasta 84%+ sin bajar). Hubo que reiniciarla manualmente desde
 la consola. Construir de a uno tarda un poco más en total pero nunca compite por RAM
-consigo mismo.
+consigo mismo. Le pasó **dos veces** a `frontend` (una por instancia Ubuntu, otra ya
+corregido el script pero por las dudas se repitió la prueba en la instancia Amazon
+Linux nueva) — con el build secuencial no volvió a pasar.
+
+### Cómo hacer un cambio y redesplegarlo en un microservicio
+
+El flujo normal para editar código y que quede reflejado en el EC2 correspondiente:
+
+```bash
+# 1. Editar el código local como siempre (ej. algo en core-service).
+
+# 2. Bajar el contenedor de ESE rol antes de tocar nada en el servidor (opcional si
+#    vas a usar ec2-deploy.sh, que hace su propio `up -d` al final — pero si querés
+#    dejarlo abajo mientras investigás algo, o forzar un estado limpio):
+./scripts/ec2-down.sh core          # solo detiene, sin borrar volúmenes
+./scripts/ec2-down.sh core -v       # detiene Y borra volúmenes (¡pierde datos de Postgres si es "core"!)
+
+# 3. Sincronizar + reconstruir + volver a levantar, todo en un comando (build
+#    secuencial, nunca paralelo — ver motivo arriba):
+./scripts/ec2-deploy.sh core
+
+# Alternativa manual, paso a paso, si querés más control:
+./scripts/ec2-sync.sh core                          # solo copia el código, sin tocar contenedores
+./scripts/ec2-connect.sh core "cd ~/Bananagram && sudo docker compose -f docker-compose.core.yml build core-service"
+./scripts/ec2-connect.sh core "cd ~/Bananagram && sudo docker compose -f docker-compose.core.yml up -d"
+
+# 4. Verificar que quedó arriba:
+./scripts/ec2-status.sh core
+```
+
+Para bajar/redesplegar **más de un rol** (por ejemplo, un cambio que toca tanto
+`core-service` como `api-gateway`): repetir el mismo flujo por cada rol afectado —
+cada uno tiene su propio compose file y build, no hay un comando que toque 2 a la vez
+a propósito (evita construir de más en instancias que no cambiaron).
+
+Si solo cambiaste un `.env` (sin tocar código), no hace falta reconstruir la imagen —
+alcanza con recrear el contenedor para que relea el archivo:
+```bash
+./scripts/ec2-connect.sh auth-gateway "cd ~/Bananagram && sudo docker compose -f docker-compose.auth-gateway.yml up -d --force-recreate auth-service"
+```
 
 ## `.env` por instancia (contenido, no valores)
 
@@ -265,21 +396,26 @@ levanta cada instancia — no hay un mecanismo automático de secretos todavía 
   respondió `401` (falta token, pero la petición SÍ llegó y volvió — confirma que el
   security group y la ruta de red funcionan).
 - ✅ **extras**: `alexa-service` + `ai-service` arriba y estables.
-- 🔄 **frontend**: en redespliegue — el primer intento de build (`--build` en
-  paralelo sobre las 6 apps) dejó la instancia sin RAM y hubo que reiniciarla desde la
-  consola. Redesplegando con `ec2-deploy.sh` (build secuencial).
+- 🔄 **frontend**: recreada en Amazon Linux 2023 (ver sección arriba) y en
+  redespliegue con build secuencial — a mitad de las 6 apps al momento de escribir
+  esto, sin errores.
+- ✅ **6 commits locales** en `feat/dev-desp` con todo el trabajo de código hasta
+  ahora (Cloudinary→S3, fixes de Docker/Compose, arquitectura multi-EC2, scripts,
+  esta documentación) — **sin push todavía**, se mergea a `develop` recién cuando el
+  despliegue funcione de punta a punta en el navegador.
+- ✅ **S3 real accesible también desde local** (no solo desde los EC2) — credenciales
+  temporales del Learner Lab puestas en `~/.aws/credentials`, verificado listando el
+  bucket con el SDK. Ver sección "Probar contra el bucket S3 real desde local" arriba.
 
 ## Pendiente
 
-1. Terminar el redespliegue de `frontend` (en curso).
+1. Terminar el redespliegue de `frontend` en Amazon Linux (en curso).
 2. Prueba real en navegador: entrar a `http://52.200.97.70`, login, al menos un flujo
    completo (crear marca, publicación, etc.) — para confirmar que las 4 instancias
    realmente arman el sistema completo, no solo que cada una responde por separado.
 3. `pnpm seed` — **solo el seed**, sin datos de prueba adicionales (pedido explícito
    del usuario: sistema limpio, nada más que lo que carga el seed).
-4. Una vez confirmado en el navegador: commitear los cambios de código en
-   `feat/dev-desp` (el usuario ya dio luz verde para esto, condicionado a que todo
-   funcione primero) y mergear a `develop`.
+4. Una vez confirmado en el navegador: push de `feat/dev-desp` y merge a `develop`.
 5. TLS/dominio — hoy todo es HTTP plano sobre IPs públicas crudas. Sin Nginx ni
    certificados todavía en ninguna de las 4 instancias.
 6. Secretos hoy se escriben a mano por SSH — no hay Secrets Manager ni nada
@@ -288,3 +424,9 @@ levanta cada instancia — no hay un mecanismo automático de secretos todavía 
    rehacer una instancia.
 7. Granularidad de los security groups internos (VPC CIDR completo en vez de
    SG-a-SG) — ver nota en la sección de security groups arriba.
+8. La sesión del AWS Academy Learner Lab tiene un límite de tiempo (se vio un
+   contador de "tiempo restante" en el panel del lab) — cuando termine o se reinicie,
+   las credenciales de `~/.aws/credentials` dejan de servir y **puede que las 4
+   instancias EC2 también se detengan/pierdan** según cómo esté configurado el lab.
+   Sin confirmar todavía qué pasa exactamente al llegar ese límite — a tener en
+   cuenta si el despliegue "desaparece" sin razón aparente.

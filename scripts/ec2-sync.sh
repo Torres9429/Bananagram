@@ -18,7 +18,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source scripts/lib/ec2-hosts.sh
 
 EC2_KEY_PATH="${EC2_KEY_PATH:-$HOME/Descargas/Bananagram.pem}"
-EC2_USER="${EC2_USER:-ubuntu}"
 
 RSYNC_EXCLUDES=(
   --exclude 'node_modules' --exclude '.git' --exclude '.next' --exclude '.turbo'
@@ -29,12 +28,13 @@ RSYNC_EXCLUDES=(
 )
 
 sync_one() {
-  local role="$1" host
+  local role="$1" host user
   host="$(ec2_host_for "$role")"
+  user="${EC2_USER:-$(ec2_user_for "$role")}"
   echo "== sync -> $role ($host) =="
   rsync -az --delete "${RSYNC_EXCLUDES[@]}" \
     -e "ssh -i $EC2_KEY_PATH -o StrictHostKeyChecking=accept-new" \
-    ./ "$EC2_USER@$host:/home/ubuntu/Bananagram/"
+    ./ "$user@$host:$(ec2_repo_path_for "$role")/"
 }
 
 ROLE="${1:-}"

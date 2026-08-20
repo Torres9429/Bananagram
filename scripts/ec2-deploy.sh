@@ -34,7 +34,7 @@ for svc in $SERVICES; do
   BUILD_CMDS="$BUILD_CMDS sudo docker compose -f $COMPOSE_FILE build $svc &&"
 done
 
-./scripts/ec2-connect.sh "$ROLE" "cd /home/ubuntu/Bananagram && rm -f build.log && nohup bash -c '
+./scripts/ec2-connect.sh "$ROLE" "cd $(ec2_repo_path_for "$ROLE") && rm -f build.log && nohup bash -c '
 set -e
 $BUILD_CMDS
 sudo docker compose -f $COMPOSE_FILE up -d

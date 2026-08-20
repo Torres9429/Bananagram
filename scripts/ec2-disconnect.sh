@@ -9,15 +9,15 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source scripts/lib/ec2-hosts.sh
 
-EC2_USER="${EC2_USER:-ubuntu}"
 ROLE="${1:-all}"
 
 close_one() {
-  local role="$1" host socket
+  local role="$1" host user socket
   host="$(ec2_host_for "$role")"
+  user="${EC2_USER:-$(ec2_user_for "$role")}"
   socket="$HOME/.ssh/sockets/bananagram-ec2-$role.sock"
   if [ -S "$socket" ]; then
-    ssh -o ControlPath="$socket" -O exit "$EC2_USER@$host" 2>/dev/null || true
+    ssh -o ControlPath="$socket" -O exit "$user@$host" 2>/dev/null || true
     echo "Conexión cerrada: $role"
   fi
 }
