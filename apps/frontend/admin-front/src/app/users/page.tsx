@@ -9,6 +9,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton, ConfirmDialog, useToast } from '@repo/ui/ui';
+import { formatRoleName } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
 import { CreateUserDialog } from '../../components/CreateUserDialog';
 import { useListUsersQuery, useRemoveUserMutation, type AdminUser } from '../../store/api/admin.api';
@@ -46,7 +47,7 @@ export default function UsersPage() {
       render: (u) => (
         <Stack direction="row" gap={0.5} flexWrap="wrap">
           {u.roles.map((r) => (
-            <Chip key={r.role.id} size="small" label={r.role.name} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
+            <Chip key={r.role.id} size="small" label={formatRoleName(r.role.name)} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
           ))}
         </Stack>
       ),

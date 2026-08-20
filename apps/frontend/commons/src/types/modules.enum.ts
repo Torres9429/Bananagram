@@ -6,6 +6,7 @@ export enum AppModule {
   POST = 'publicaciones',
   CALENDAR = 'calendario',
   CAMPAIGNS = 'campanas',
+  IDEAS = 'ideas',
   METRICS = 'metricas',
   SCORE = 'score',
   REPORTS = 'reportes',

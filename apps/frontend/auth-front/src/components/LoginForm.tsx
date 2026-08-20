@@ -99,15 +99,12 @@ export function LoginForm() {
           ¿Olvidaste tu contraseña?
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          ¿Eres Cliente?{' '}
+          ¿No tienes cuenta?{' '}
           <Box component={Link} href="/register" sx={{ color: '#E6A817', fontWeight: 600, textDecoration: 'none' }}>
             Crea tu cuenta
           </Box>
         </Typography>
       </Box>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
-        ¿Eres CM o Diseñador? Activa tu cuenta desde el enlace que te enviaron por correo.
-      </Typography>
     </Box>
   );
 }

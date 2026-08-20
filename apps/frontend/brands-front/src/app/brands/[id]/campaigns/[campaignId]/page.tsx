@@ -23,7 +23,7 @@ import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { usePermissions, PrimaryButton, StatusChip } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
-import { getInitials } from '@repo/ui/utils';
+import { getInitials, formatDateRange } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
 import { useGetCampaignMetricsQuery, useRefreshCampaignMetricsMutation } from '../../../../../store/api/metrics.api';
 import {
@@ -53,11 +53,15 @@ export default function CampaignDetailPage() {
   const { can } = usePermissions();
   const params = useParams<{ id: string; campaignId: string }>();
   const user = useSelector(selectUser);
-  const role = user?.roles?.[0] ?? '';
-  const isClient = role === 'cliente';
-  const isDesigner = role === 'disenador';
-  const backHref = isClient ? '/profile' : '/my-campaigns';
-  const backLabel = isClient ? 'Volver a mi perfil' : 'Volver a mis campañas';
+  // Antes: role = user?.roles?.[0] — se rompía silenciosamente para
+  // usuarios multi-rol (ej. multi@bananagram.mx) al depender solo del
+  // primer rol del arreglo (auditoría final, hallazgo real). Mismo criterio
+  // "¿es dueño/gestor de marca?" ya usado en Sidebar/profile/my-campaigns —
+  // la diferencia de contexto (volver a /profile vs. /my-campaigns) se
+  // mantiene como decisión de UX, no de autorización.
+  const hasProfileAccess = can('marcas', 'crear') || can('marcas', 'editar');
+  const backHref = hasProfileAccess ? '/profile' : '/my-campaigns';
+  const backLabel = hasProfileAccess ? 'Volver a mi perfil' : 'Volver a mis campañas';
 
   const { data: campaign, isFetching: isLoadingCampaign } = useGetCampaignQuery(params.campaignId);
   const { data: brand } = useGetBrandQuery(campaign?.brandId ?? '', { skip: !campaign?.brandId });
@@ -103,7 +107,7 @@ export default function CampaignDetailPage() {
           <Box>
             <Typography variant="h5" fontWeight={700}>{campaign.name}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {brand?.name ?? '—'} · {campaign.startDate ?? 'Sin definir'} – {campaign.endDate ?? 'Sin definir'}
+              {brand?.name ?? '—'} · {formatDateRange(campaign.startDate, campaign.endDate)}
             </Typography>
           </Box>
           <Stack direction="row" gap={1}>
@@ -112,7 +116,7 @@ export default function CampaignDetailPage() {
           </Stack>
         </Stack>
 
-        {campaign.cmStatus === 'rechazada' && isClient && (
+        {campaign.cmStatus === 'rechazada' && hasProfileAccess && (
           <Alert
             severity="warning"
             sx={{ mb: 3, borderRadius: 2 }}
@@ -127,8 +131,13 @@ export default function CampaignDetailPage() {
           </Alert>
         )}
 
-        {/* Accesos claros — equipo oculto para Diseñador (no gestiona
-            equipo); aprobaciones solo para Cliente (post:approve) */}
+        {/* Antes: "Ver equipo" oculto para Diseñador vía isDesigner (nombre
+            de rol crudo). team/page.tsx no tiene su propio gate de
+            visibilidad — cualquiera que llegue a ver esta campaña puede ver
+            su roster; solo gestionar (agregar/quitar) está detrás de
+            campanas:asignar (canManage, ya real en team/page.tsx). No existe
+            un permiso que signifique "puede ver el equipo" distinto de
+            "puede ver la campaña", así que se muestra a todos por igual. */}
         <Stack direction="row" gap={1.5} flexWrap="wrap" mb={3}>
           <Button
             variant="outlined"
@@ -138,16 +147,14 @@ export default function CampaignDetailPage() {
           >
             Ver todas las publicaciones
           </Button>
-          {!isDesigner && (
-            <Button
-              variant="outlined"
-              startIcon={<GroupOutlinedIcon />}
-              onClick={() => router.push(`/brands/${params.id}/campaigns/${campaign.id}/team`)}
-              sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
-            >
-              Ver equipo
-            </Button>
-          )}
+          <Button
+            variant="outlined"
+            startIcon={<GroupOutlinedIcon />}
+            onClick={() => router.push(`/brands/${params.id}/campaigns/${campaign.id}/team`)}
+            sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
+          >
+            Ver equipo
+          </Button>
           {can('publicaciones', 'aprobar') && (
             <Button
               variant="outlined"
@@ -166,7 +173,7 @@ export default function CampaignDetailPage() {
               Crear publicación
             </PrimaryButton>
           )}
-          {can('campanas', 'crear') && (
+          {can('ideas', 'crear') && (
             <Button
               variant="outlined"
               startIcon={<AutoAwesomeIcon />}
@@ -178,9 +185,9 @@ export default function CampaignDetailPage() {
           )}
         </Stack>
 
-        {/* Equipo asignado — resumen inline, oculto para Diseñador */}
-        {!isDesigner && (
-          <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
+        {/* Equipo asignado — resumen inline, mismo criterio que el botón de
+            arriba: visible para todo el que puede ver la campaña. */}
+        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
             <Typography variant="subtitle2" color="text.secondary" mb={1.5}>Equipo asignado</Typography>
             {!cm && assignedDesigners.length === 0 ? (
               <Typography variant="body2" color="text.secondary">Sin equipo asignado todavía.</Typography>
@@ -210,7 +217,6 @@ export default function CampaignDetailPage() {
               </Stack>
             )}
           </Paper>
-        )}
 
         {/* Publicaciones recientes — real desde la Fase N (GET /posts?
             campaignId=, posts-front ya tiene su propia UI completa). Cross-

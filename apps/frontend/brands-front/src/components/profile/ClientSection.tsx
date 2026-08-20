@@ -22,7 +22,7 @@ import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser, useListCategoriesQuery } from '@repo/ui/state';
-import { getInitials } from '@repo/ui/utils';
+import { getInitials, formatDateRange } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CreateBrandDialog } from '../CreateBrandDialog';
@@ -474,7 +474,7 @@ export function ClientSection() {
                   >
                     <Box>
                       <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                      <Typography variant="caption" color="text.secondary">{formatDateRange(c.startDate, c.endDate)}</Typography>
                     </Box>
                     <Stack direction="row" gap={1} alignItems="center">
                       {c.cmStatus === 'rechazada' && (

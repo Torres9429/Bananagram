@@ -10,13 +10,14 @@ import TableHead from '@mui/material/TableHead';
 import TableBody from '@mui/material/TableBody';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
+import Skeleton from '@mui/material/Skeleton';
 import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
-import { EmptyState } from '@repo/ui';
+import { EmptyState } from '@repo/ui/ui';
 import { selectNetwork } from '../../store/analyticsFilters.slice';
 import { totalsByNetwork } from '../../lib/analytics/real-metrics';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import type { SocialNetworkCode } from '../../lib/analytics/types';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useFilteredCampaignsResult } from './useFilteredCampaigns';
 import { useNetworkCodesFilter } from './useNetworkCodesFilter';
 
 /**
@@ -28,9 +29,20 @@ import { useNetworkCodesFilter } from './useNetworkCodesFilter';
  */
 export function NetworkComparison() {
   const dispatch = useDispatch();
-  const campaigns = useFilteredCampaigns();
+  const { campaigns, isLoading } = useFilteredCampaignsResult();
   const networkCodes = useNetworkCodesFilter();
   const rows = totalsByNetwork(campaigns, networkCodes);
+
+  if (isLoading) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid #E8E8E8', borderRadius: 3, mb: 3 }}>
+        <Skeleton variant="text" width={320} height={28} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 2, mb: 3 }} />
+        <Skeleton variant="text" width={140} height={22} sx={{ mb: 1 }} />
+        <Skeleton variant="rectangular" height={240} sx={{ borderRadius: 2 }} />
+      </Paper>
+    );
+  }
 
   if (rows.length === 0) {
     return (
@@ -72,7 +84,7 @@ export function NetworkComparison() {
                     </Stack>
                   </TableCell>
                   <TableCell align="right">{row.reach.toLocaleString()}</TableCell>
-                  <TableCell align="right">{row.engagementRate ?? 0}%</TableCell>
+                  <TableCell align="right">{row.engagementRate === null ? '—' : `${row.engagementRate}%`}</TableCell>
                   <TableCell align="right">{row.posts}</TableCell>
                   <TableCell align="right">{row.interactions.toLocaleString()}</TableCell>
                 </TableRow>

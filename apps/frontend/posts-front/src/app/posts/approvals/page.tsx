@@ -46,17 +46,25 @@ export default function PostsApprovalPage() {
   const router = useRouter();
   const user = useSelector(selectUser);
   const { showSuccess, showError } = useToast();
-  const { can, canAny } = usePermissions();
+  const { can } = usePermissions();
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
 
   const roles = user?.roles ?? [];
   const isCm = roles.includes('community_manager');
   const isDesigner = roles.includes('disenador');
   const isClient = roles.includes('cliente');
-  // Aprobar/Rechazar es la acción protegida — se gatea por permiso, no por
-  // rol. El resto de esta pantalla (a quién le toca ver qué cola, reenviar a
-  // revisión) sigue siendo lógica de negocio por rol, sin tocar.
-  const canReviewPublicaciones = canAny('publicaciones', ['aprobar', 'rechazar']);
+  // Antes: canReviewPublicaciones = canAny('publicaciones',['aprobar','rechazar'])
+  // decidía si mostrar la sección "Para revisar" (cola en_revision, etapa del
+  // CM) — pero Cliente también tiene aprobar/rechazar reales, solo que para
+  // SU etapa (aprobado→programar). Con el flag compartido, un Cliente veía
+  // la cola de revisión del CM (auditoría final, bug de granularidad real).
+  // "Para revisar" es específicamente la etapa del CM (en_revision→aprobado
+  // en la máquina de estados), así que se gatea por isCm, no por el permiso
+  // compartido. Aprobar/Rechazar dentro de esa sección se sigue gateando por
+  // can('publicaciones','aprobar'/'rechazar') a nivel de botón (ya estaba
+  // bien). El resto de esta pantalla (a quién le toca ver qué cola, reenviar
+  // a revisión) sigue siendo lógica de negocio por rol, sin tocar.
+  const canReviewPublicaciones = isCm;
 
   const { data: campaigns = [] } = useListCampaignsQuery();
   const { data: draftPosts = [] } = useListPostsQuery({ status: 'borrador' });

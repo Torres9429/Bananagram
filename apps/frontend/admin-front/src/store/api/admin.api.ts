@@ -52,10 +52,20 @@ export interface AdminRole {
   permissions: RolePermission[];
 }
 
+export interface AuditLogEntry {
+  id: string;
+  tableName: string;
+  recordId: string | null;
+  action: string;
+  performedBy: string;
+  requestId: string | null;
+  createdAt: string;
+}
+
 export const adminApi = createApi({
   reducerPath: 'adminApi',
   baseQuery: createAuthenticatedBaseQuery(),
-  tagTypes: ['AdminUser', 'AdminRole'],
+  tagTypes: ['AdminUser', 'AdminRole', 'AuditLog'],
   endpoints: (builder) => ({
     listUsers: builder.query<AdminUser[], string | void>({
       query: (roleName) => (roleName ? `admin/users?roleName=${roleName}` : 'admin/users'),
@@ -110,6 +120,11 @@ export const adminApi = createApi({
       }),
       invalidatesTags: ['AdminRole'],
     }),
+
+    getAuditLog: builder.query<AuditLogEntry[], number | void>({
+      query: (limit) => (limit ? `admin/audit-log?limit=${limit}` : 'admin/audit-log'),
+      providesTags: ['AuditLog'],
+    }),
   }),
 });
 
@@ -125,4 +140,5 @@ export const {
   useListModulesQuery,
   useListActionsQuery,
   useUpdateRolePermissionMutation,
+  useGetAuditLogQuery,
 } = adminApi;

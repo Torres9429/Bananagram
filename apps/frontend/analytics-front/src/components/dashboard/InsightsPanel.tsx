@@ -13,6 +13,7 @@ import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useGetCampaignMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useDateRangeParams } from './useDateRangeParams';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useSelectedNetwork } from './useSelectedNetwork';
 
 const DAY_LABELS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
@@ -28,12 +29,14 @@ const DAY_LABELS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viern
 export function InsightsPanel() {
   const campaigns = useFilteredCampaigns();
   const range = useDateRangeParams();
+  const networkCode = useSelectedNetwork();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const activeCampaignId = campaignId ?? campaigns[0]?.campaignId ?? null;
   const activeCampaign = campaigns.find((c) => c.campaignId === activeCampaignId);
 
+  // networkCode agregado 2026-08-20 — mismo bug/fix que EngagementChart.
   const { data: history } = useGetCampaignMetricsHistoryQuery(
-    activeCampaignId ? { campaignId: activeCampaignId, range } : ({} as never),
+    activeCampaignId ? { campaignId: activeCampaignId, range, networkCode: networkCode ?? undefined } : ({} as never),
     { skip: !activeCampaignId },
   );
 

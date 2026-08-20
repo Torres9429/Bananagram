@@ -55,8 +55,14 @@ export function NetworkMetricCards() {
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
       <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Métricas específicas de la red</Typography>
+      {/* Descripción actualizada (2026-08-20): "solo se muestran los que
+          Ayrshare devuelve" sonaba a que era una elección de Ayrshare — en
+          varios casos (ej. Facebook) el dato ya no existe en la plataforma
+          de origen (Meta retiró varias métricas de su Graph API el 15 de
+          junio de 2026), no es algo que Ayrshare esté ocultando. */}
       <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-        Cada red expone campos distintos — solo se muestran los que Ayrshare devuelve para esta.
+        Cada red expone campos distintos, y algunos ya no existen en la plataforma de origen (ej. Meta
+        retiró varias métricas de Facebook en 2026) — solo se muestran los que sí están disponibles hoy.
       </Typography>
       {cards.length === 0 ? (
         <EmptyState

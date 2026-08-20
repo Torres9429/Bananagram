@@ -56,7 +56,11 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // Diseñador, que no ve ese ítem (ver roleAdjusted). Ítem propio para que
   // el permiso/rol que ya autoriza a Diseñador tenga un camino real.
   { key: 'alexa', label: 'Alexa Skill', href: '/profile/alexa', icon: <MicOutlinedIcon /> },
-  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }] },
+  // Antes sin AppAction.VIEW: un rol nuevo de solo lectura (solo
+  // publicaciones:ver, sin crear/aprobar) nunca veía este ítem pese a poder
+  // listar publicaciones de verdad — mismo hallazgo que el resto del punto 8
+  // (auditoría final).
+  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }, { module: AppModule.POST, action: AppAction.VIEW }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.

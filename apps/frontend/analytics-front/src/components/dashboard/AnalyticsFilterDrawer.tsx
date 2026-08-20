@@ -16,11 +16,12 @@ import Accordion from '@mui/material/Accordion';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import Divider from '@mui/material/Divider';
+import LinearProgress from '@mui/material/LinearProgress';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { LabeledSelect, LabeledField, STATUS_LABELS, PrimaryButton } from '@repo/ui/ui';
+import { LabeledSelect, LabeledField, STATUS_LABELS, PrimaryButton, useToast } from '@repo/ui/ui';
 import {
   clearAllFilters,
   selectCampaign,
@@ -75,19 +76,26 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
   const dispatch = useDispatch();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { showInfo } = useToast();
 
   const filters = useSelector(selectAnalyticsFilters);
   const { dateRange, setStart, setEnd } = useDateRangeFilter();
 
-  const { data: brands = [] } = useGetBrandsQuery();
-  const { data: allCampaigns = [] } = useGetCampaignsMetricsSummaryQuery();
+  const { data: brands = [], isLoading: isBrandsLoading, isFetching: isBrandsFetching } = useGetBrandsQuery();
+  const { data: allCampaigns = [], isLoading: isCampaignsLoading, isFetching: isCampaignsFetching } = useGetCampaignsMetricsSummaryQuery();
   // Una campaña filtrada no debe ocultar sus propias opciones — se listan
   // sobre el universo completo, acotado solo por la Marca elegida (si hay).
   const campaignOptions = filters.profileId ? allCampaigns.filter((c) => c.brandId === filters.profileId) : allCampaigns;
   // Mismo criterio que arma los Tabs en metrics/page.tsx: redes realmente
   // conectadas de la marca activa, no una lista fija de 6.
   const networkBrandId = useActiveBrandId();
-  const { data: socialAccounts = [] } = useGetBrandSocialAccountsQuery(networkBrandId ?? '', { skip: !networkBrandId });
+  const {
+    data: socialAccounts = [],
+    isLoading: isNetworksLoading,
+    isFetching: isNetworksFetching,
+  } = useGetBrandSocialAccountsQuery(networkBrandId ?? '', { skip: !networkBrandId });
+  const isFilterOptionsLoading =
+    isBrandsLoading || isBrandsFetching || isCampaignsLoading || isCampaignsFetching || isNetworksLoading || isNetworksFetching;
   const networkOptions = Array.from(new Set(socialAccounts.filter((a) => a.active).map((a) => a.socialNetwork.code)));
 
   function handleNetworksChange(event: SelectChangeEvent<unknown>) {
@@ -114,6 +122,8 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
       }}
     >
       <Box sx={{ p: 3, overflowY: 'auto' }}>
+        {isFilterOptionsLoading && <LinearProgress sx={{ mb: 2 }} />}
+
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6" fontWeight={700}>Filtros</Typography>
           <IconButton onClick={onClose} size="small">
@@ -132,6 +142,7 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
             <LabeledSelect
               label="Marca"
               displayEmpty
+              disabled={isFilterOptionsLoading}
               value={filters.profileId ?? ''}
               onChange={(e) => dispatch(setProfile((e.target.value as string) || null))}
             >
@@ -145,6 +156,7 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
           <LabeledSelect
             label="Campaña"
             displayEmpty
+            disabled={isFilterOptionsLoading}
             value={filters.campaignId ?? ''}
             onChange={(e) => dispatch(selectCampaign((e.target.value as string) || null))}
           >
@@ -161,6 +173,7 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
               label="Red social"
               multiple
               displayEmpty
+              disabled={isFilterOptionsLoading}
               value={filters.networks}
               onChange={handleNetworksChange}
               renderValue={(selected) =>
@@ -178,7 +191,14 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
             </LabeledSelect>
           )}
 
-          <Stack direction="row" gap={2}>
+          {/* Bug real (2026-08-20): en el Drawer mobile (anchor="bottom",
+              width:'100%') estos 2 campos de fecha quedaban forzados uno
+              junto al otro sin importar qué tan angosta fuera la pantalla —
+              a diferencia de AnalyticsFilterBar.tsx, que directamente los
+              oculta en xs, este Drawer es el único lugar donde el usuario
+              de celular puede poner un rango de fechas, así que aquí no se
+              pueden ocultar, se apilan. */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
             <Box flex={1}>
               <LabeledField
                 label="Desde"
@@ -305,7 +325,15 @@ export function AnalyticsFilterDrawer({ open, onClose }: AnalyticsFilterDrawerPr
         <Divider sx={{ my: 2 }} />
 
         <Stack direction="row" gap={1.5}>
-          <Button fullWidth variant="outlined" onClick={() => dispatch(clearAllFilters())} sx={{ color: 'primary.contrastTextMuted', borderColor: 'divider' }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={() => {
+              dispatch(clearAllFilters());
+              showInfo('Filtros limpiados.');
+            }}
+            sx={{ color: 'primary.contrastTextMuted', borderColor: 'divider' }}
+          >
             Limpiar filtros
           </Button>
           <PrimaryButton fullWidth onClick={onClose}>

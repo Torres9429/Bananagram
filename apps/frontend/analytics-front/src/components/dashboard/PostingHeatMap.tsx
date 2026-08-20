@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
@@ -14,18 +13,24 @@ import { useFilteredCampaigns } from './useFilteredCampaigns';
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+const GRID_TEMPLATE_COLUMNS = `36px repeat(${HOURS.length}, 1fr)`;
 
 // Datos reales (Fase Q2) — Post.publishedAt ya trae la hora real, no hacía
 // falta ningún dato nuevo del lado del backend para esto (a diferencia de lo
 // que asumía la Fase Q original, que lo dejó como EmptyState).
-export function PostingHeatMap() {
+//
+// networkCode: cuando se pasa (tabs de red específica), acota el heatmap a
+// solo lo publicado en esa red — antes este widget solo existía en General,
+// agregado entre TODAS las redes conectadas, sin forma de ver "¿a qué hora
+// funciona mejor ESTA red en particular?" (feedback del usuario, 2026-08-19).
+export function PostingHeatMap({ networkCode }: { networkCode?: string } = {}) {
   const campaigns = useFilteredCampaigns();
   const range = useDateRangeParams();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const activeCampaignId = campaignId ?? campaigns[0]?.campaignId ?? null;
 
   const { data: history } = useGetCampaignMetricsHistoryQuery(
-    activeCampaignId ? { campaignId: activeCampaignId, range } : ({} as never),
+    activeCampaignId ? { campaignId: activeCampaignId, range, networkCode } : ({} as never),
     { skip: !activeCampaignId },
   );
 
@@ -56,25 +61,55 @@ export function PostingHeatMap() {
         </LabeledSelect>
       )}
       {grid.size === 0 ? (
-        <EmptyState title="Sin publicaciones con métricas todavía" description="Se necesitan posts publicados con al menos una captura de métricas." />
+        <EmptyState
+          title="Sin publicaciones con métricas todavía"
+          description={
+            networkCode
+              ? 'Esta campaña no tiene publicaciones con métricas capturadas en esta red todavía.'
+              : 'Se necesitan posts publicados con al menos una captura de métricas.'
+          }
+        />
       ) : (
+        // CSS Grid con columnas 1fr (antes era una fila de Box de ancho fijo
+        // dentro de un contenedor con scroll horizontal — dejaba una franja
+        // vacía a la derecha en pantallas anchas porque el grid nunca crecía
+        // más allá de su ancho mínimo). Con 1fr, las 24 columnas siempre
+        // llenan el ancho real disponible del Paper, sin scroll ni espacio
+        // muerto (feedback del usuario, 2026-08-19).
+        //
+        // Bug real (2026-08-20): ese cambio quitó el scroll horizontal por
+        // completo, así que en pantallas angostas (celular) las 24 columnas
+        // se comprimían a unos pocos px cada una — las horas ya ni cabían y
+        // las celdas quedaban invisibles. `minWidth` es solo un piso: en
+        // desktop el contenedor real ya es más ancho que eso, así que 1fr
+        // sigue llenando el espacio disponible sin franja vacía (nada
+        // cambia ahí); en mobile, cuando el Paper es más angosto que el
+        // piso, el scroll horizontal interno (no el de toda la página) se
+        // activa solo ahí — mismo patrón que ya usa NetworkComparison.tsx
+        // para su tabla.
         <Box sx={{ overflowX: 'auto' }}>
-          <Stack gap={0.5} sx={{ minWidth: 640 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: GRID_TEMPLATE_COLUMNS, gap: 0.5, minWidth: 720 }}>
+            <Box />
+            {HOURS.map((hour) => (
+              <Typography key={hour} variant="caption" sx={{ textAlign: 'center', color: 'text.secondary', fontSize: 10 }}>
+                {hour}
+              </Typography>
+            ))}
             {DAY_LABELS.map((label, dayOfWeek) => (
-              <Stack key={label} direction="row" gap={0.5} alignItems="center">
-                <Typography variant="caption" sx={{ width: 32, color: 'text.secondary' }}>{label}</Typography>
+              <Box key={label} sx={{ display: 'contents' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, alignSelf: 'center' }}>{label}</Typography>
                 {HOURS.map((hour) => {
                   const value = grid.get(`${dayOfWeek}-${hour}`) ?? 0;
                   const opacity = max > 0 ? Math.max(0.08, value / max) : 0.08;
                   return (
                     <Tooltip key={hour} title={`${label} ${hour}:00 — ${value} interacciones`}>
-                      <Box sx={{ width: 20, height: 20, borderRadius: 0.5, bgcolor: `rgba(224, 168, 0, ${opacity})` }} />
+                      <Box sx={{ aspectRatio: '1 / 1', borderRadius: 0.75, bgcolor: `rgba(224, 168, 0, ${opacity})`, border: '1px solid rgba(0,0,0,0.04)' }} />
                     </Tooltip>
                   );
                 })}
-              </Stack>
+              </Box>
             ))}
-          </Stack>
+          </Box>
         </Box>
       )}
     </Paper>

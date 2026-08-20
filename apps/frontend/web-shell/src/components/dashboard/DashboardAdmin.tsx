@@ -12,16 +12,43 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
-import { WidgetCard, PrimaryButton } from '@repo/ui/ui';
+import { WidgetCard, PrimaryButton, EmptyState, usePermissions } from '@repo/ui/ui';
 import { ZONE_URLS } from '@repo/ui/config';
-import { MOCK_ADMIN_DASHBOARD } from '../../lib/mock-data';
+import {
+  useListUsersQuery,
+  useListRolesQuery,
+  useGetAuditLogQuery,
+  useListCategoriesQuery,
+  useListSpecialtiesQuery,
+  useListSocialNetworksQuery,
+} from '@repo/ui/state';
+import { formatDate, formatRoleName } from '@repo/ui/utils';
 
 function nav(path: string) {
   window.location.href = `${ZONE_URLS.adminFront}${path}`;
 }
 
 export function DashboardAdmin() {
-  const { users, catalogs, recentAudit } = MOCK_ADMIN_DASHBOARD;
+  const { can } = usePermissions();
+  const canUsers = can('usuarios', 'ver');
+  const canRoles = can('privilegios', 'ver');
+  const canCatalogs = can('catalogos', 'ver');
+
+  const { data: users = [] } = useListUsersQuery(undefined, { skip: !canUsers });
+  const { data: roles = [] } = useListRolesQuery(undefined, { skip: !canRoles });
+  const { data: auditLog = [] } = useGetAuditLogQuery(10, { skip: !canUsers });
+  const { data: categories = [] } = useListCategoriesQuery(undefined, { skip: !canCatalogs });
+  const { data: specialties = [] } = useListSpecialtiesQuery(undefined, { skip: !canCatalogs });
+  const { data: socialNetworks = [] } = useListSocialNetworksQuery(undefined, { skip: !canCatalogs });
+
+  const active = users.filter((u) => u.status === 'active').length;
+  const pendingActivation = users.filter((u) => u.status === 'pending').length;
+  const byRole = Object.entries(
+    users.reduce<Record<string, number>>((acc, u) => {
+      for (const { role } of u.roles) acc[role.name] = (acc[role.name] ?? 0) + 1;
+      return acc;
+    }, {}),
+  ).map(([role, count]) => ({ role, count }));
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
@@ -29,7 +56,7 @@ export function DashboardAdmin() {
         <Box>
           <Typography variant="h5" fontWeight={700}>Panel de administración</Typography>
           <Typography variant="body2" color="text.secondary">
-            Vista general del sistema — {users.total} usuarios registrados
+            Vista general del sistema{canUsers ? ` — ${users.length} usuarios registrados` : ''}
           </Typography>
         </Box>
         <PrimaryButton
@@ -41,10 +68,10 @@ export function DashboardAdmin() {
       </Stack>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <WidgetCard icon={<PeopleOutlinedIcon />} label="Usuarios activos" value={users.active} />
-        <WidgetCard icon={<PersonAddOutlinedIcon />} label="Pendientes de activación" value={users.pendingActivation} iconBg="#FFF3E0" iconColor="#E65100" />
-        <WidgetCard icon={<CategoryOutlinedIcon />} label="Catálogos configurados" value={catalogs.socialNetworks + catalogs.categories + catalogs.specialties} />
-        <WidgetCard icon={<AdminPanelSettingsOutlinedIcon />} label="Roles del sistema" value={4} />
+        <WidgetCard icon={<PeopleOutlinedIcon />} label="Usuarios activos" value={canUsers ? active : null} />
+        <WidgetCard icon={<PersonAddOutlinedIcon />} label="Pendientes de activación" value={canUsers ? pendingActivation : null} iconBg="#FFF3E0" iconColor="#E65100" />
+        <WidgetCard icon={<CategoryOutlinedIcon />} label="Catálogos configurados" value={canCatalogs ? categories.length + specialties.length + socialNetworks.length : null} />
+        <WidgetCard icon={<AdminPanelSettingsOutlinedIcon />} label="Roles del sistema" value={canRoles ? roles.length : null} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -56,19 +83,23 @@ export function DashboardAdmin() {
                 Ver todos →
               </Typography>
             </Stack>
-            <Stack gap={1.5}>
-              {users.byRole.map((r) => (
-                <Stack key={r.role} direction="row" justifyContent="space-between" alignItems="center">
-                  <Stack direction="row" gap={1} alignItems="center">
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontSize: 11, fontWeight: 700 }}>
-                      {r.role[0]}
-                    </Avatar>
-                    <Typography variant="body2">{r.role}</Typography>
+            {!canUsers ? (
+              <EmptyState title="Sin permiso" description="No tienes permiso para ver usuarios (usuarios:ver)." />
+            ) : (
+              <Stack gap={1.5}>
+                {byRole.map((r) => (
+                  <Stack key={r.role} direction="row" justifyContent="space-between" alignItems="center">
+                    <Stack direction="row" gap={1} alignItems="center">
+                      <Avatar sx={{ width: 28, height: 28, bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontSize: 11, fontWeight: 700 }}>
+                        {formatRoleName(r.role)[0]}
+                      </Avatar>
+                      <Typography variant="body2">{formatRoleName(r.role)}</Typography>
+                    </Stack>
+                    <Chip size="small" label={r.count} sx={{ bgcolor: '#F5F5F5', fontWeight: 700 }} />
                   </Stack>
-                  <Chip size="small" label={r.count} sx={{ bgcolor: '#F5F5F5', fontWeight: 700 }} />
-                </Stack>
-              ))}
-            </Stack>
+                ))}
+              </Stack>
+            )}
           </Paper>
         </div>
 
@@ -103,19 +134,25 @@ export function DashboardAdmin() {
                   Ver log completo →
                 </Typography>
               </Stack>
-              <Stack gap={1.5}>
-                {recentAudit.map((entry) => (
-                  <Stack key={entry.id} direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>{entry.actor}</Typography>
-                      <Typography variant="caption" color="text.secondary">{entry.action}</Typography>
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', ml: 1 }}>
-                      {entry.date}
-                    </Typography>
-                  </Stack>
-                ))}
-              </Stack>
+              {!canUsers ? (
+                <EmptyState title="Sin permiso" description="No tienes permiso para ver la auditoría (usuarios:ver)." />
+              ) : auditLog.length === 0 ? (
+                <EmptyState title="Sin actividad reciente" description="Todavía no hay eventos registrados." />
+              ) : (
+                <Stack gap={1.5}>
+                  {auditLog.map((entry) => (
+                    <Stack key={entry.id} direction="row" justifyContent="space-between" alignItems="flex-start">
+                      <Box>
+                        <Typography variant="body2" fontWeight={600}>{entry.performedBy}</Typography>
+                        <Typography variant="caption" color="text.secondary">{entry.action}</Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', ml: 1 }}>
+                        {formatDate(entry.createdAt)}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
             </Paper>
           </Stack>
         </div>

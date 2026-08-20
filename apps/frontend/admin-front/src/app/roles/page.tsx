@@ -128,7 +128,7 @@ export default function RolesPage() {
           <Box>
             <Typography variant="h5" fontWeight={700} mb={0.5}>Roles y privilegios</Typography>
             <Typography variant="body2" color="text.secondary">
-              Cada casilla se guarda de inmediato en <code>role_permissions</code>.
+              Cada casilla se guarda de inmediato en el sistema.
             </Typography>
           </Box>
           {can('privilegios', 'crear') && (

@@ -1,12 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useDispatch } from 'react-redux';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
 import { EmptyState } from '@repo/ui/ui';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { selectNetwork } from '../../store/analyticsFilters.slice';
+import type { SocialNetworkCode } from '../../lib/analytics/types';
 
 const METRICS: { key: 'likes' | 'comments' | 'shares' | 'views' | 'reach'; label: string }[] = [
   { key: 'likes', label: 'Likes' },
@@ -21,6 +24,7 @@ const METRICS: { key: 'likes' | 'comments' | 'shares' | 'views' | 'reach'; label
 // tiene escalas muy distintas — alcance en miles, comentarios en decenas —
 // sin normalizar, un radar sin escalar haría invisibles las métricas chicas).
 export function NetworkRadarComparison() {
+  const dispatch = useDispatch();
   const campaigns = useFilteredCampaigns();
 
   const { data, networkCodes } = useMemo(() => {
@@ -68,7 +72,9 @@ export function NetworkRadarComparison() {
           <PolarAngleAxis dataKey="metric" tick={{ fontSize: 12 }} />
           <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 10 }} />
           <RechartsTooltip />
-          <Legend />
+          {/* Click en la leyenda filtra por esa red — mismo drill que
+              NetworkComparison, la relación real es SocialAccount.socialNetworkCode. */}
+          <Legend onClick={(entry) => dispatch(selectNetwork(entry.dataKey as SocialNetworkCode))} wrapperStyle={{ cursor: 'pointer' }} />
           {networkCodes.map((code) => (
             <Radar
               key={code}
@@ -77,6 +83,8 @@ export function NetworkRadarComparison() {
               stroke={NETWORK_DISPLAY[code as keyof typeof NETWORK_DISPLAY]?.color ?? '#9E9E9E'}
               fill={NETWORK_DISPLAY[code as keyof typeof NETWORK_DISPLAY]?.color ?? '#9E9E9E'}
               fillOpacity={0.15}
+              onClick={() => dispatch(selectNetwork(code as SocialNetworkCode))}
+              style={{ cursor: 'pointer' }}
             />
           ))}
         </RadarChart>

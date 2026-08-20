@@ -5,11 +5,12 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
+import Skeleton from '@mui/material/Skeleton';
 import { EmptyState, ScoreGauge } from '@repo/ui/ui';
 import { useGetBrandScoreQuery } from '../../store/api/analytics.api';
 import { totalsByNetwork } from '../../lib/analytics/real-metrics';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useFilteredCampaignsResult } from './useFilteredCampaigns';
 import { useNetworkCodesFilter } from './useNetworkCodesFilter';
 import { useActiveBrandId } from './useActiveBrandId';
 
@@ -22,10 +23,20 @@ import { useActiveBrandId } from './useActiveBrandId';
  * marca, no hay atribución por campaña/post en el modelo de datos actual).
  */
 export function ScoreExplanationPanel() {
-  const campaigns = useFilteredCampaigns();
+  const { campaigns } = useFilteredCampaignsResult();
   const networkCodes = useNetworkCodesFilter();
   const brandId = useActiveBrandId();
-  const { data: score } = useGetBrandScoreQuery(brandId ?? '', { skip: !brandId });
+  const { data: score, isLoading, isFetching } = useGetBrandScoreQuery(brandId ?? '', { skip: !brandId });
+
+  if ((isLoading || isFetching) && !score) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
+        <Skeleton variant="text" width={180} height={28} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={250} sx={{ borderRadius: 2, mb: 2 }} />
+        <Skeleton variant="text" width="65%" height={22} />
+      </Paper>
+    );
+  }
 
   if (!score) {
     return (

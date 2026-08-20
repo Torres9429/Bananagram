@@ -150,7 +150,7 @@ export const postsApi = createApi({
     }),
     // Edición de contenido, sin cambiar status — borrador/rechazado (Diseñador/
     // CM/dueño de marca/admin) o rechazado_cliente (solo CM, "editarla él mismo").
-    updatePost: builder.mutation<RealPostListItem, { id: string; content?: string; instructions?: string }>({
+    updatePost: builder.mutation<RealPostListItem, { id: string; content?: string; instructions?: string; socialNetworkIds?: string[] }>({
       query: ({ id, ...body }) => ({ url: `posts/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Post'],
     }),

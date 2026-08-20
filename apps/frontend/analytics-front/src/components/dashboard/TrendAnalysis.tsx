@@ -15,6 +15,7 @@ import { EmptyState, LabeledSelect } from '@repo/ui/ui';
 import { useGetCampaignMetricsHistoryQuery, type CampaignHistoryDay } from '../../store/api/analytics.api';
 import { useDateRangeParams } from './useDateRangeParams';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useSelectedNetwork } from './useSelectedNetwork';
 
 const WINDOWS = [7, 30, 90] as const;
 
@@ -43,12 +44,14 @@ function windowDelta(series: CampaignHistoryDay[], days: number, field: 'reach' 
 export function TrendAnalysis() {
   const campaigns = useFilteredCampaigns();
   const range = useDateRangeParams();
+  const networkCode = useSelectedNetwork();
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(30);
   const activeCampaignId = campaignId ?? campaigns[0]?.campaignId ?? null;
 
+  // networkCode agregado 2026-08-20 — mismo bug/fix que EngagementChart.
   const { data: history } = useGetCampaignMetricsHistoryQuery(
-    activeCampaignId ? { campaignId: activeCampaignId, range } : ({} as never),
+    activeCampaignId ? { campaignId: activeCampaignId, range, networkCode: networkCode ?? undefined } : ({} as never),
     { skip: !activeCampaignId },
   );
 

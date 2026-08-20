@@ -39,11 +39,13 @@ function getErrorMessage(error: unknown): string {
   return 'No se pudieron generar ideas. Intenta de nuevo.';
 }
 
-// "Generar ideas con IA" — campanas:crear (Sección 5.1), mismo criterio que
-// ya usa el dominio real de ideas (alexa-service/ideas.controller.ts): sin
-// módulo propio en el catálogo de permisos. No persiste nada — ai-service no
-// guarda ideas en BD, el usuario copia lo que le sirva a mano (fuera de
-// alcance de esta primera versión guardar/editar desde acá).
+// "Generar ideas con IA" — gateado por ideas:crear (módulo propio desde
+// 2026-08-19, separado de campanas:crear específicamente para que Diseñador
+// pueda usarlo sin necesitar campanas:crear — ver
+// alexa-service/ideas.controller.ts / ai-service/ai.controller.ts). No
+// persiste nada — ai-service no guarda ideas en BD, el usuario copia lo que
+// le sirva a mano (fuera de alcance de esta primera versión guardar/editar
+// desde acá).
 export function GenerateIdeasDialog({ open, campaignId, brandName, category, onClose }: Props) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));

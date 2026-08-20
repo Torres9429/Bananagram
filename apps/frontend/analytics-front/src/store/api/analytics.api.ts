@@ -28,6 +28,10 @@ export interface CampaignTopPost {
   postId: string;
   network: string;
   date: string | null;
+  // Recorte corto del caption real (≤60 chars + "…") — sin esto, 2 posts de
+  // la misma campaña se veían idénticos en TopContent/ReachEngagementScatter/
+  // PostPerformanceChart (solo mostraban el nombre de campaña, repetido).
+  contentSnippet: string;
   engagementRate: number;
   likes: number;
   comments: number;
@@ -231,8 +235,8 @@ export const analyticsApi = createApi({
   // metrics/page.tsx, acotado a 2 llamadas máx. por entrada — ver ahí).
   refetchOnMountOrArgChange: true,
   endpoints: (builder) => ({
-    getCampaignsMetricsSummary: builder.query<CampaignMetricsSummary[], void>({
-      query: () => 'campaigns/metrics-summary',
+    getCampaignsMetricsSummary: builder.query<CampaignMetricsSummary[], DateRangeParams | void>({
+      query: (range) => withRange('campaigns/metrics-summary', (range as DateRangeParams | undefined) ?? undefined),
       providesTags: ['CampaignsMetricsSummary'],
     }),
     // Filtrado server-side por pertenencia (BrandsService.listBrands): Admin
@@ -263,8 +267,12 @@ export const analyticsApi = createApi({
       query: ({ brandId, range }) => withRange(`brands/${brandId}/score-history`, range),
       providesTags: ['BrandScoreHistory'],
     }),
-    getCampaignMetricsHistory: builder.query<CampaignMetricsHistory, { campaignId: string; range?: DateRangeParams }>({
-      query: ({ campaignId, range }) => withRange(`campaigns/${campaignId}/metrics-history`, range),
+    getCampaignMetricsHistory: builder.query<CampaignMetricsHistory, { campaignId: string; range?: DateRangeParams; networkCode?: string }>({
+      query: ({ campaignId, range, networkCode }) => {
+        const path = withRange(`campaigns/${campaignId}/metrics-history`, range);
+        if (!networkCode) return path;
+        return `${path}${path.includes('?') ? '&' : '?'}network=${networkCode}`;
+      },
       providesTags: ['CampaignMetricsHistory'],
     }),
     getPostMetrics: builder.query<PostMetricsDetail, { campaignId: string; postId: string }>({

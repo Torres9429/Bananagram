@@ -21,7 +21,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { StatusChip, PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
-import { selectUser } from '@repo/ui/state';
+import { selectUser, useListSocialNetworksQuery } from '@repo/ui/state';
 import { ZONE_URLS } from '@repo/ui/config';
 import type { PostSocialAccountStatus } from '@repo/ui/types';
 import {
@@ -96,10 +96,15 @@ export default function PostDetailPage() {
   const [editContent, setEditContent] = useState('');
   const [editInstructions, setEditInstructions] = useState('');
   const [editFiles, setEditFiles] = useState<File[]>([]);
+  const [editAddNetworkIds, setEditAddNetworkIds] = useState<string[]>([]);
   const [cmComment, setCmComment] = useState('');
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const { data: post, isFetching } = useGetPostQuery(params.id);
+  // Catálogo completo — filtrado abajo contra post.socialNetworks para
+  // ofrecer solo las que la publicación todavía NO tiene (agregar, no
+  // duplicar/reemplazar, ver update-post.dto.ts).
+  const { data: allSocialNetworks = [] } = useListSocialNetworksQuery();
   const [submitForReview, { isLoading: isSubmitting }] = useSubmitForReviewMutation();
   const [approvePost, { isLoading: isApproving }] = useApprovePostMutation();
   const [rejectPost] = useRejectPostMutation();
@@ -174,6 +179,7 @@ export default function PostDetailPage() {
     setEditContent(post!.content);
     setEditInstructions(post!.instructions ?? '');
     setEditFiles([]);
+    setEditAddNetworkIds([]);
     setEditing(true);
   }
 
@@ -184,7 +190,12 @@ export default function PostDetailPage() {
     setEditContent(text);
     setEditInstructions(post!.instructions ?? '');
     setEditFiles([]);
+    setEditAddNetworkIds([]);
     setEditing(true);
+  }
+
+  function toggleAddNetwork(id: string) {
+    setEditAddNetworkIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   function handleEditFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -207,7 +218,13 @@ export default function PostDetailPage() {
 
   async function handleSaveEdit(resendAfter: boolean) {
     try {
-      await updatePost({ id: post!.id, content: editContent.trim(), instructions: editInstructions.trim() || undefined }).unwrap();
+      await updatePost({
+        id: post!.id,
+        content: editContent.trim(),
+        instructions: editInstructions.trim() || undefined,
+        socialNetworkIds: editAddNetworkIds.length > 0 ? editAddNetworkIds : undefined,
+      }).unwrap();
+      setEditAddNetworkIds([]);
       if (editFiles.length > 0) {
         try {
           await uploadMedia({ id: post!.id, files: editFiles }).unwrap();
@@ -386,6 +403,38 @@ export default function PostDetailPage() {
                   value={editInstructions}
                   onChange={(e) => setEditInstructions(e.target.value)}
                 />
+
+                {/* Solo AGREGA redes — nunca quita las que el post ya tenía
+                    (ver update-post.dto.ts). A diferencia de media, esto sí
+                    aplica en los 4 estados editables (incluido
+                    rechazado_cliente/en_revision) — agregar una red no toca
+                    ninguna entrega ya en curso de las que ya tenía. */}
+                {allSocialNetworks.filter((n) => !post.socialNetworks.some((psn) => psn.socialNetworkId === n.id)).length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary" mb={1}>Agregar más redes sociales</Typography>
+                    <Stack direction="row" gap={1} flexWrap="wrap">
+                      {allSocialNetworks
+                        .filter((n) => !post.socialNetworks.some((psn) => psn.socialNetworkId === n.id))
+                        .map((n) => {
+                          const active = editAddNetworkIds.includes(n.id);
+                          return (
+                            <Chip
+                              key={n.id}
+                              label={n.name}
+                              onClick={() => toggleAddNetwork(n.id)}
+                              sx={{
+                                cursor: 'pointer',
+                                border: `1px solid ${active ? '#E0A800' : '#E8E8E8'}`,
+                                bgcolor: active ? '#FFF8E1' : 'transparent',
+                                color: active ? 'primary.contrastTextMuted' : '#1A1A1A',
+                                fontWeight: 600,
+                              }}
+                            />
+                          );
+                        })}
+                    </Stack>
+                  </Box>
+                )}
 
                 {/* Solo borrador/rechazado permiten tocar media en el
                     backend (attachMediaToPost/removeMediaFromPost) —

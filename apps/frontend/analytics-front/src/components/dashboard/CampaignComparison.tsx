@@ -18,6 +18,14 @@ const ROWS: { key: 'reach' | 'engagementRate' | 'posts' | 'interactions'; label:
   { key: 'interactions', label: 'Interacciones' },
 ];
 
+// engagementRate es el único campo de ScopedMetrics que puede ser null (sin
+// alcance conocido) — el resto siempre es number. `?? 0` lo colapsaría a
+// "0% de engagement", indistinguible de un 0 real (bug real encontrado en
+// auditoría, no fabricar datos).
+function formatRow(value: number | null, unit?: string): string {
+  return value === null ? '—' : `${value}${unit ?? ''}`;
+}
+
 /**
  * Compara 2 campañas lado a lado — datos reales (Fase Q). "Top de campaña"
  * muestra un solo post (topPost, lo único que calcula el backend hoy) en vez
@@ -66,19 +74,26 @@ export function CampaignComparison() {
       ) : (
         <>
           <Stack gap={1.5} mb={2}>
+            {/* Bug real (2026-08-20): xs={4} apretaba value/label/value en 3
+                columnas de ~30% en celular — números grandes (alcance,
+                interacciones de 6-7 dígitos) se envolvían en varias líneas
+                de forma despareja entre columna A y B. xs={12} apila las 3
+                en filas propias por debajo de 600px (mismo patrón A/label/B,
+                solo vertical); sm={4} mantiene las 3 columnas de siempre a
+                partir de tablet. */}
             {ROWS.map((row) => (
-              <Grid container spacing={2} key={row.key} alignItems="center">
-                <Grid item xs={4}>
+              <Grid container spacing={{ xs: 0.5, sm: 2 }} key={row.key} alignItems="center">
+                <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
                   <Typography variant="body2" fontWeight={700} sx={{ color: 'primary.contrastTextMuted' }}>
-                    {metricsA[row.key] ?? 0}{row.unit ?? ''}
+                    {formatRow(metricsA[row.key], row.unit)}
                   </Typography>
                 </Grid>
-                <Grid item xs={4} textAlign="center">
+                <Grid item xs={12} sm={4} sx={{ textAlign: 'center' }}>
                   <Typography variant="caption" color="text.secondary">{row.label}</Typography>
                 </Grid>
-                <Grid item xs={4} textAlign="right">
+                <Grid item xs={12} sm={4} sx={{ textAlign: { xs: 'center', sm: 'right' } }}>
                   <Typography variant="body2" fontWeight={700} sx={{ color: '#1565C0' }}>
-                    {metricsB[row.key] ?? 0}{row.unit ?? ''}
+                    {formatRow(metricsB[row.key], row.unit)}
                   </Typography>
                 </Grid>
               </Grid>
@@ -89,7 +104,7 @@ export function CampaignComparison() {
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" fontWeight={700} mb={1}>Top de {campaignA.name}</Typography>
               {campaignA.topPost ? (
-                <Typography variant="caption" color="text.secondary">• {campaignA.topPost.network} ({campaignA.topPost.engagementRate}%)</Typography>
+                <Typography variant="caption" color="text.secondary">• {campaignA.topPost.contentSnippet || 'Sin contenido'} — {campaignA.topPost.network} ({campaignA.topPost.engagementRate}%)</Typography>
               ) : (
                 <Typography variant="caption" color="text.secondary">Sin post destacado todavía.</Typography>
               )}
@@ -97,7 +112,7 @@ export function CampaignComparison() {
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" fontWeight={700} mb={1}>Top de {campaignB.name}</Typography>
               {campaignB.topPost ? (
-                <Typography variant="caption" color="text.secondary">• {campaignB.topPost.network} ({campaignB.topPost.engagementRate}%)</Typography>
+                <Typography variant="caption" color="text.secondary">• {campaignB.topPost.contentSnippet || 'Sin contenido'} — {campaignB.topPost.network} ({campaignB.topPost.engagementRate}%)</Typography>
               ) : (
                 <Typography variant="caption" color="text.secondary">Sin post destacado todavía.</Typography>
               )}

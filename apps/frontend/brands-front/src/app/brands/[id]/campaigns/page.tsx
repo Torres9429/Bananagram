@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import { PrimaryButton, usePermissions } from '@repo/ui/ui';
+import { formatDateRange } from '@repo/ui/utils';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { CreateCampaignDialog } from '../../../../components/CreateCampaignDialog';
 import { useListCampaignsQuery } from '../../../../store/api/campaigns.api';
@@ -58,7 +59,7 @@ export default function CampaignsPage() {
               >
                 <Box>
                   <Typography variant="body1" fontWeight={600}>{c.name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                  <Typography variant="caption" color="text.secondary">{formatDateRange(c.startDate, c.endDate)}</Typography>
                 </Box>
                 <Stack direction="row" gap={1} alignItems="center">
                   {c.cmStatus === 'rechazada' && (

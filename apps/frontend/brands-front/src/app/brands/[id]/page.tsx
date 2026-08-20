@@ -12,6 +12,7 @@ import { BrandTabs } from '../../../components/BrandTabs';
 import { useGetBrandQuery } from '../../../store/api/brands.api';
 import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
 import { CAMPAIGN_STATUS_LABEL } from '../../../lib/mock-data';
+import { formatDateRange } from '@repo/ui/utils';
 
 export default function BrandOverviewPage() {
   const params = useParams<{ id: string }>();
@@ -68,7 +69,7 @@ export default function BrandOverviewPage() {
                       >
                         <Box>
                           <Typography variant="body2" fontWeight={600}>{c.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{c.startDate ?? 'Sin definir'} – {c.endDate ?? 'Sin definir'}</Typography>
+                          <Typography variant="caption" color="text.secondary">{formatDateRange(c.startDate, c.endDate)}</Typography>
                         </Box>
                         <Stack direction="row" gap={1} alignItems="center">
                           {c.cmStatus === 'rechazada' && (

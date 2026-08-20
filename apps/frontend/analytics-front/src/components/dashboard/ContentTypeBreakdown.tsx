@@ -3,9 +3,10 @@
 import { useMemo } from 'react';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
+import Skeleton from '@mui/material/Skeleton';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { EmptyState } from '@repo/ui/ui';
-import { useFilteredCampaigns } from './useFilteredCampaigns';
+import { useFilteredCampaignsResult } from './useFilteredCampaigns';
 
 const TYPE_LABEL: Record<string, string> = { imagen: 'Imagen', video: 'Video', carrusel: 'Carrusel', sin_media: 'Solo texto' };
 const TYPE_COLOR: Record<string, string> = { imagen: '#E0A800', video: '#1565C0', carrusel: '#2E7D32', sin_media: '#9E9E9E' };
@@ -13,7 +14,7 @@ const TYPE_COLOR: Record<string, string> = { imagen: '#E0A800', video: '#1565C0'
 // Datos reales, propios (Post.media.mimeType, nunca de Ayrshare) — 0 adjuntos
 // = solo texto, 1 = imagen o video según mimeType, 2+ = carrusel.
 export function ContentTypeBreakdown() {
-  const campaigns = useFilteredCampaigns();
+  const { campaigns, isLoading } = useFilteredCampaignsResult();
 
   const data = useMemo(() => {
     const totals = new Map<string, number>();
@@ -26,6 +27,15 @@ export function ContentTypeBreakdown() {
   }, [campaigns]);
 
   const total = data.reduce((sum, d) => sum + d.count, 0);
+
+  if (isLoading) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
+        <Skeleton variant="text" width={320} height={28} sx={{ mb: 2 }} />
+        <Skeleton variant="rectangular" height={240} sx={{ borderRadius: 2 }} />
+      </Paper>
+    );
+  }
 
   if (total === 0) {
     return (
@@ -46,7 +56,7 @@ export function ContentTypeBreakdown() {
             ))}
           </Pie>
           <RechartsTooltip />
-          <Legend />
+          <Legend wrapperStyle={{ paddingTop: '40px' }} />
         </PieChart>
       </ResponsiveContainer>
     </Paper>

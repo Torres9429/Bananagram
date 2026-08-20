@@ -32,7 +32,11 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // "puede poseer/gestionar una marca" — no un proxy de rol; cualquier rol
   // futuro con ese permiso otorgado ve este ítem, sin tocar código.
   { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.CREATE }, { module: AppModule.BRANDS, action: AppAction.EDIT }] },
-  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }] },
+  // Antes sin AppAction.VIEW: un rol nuevo de solo lectura (solo
+  // publicaciones:ver, sin crear/aprobar) nunca veía este ítem pese a poder
+  // listar publicaciones de verdad — mismo hallazgo que el resto del punto 8
+  // (auditoría final).
+  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }, { module: AppModule.POST, action: AppAction.VIEW }] },
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.
