@@ -27,6 +27,23 @@ Stack: Next.js (MFE host, Multi-Zones) + NestJS (microservicios) + PostgreSQL + 
   y `catalogos` (agregado 2026-07-27 — los 3 catálogos no encajaban en ninguno existente).
 - Endpoint: `GET /me/permissions` → fuente de verdad del menú frontend
 - Hook: `usePermissions()` (`apps/frontend/commons/src/hooks/usePermissions.ts`) → `can(module, action)` / `canAny(module, actions)`
+- **Regla de autoridad (auditoría final, 2026-08-19/20)**: `can(module, action)` es la ÚNICA fuente de
+  capacidad; ownership/relación (`cmId===user.id`, `brand.ownerId===user.id`, etc.) es la única fuente de
+  alcance de recurso. Un check crudo por nombre de rol (`role==='cliente'`, `roles.includes('disenador')`)
+  en frontend o backend es un bug — **salvo 2 excepciones documentadas, no generalizar a una tercera sin
+  confirmarlo antes con el usuario**:
+  - `isAdmin` en los Sidebars (colapsa el menú a solo Dashboard+Admin) — es simplificación de UX para el
+    superusuario, no una restricción de acceso (Admin ya tiene el permiso máximo en todo).
+  - `canUseAlexaSkill`/`auth.service.ts.createLinkCode` (Cliente/Diseñador/Administrador) — no existe
+    ningún permiso `alexa:*` en el catálogo de 10 módulos; el backend también autoriza por rol crudo ahí,
+    así que generalizar solo el frontend crearía un desfase real con el backend.
+- **`/internal/*` (auth-service↔core-service) — `InternalAuthGuard`+`INTERNAL_SERVICE_SECRET`
+  (2026-08-19)**: compara el header `X-Internal-Token` contra `process.env.INTERNAL_SERVICE_SECRET`, falla
+  cerrado si la variable no está configurada. Antes esas rutas no tenían ningún guard y, al publicar el
+  puerto del servicio sin restringir, eran alcanzables desde fuera del contenedor sin autenticación — el
+  gateway nunca las proxea, pero eso no era la protección real. Aplicado a `UserProfilesController`
+  (`core-service`) e `InternalNotificationsController` (`auth-service`); los 4 call sites reales
+  (`auth.service.ts` ×2, `profile.service.ts`, `notifications-client.service.ts`) mandan el header.
 
 ## Fórmula score digital
 Documentada como `Score = (Consistencia×0.30) + (Engagement×0.40) + (Frecuencia×0.30)`, pero el código real
@@ -160,11 +177,18 @@ puntual, no la regla — detalle exhaustivo en `.claude/INVENTORY.md` §0; resum
   punta en `posts-front`/`brands-front`. `fetchContentIdeas` (la voz de Alexa) sigue siendo la única puerta
   de IA sin conectar, ver sección "Alexa Skill" arriba.
 - **Sigue faltando de verdad**: generación real de reportes (`POST /reports` solo registra la solicitud,
-  `fileUrl` queda `null`), y un puñado de rutas/componentes frontend puntuales que siguen mock pese a que
-  el backend ya existe (`admin-front` `/users`/`/roles`/`/audit-log`, `auth-front` registro/activación,
-  `brands-front` `/profile/calendar` y el árbol legacy `/brands/[id]/{metrics,score,reports,calendar}`,
-  y 5 de 15 widgets de `analytics-front` como `EmptyState` honesto por falta de dato nativo) — lista
-  completa en `.claude/INVENTORY.md` §0.
+  `fileUrl` queda `null`), `auth-front`'s `ActivateForm` (huérfano — el flujo de activación por email ya no
+  corresponde a como `admin/users.controller.ts` crea usuarios hoy, activos de inmediato; nada lo enlaza ya
+  desde `LoginForm`), `brands-front` `/profile/calendar` y el árbol legacy
+  `/brands/[id]/{metrics,score,reports,calendar}`, y algunos widgets de `analytics-front` como `EmptyState`
+  honesto por falta de dato nativo. **Ya NO son mock** (corregido 2026-08-19/20, no repetir este trabajo):
+  `auth-front`'s `RegisterForm` (registro real contra `POST auth/register`, sin catálogo de
+  categorías/especialidades — se completan después vía `PATCH me/profile`, ya autenticado), `TopBar`'s
+  logout (`POST auth/logout` real antes de limpiar la sesión local), y `admin-front`'s `/users`/`/roles`/
+  `/audit-log` + `web-shell`'s `DashboardAdmin` (los 4 conectados a datos reales, incluido un
+  `GET admin/audit-log` nuevo). Lista completa (con matices por componente) en `.claude/INVENTORY.md` §0 —
+  **ojo**: esa sección todavía describe varias de estas cosas como mock, quedó desactualizada por este
+  trabajo; confía en este párrafo sobre esa sección hasta que se actualice a fondo.
 - **El gateway ya proxea de verdad**: `/api/auth/*`, `/api/me/*`, `/api/admin/*` → `AUTH_SERVICE_URL`;
   `/api/catalogs/*`, `/api/brands/*`, `/api/campaigns/*`, `/api/cm-team/*`, `/api/posts/*`,
   `/api/reports/*` → `CORE_SERVICE_URL`; **`/api/ideas/*` → `ALEXA_SERVICE_URL`** (no core-service — el
@@ -176,9 +200,10 @@ puntual, no la regla — detalle exhaustivo en `.claude/INVENTORY.md` §0; resum
   `app.use(createProxyMiddleware(...))` **sin** pasar el path como argumento de `app.use()` — Express
   recorta ese prefijo de `req.url` antes de pasarlo al middleware si se hace así, rompiendo el proxy; se
   usa `pathFilter` en su lugar, que matchea sobre la URL completa sin tocarla. `/api/internal/*` (tráfico
-  servicio-a-servicio: auth-service↔core-service) **no** se proxea a propósito. **Sin confirmar en vivo**:
-  el override de `docker-compose.yml` para `api-gateway` no incluye `ALEXA_SERVICE_URL`, así que
-  `/api/ideas` probablemente no resuelve dentro del perfil `full` containerizado.
+  servicio-a-servicio: auth-service↔core-service, protegido por `InternalAuthGuard`+`INTERNAL_SERVICE_SECRET`,
+  ver más abajo) **no** se proxea a propósito. **Ya corregido (2026-08-19)**: el override de
+  `docker-compose.yml` para `api-gateway` ahora sí incluye `ALEXA_SERVICE_URL: http://alexa-service:3004`
+  (junto con `AI_SERVICE_URL`) — `/api/ideas` resuelve bajo el perfil `full` containerizado.
 - **El frontend ya NO corre 100% en modo mock**: el login es real (`auth-front`'s `LoginForm` llama al
   backend de verdad, con refresh automático de token y 2 cookies de sesión reales). Catálogos en
   `admin-front`, y la mayoría de `brands-front`/`posts-front`/`analytics-front` (campañas, publicaciones
@@ -259,6 +284,7 @@ pnpm lint                      # turbo run lint
 - Para un solo frontend: `pnpm --filter @repo/web-shell dev` (equivalentes: `admin-front`, `analytics-front`, `auth-front`, `brands-front`, `posts-front` — cada uno con su propio puerto fijo, ver abajo).
 - Tests de integración backend viven en `apps/backend/test/*.spec.ts` (no dentro de cada servicio) y usan `apps/backend/test/helpers/auth.helper.ts` (JWT de prueba por rol) y `db.helper.ts` (limpieza de tablas). Paquete propio `@repo/backend-integration-tests` (`jest`+`ts-jest`, agregado 2026-07-27 — antes no existía ni `package.json` ahí, los specs no se ejecutaban nunca): `pnpm --filter @repo/backend-integration-tests test` (necesita `docker compose up -d postgres`). Tests e2e cross-servicio en `apps/e2e/src/*.e2e.spec.ts` (paquete `@repo/e2e`, usa `supertest`) siguen siendo placeholder.
 - `docker compose --profile full up -d --build` levanta el stack completo containerizado (todos los servicios + fronts); el modo diario (`docker compose up -d`, sin profile) solo levanta `postgres` + `adminer` y se espera correr el resto con `pnpm dev` en el host.
+- **Bug real corregido en vivo (2026-08-20)**: los 10 Dockerfiles que corren `pnpm exec turbo run build` (los 6 frontends + `auth-service`/`core-service`/`alexa-service`/`ai-service` — `api-gateway` no usa turbo, no aplica) copiaban `package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc` pero nunca `turbo.json` — Turbo fallaba con "Could not find turbo.json" dentro del contenedor aunque el archivo sí existiera en el repo. Ahora la línea `COPY` incluye `turbo.json`. Bug independiente pero relacionado: `.dockerignore` excluía `apps/frontend` (comentario viejo: "Backend Docker build context = repo root", escrito cuando solo el backend construía desde la raíz) — como todos los servicios (backend y frontend) usan `context: .` en `docker-compose.yml`, esa exclusión le vaciaba el contexto a los 6 Dockerfiles de frontend. Ya se quitó esa exclusión; `.dockerignore` es compartido por ambos contextos ahora.
 
 ## Puertos
 
@@ -290,7 +316,14 @@ pnpm lint                      # turbo run lint
 - `commons/` — **desde el 2026-08-16 (`c867e24`), de nuevo un paquete workspace real** (`@repo/backend-commons`, `package.json`+`tsconfig.json`+`dist/`, un único barrel `src/index.ts` sin subpaths — la resolución clásica de módulos que usa `tsconfig.base.json` de backend no resuelve de forma confiable un `exports` map con subpaths). Antes de esa fecha había quedado huérfano (nada lo importaba; ver histórico más abajo) — hoy `auth-service`, `core-service`, `alexa-service` y `ai-service` (este último desde 2026-08-18) lo declaran como dependencia y lo importan de verdad (`import { X } from '@repo/backend-commons'`), ya no por path relativo. Ya **no** incluye Prisma (el schema único se eliminó junto con la separación de bases, 2026-07-23):
   - `guards/` — `JwtAuthGuard` (reescrito al revivir el paquete: ya **no** usa passport-jwt, verifica RS256 contra el JWKS remoto de `auth-service` vía `jose`) + `TokenDenylistService`, compartidos entre `core-service`, `alexa-service` y `ai-service` (verificadores idénticos, sin firmar nunca); `auth-service` mantiene su propia copia local (`src/guards/jwt-auth.guard.ts`) porque es el emisor del JWT, no un verificador remoto — esa no se comparte. `PermissionGuard` sí se comparte entre esos mismos 4 servicios (antes se duplicaba localmente en cada uno, criterio abandonado con el commit `c867e24`). `BrandAccessGuard` sigue sin vivir aquí — sigue en `core-service/src/guards/`, ver nota de `brandIds` arriba.
   - `decorators/` — `@CurrentUser()`, `@RequirePermission(module, action)` — compartidos entre esos mismos 4 servicios
-  - `interceptors/` — `LoggingInterceptor` (exportado, pero sin importadores reales todavía — ningún `main.ts` lo registra global). `AuditInterceptor` **sí está implementado y registrado** en `auth-service`/`core-service` (`app.useGlobalInterceptors(new AuditInterceptor(writeAuditEntry))`, ver sus `main.ts`) — agnóstico de Prisma a propósito (cada servicio inyecta su propia función de escritura contra su propio cliente), audita todo método mutante (`POST/PUT/PATCH/DELETE`), redacta claves sensibles (`password/token/secret/apikey/privatekey`) antes de guardar el body de respuesta. **Bug real corregido en vivo (2026-08-19)**: `AuditEntryInput.recordId` siempre fue `string | null` (a propósito — no toda acción mutante tiene un recordId natural, ej. `POST /auth/login`), pero `AuditLog.recordId` en ambos `schema.prisma` era `String` no-nullable — cualquier acción sin `:id` en la ruta ni `.id` en la respuesta fallaba en silencio al escribir (atrapado y solo logueado como `WARN`, nunca rompía la request real, pero el audit trail quedaba vacío; en `auth-service` esto significaba que **ningún** login se auditaba nunca). Ambos schemas pasaron a `recordId String?` (migración `audit_log_record_id_nullable` en los 2 servicios).
+  - `interceptors/` — `LoggingInterceptor` (exportado, pero sin importadores reales todavía — ningún `main.ts` lo registra global). `AuditInterceptor` **sí está implementado y registrado** en `auth-service`/`core-service` (`app.useGlobalInterceptors(new AuditInterceptor(writeAuditEntry))`, ver sus `main.ts`) — agnóstico de Prisma a propósito (cada servicio inyecta su propia función de escritura contra su propio cliente), audita todo método mutante (`POST/PUT/PATCH/DELETE`), redacta claves sensibles (`password/token/secret/apikey/privatekey`) antes de guardar el body de respuesta.
+  **`performedBy` — corregido 2026-08-20**: antes era `req.user?.sub` (UUID crudo, ilegible en
+  `/audit-log`) con `'anonymous'` fijo para login/register/refresh (nunca hay `req.user` en ese punto de la
+  request). Ahora es `req.user?.email` — mismo payload del JWT, ya trae `email` — y para
+  login/register/refresh decodifica (sin verificar firma, es el token que el propio servicio acaba de
+  firmar en esta misma request, solo para loguear) el `email` del `accessToken` recién emitido en la
+  respuesta, en vez de mostrar `'anonymous'` siempre. Filas ya escritas antes de este fix no se reescriben.
+  **Bug real corregido en vivo (2026-08-19)**: `AuditEntryInput.recordId` siempre fue `string | null` (a propósito — no toda acción mutante tiene un recordId natural, ej. `POST /auth/login`), pero `AuditLog.recordId` en ambos `schema.prisma` era `String` no-nullable — cualquier acción sin `:id` en la ruta ni `.id` en la respuesta fallaba en silencio al escribir (atrapado y solo logueado como `WARN`, nunca rompía la request real, pero el audit trail quedaba vacío; en `auth-service` esto significaba que **ningún** login se auditaba nunca). Ambos schemas pasaron a `recordId String?` (migración `audit_log_record_id_nullable` en los 2 servicios).
   - `filters/` — `HttpExceptionFilter` (exportado, mismo caso que `LoggingInterceptor`: sin registrar globalmente todavía)
   - `circuit-breaker/` — factory de `opossum` para llamadas REST entre servicios (ADR-0003, sin mensajería async); esta versión ya trae el fix de import CommonJS (`import CircuitBreaker = require('opossum')`, `opossum` es CJS puro) que antes solo tenía la copia local de `core-service` — usado por `AyrshareService`/`NotificationsClient`/`ai-service`'s `OpenRouterClient`. **Ojo con un gotcha real (2026-08-18)**: envolver solo el `fetch()` en el breaker no basta — `fetch()` resuelve en cuanto llegan los headers, no cuando termina de bajar el body, así que el `response.json()` posterior queda sin protección de timeout si se hace fuera de la acción del breaker (causó un post marcado `error` en `core-service` mientras Ayrshare seguía publicando de verdad en segundo plano). `fetch()`+`response.json()` deben ir juntos dentro de la misma acción.
   - `types/` — enums compartidos (`Roles`, `Modules`, `Actions`) y `JwtPayload`. `PostStatus` **no** se migró — `core-service` mantiene su propia copia local con los 11 valores reales (la vieja versión de `commons/` solo tenía 6, desactualizada)

@@ -24,11 +24,11 @@ export class CloudinaryService {
     });
   }
 
-  async uploadFile(file: UploadableFile): Promise<any> {
+  async uploadFile(file: UploadableFile, folder: string = 'bananagram/posts'): Promise<any> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: 'bananagram/posts',
+          folder,
           resource_type: 'auto',
         },
         (error, result) => {
