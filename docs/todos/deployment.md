@@ -341,9 +341,10 @@ El flujo normal para editar código y que quede reflejado en el EC2 correspondie
 #    secuencial, nunca paralelo — ver motivo arriba):
 ./scripts/ec2-deploy.sh core
 
-# Alternativa manual, paso a paso, si querés más control:
+# Alternativa manual, paso a paso, si querés más control (DOCKER_BUILDKIT=1 es
+# obligatorio a mano acá — ec2-deploy.sh ya lo pone solo, ver sección de cache abajo):
 ./scripts/ec2-sync.sh core                          # solo copia el código, sin tocar contenedores
-./scripts/ec2-connect.sh core "cd ~/Bananagram && sudo docker compose -f docker-compose.core.yml build core-service"
+./scripts/ec2-connect.sh core "cd ~/Bananagram && sudo DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.core.yml build core-service"
 ./scripts/ec2-connect.sh core "cd ~/Bananagram && sudo docker compose -f docker-compose.core.yml up -d"
 
 # 4. Verificar que quedó arriba:
@@ -360,6 +361,62 @@ alcanza con recrear el contenedor para que relea el archivo:
 ```bash
 ./scripts/ec2-connect.sh auth-gateway "cd ~/Bananagram && sudo docker compose -f docker-compose.auth-gateway.yml up -d --force-recreate auth-service"
 ```
+
+### Cache de build compartida entre servicios (BuildKit + turbo) — 2026-08-20
+
+Hasta ahora cada uno de los 11 Dockerfiles (5 backend + 6 frontend, mismo esqueleto
+`base`/`deps`/`builder`/`runtime`, ver arriba) hacía un `pnpm install --frozen-lockfile`
+y un `pnpm exec turbo run build --filter=X` totalmente independientes — ningún build
+reaprovechaba nada del anterior, ni siquiera en el mismo host, aunque instalen
+prácticamente el mismo `node_modules` y compilen `@repo/ui`/`@repo/backend-commons`
+una y otra vez de cero. En un `t3.small` (build secuencial, uno por vez, ver más
+arriba) esto se sentía especialmente: cada servicio pagaba el install completo del
+workspace entero.
+
+Fix: `RUN --mount=type=cache` (BuildKit) en los dos pasos caros de cada Dockerfile,
+con el mismo `id` en los 11 archivos para que se comparta entre builds de distintos
+servicios en el mismo host (cada `docker compose build <svc>` es un proceso de build
+separado, pero el cache mount persiste en el daemon, no en la imagen):
+
+```dockerfile
+# syntax=docker/dockerfile:1                              # necesario para que --mount
+...                                                        # exista sin depender de qué
+RUN --mount=type=cache,id=bananagram-pnpm-store,target=/pnpm-store \
+    pnpm install --frozen-lockfile --store-dir=/pnpm-store
+...
+RUN --mount=type=cache,id=bananagram-turbo-cache,target=/app/.turbo/cache \
+    pnpm exec turbo run build --filter=@repo/X
+```
+
+Dos detalles reales que costó acertar:
+- **`# syntax=docker/dockerfile:1` en la primera línea** de los 11 Dockerfiles — sin
+  este pragma, `--mount` puede fallar según qué versión de BuildKit trae empaquetada
+  el Docker Engine del host (varía entre el `docker.io`/`docker-ce` de apt en Ubuntu y
+  el binario instalado a mano en Amazon Linux). Con el pragma, BuildKit descarga/usa
+  el frontend de Dockerfile correcto sin depender de la versión del daemon.
+- **El cache de turbo v2 (el que usa este repo, `"turbo": "^2.0.0"`) vive en
+  `.turbo/cache` en la raíz del repo, NO en `node_modules/.cache/turbo`** (eso era el
+  default de turbo v1) — confirmado localmente (`find . -iname .turbo` mostró
+  `./.turbo/cache/*.tar.zst`). El primer intento montó el cache mount ahí y no habría
+  hecho nada (turbo nunca lee de esa ruta en v2, cache silenciosamente inútil sin
+  error visible). Corregido a `target=/app/.turbo/cache`.
+- El pnpm store (`--store-dir=/pnpm-store`) evita que cada servicio vuelva a
+  descomprimir/vincular los mismos paquetes de `node_modules` — el `pnpm-lock.yaml`
+  es el mismo para los 11 builds (un solo workspace), así que el store cacheado sirve
+  igual de bien para todos.
+- `api-gateway` (`apps/backend/gateway/Dockerfile`) es el único de los 11 que **no**
+  usa turbo (`pnpm --filter @repo/api-gateway run build` directo, patrón ya distinto
+  desde antes — ver comentario en el propio archivo) — sí lleva el cache mount del
+  pnpm store, pero no el de turbo porque no aplica.
+- `ec2-deploy.sh` ahora antepone `DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1` a cada
+  `docker compose build` — sin esas dos env vars, Compose puede usar el builder legacy
+  (no BuildKit) según la versión/config del host, y `--mount` fallaría directo.
+
+No medido todavía en las instancias reales (ver "Pendiente") — el build en frío del
+primer servicio de cada host sigue pagando el costo completo (cache vacía), la
+ganancia es en los builds *siguientes* al mismo host: reinstalar dependencias o
+recompilar `@repo/ui`/`@repo/backend-commons` para el segundo/tercer servicio del
+mismo compose file ya no debería repetir ese trabajo de cero.
 
 ## `.env` por instancia (contenido, no valores)
 
@@ -386,45 +443,72 @@ levanta cada instancia — no hay un mecanismo automático de secretos todavía 
 
 ## Estado a esta fecha (2026-08-20, sesión en curso)
 
-- ✅ **core**: Postgres + Redis + `core-service` arriba, migraciones aplicadas (12),
-  estable.
-- ✅ **auth-gateway**: `auth-service` + `api-gateway` arriba, migraciones aplicadas
-  (4), `GET /health` responde `200` **desde fuera de la VPC** (probado desde la
-  máquina local, no solo desde otro EC2).
-- ✅ **Networking cross-instance verificado en vivo**: `api-gateway` (auth-gateway) →
-  `core-service` (core) por IP privada — probado con `/api/catalogs/social-networks`,
-  respondió `401` (falta token, pero la petición SÍ llegó y volvió — confirma que el
-  security group y la ruta de red funcionan).
-- ✅ **extras**: `alexa-service` + `ai-service` arriba y estables.
-- 🔄 **frontend**: recreada en Amazon Linux 2023 (ver sección arriba) y en
-  redespliegue con build secuencial — a mitad de las 6 apps al momento de escribir
-  esto, sin errores.
-- ✅ **6 commits locales** en `feat/dev-desp` con todo el trabajo de código hasta
-  ahora (Cloudinary→S3, fixes de Docker/Compose, arquitectura multi-EC2, scripts,
-  esta documentación) — **sin push todavía**, se mergea a `develop` recién cuando el
-  despliegue funcione de punta a punta en el navegador.
+- 🔻 **Las 4 instancias están intencionalmente abajo ahora mismo**: `./scripts/ec2-down.sh <rol> -v`
+  corrido en las 4 (frontend, core, auth-gateway, extras) — contenedores, redes y
+  volúmenes eliminados, **incluida la base de Postgres en `core`** (se pierden los
+  datos del seed anterior; hay que correr `pnpm seed` de nuevo después del próximo
+  `up`). Fue un paso deliberado antes de aplicar el cambio de cache de build (sección
+  de arriba) para redesplegar limpio con los Dockerfiles nuevos, no un fallo.
+- ✅ Antes de bajarlos, ya se había verificado funcionando de punta a punta al menos
+  una vez: **core** (Postgres+Redis+`core-service`, 12 migraciones), **auth-gateway**
+  (`auth-service`+`api-gateway`, 4 migraciones, `GET /health` 200 desde fuera de la
+  VPC), **networking cross-instance** (`api-gateway`→`core-service` por IP privada,
+  confirmado con `/api/catalogs/social-networks` → 401 pero petición ida y vuelta
+  real), **extras** (`alexa-service`+`ai-service` estables), y **frontend** recreada
+  en Amazon Linux 2023 con las 6 apps arriba tras el redespliegue secuencial.
+- 🐛 **Bug real encontrado y corregido en código, pendiente de redesplegar**:
+  `apps/frontend/web-shell/middleware.ts` redirigía el login con
+  `NextResponse.redirect(new URL('/login', ZONE_URLS.authFront))` — `ZONE_URLS.authFront`
+  es una URL pensada para el proxy del servidor (nombre de servicio Docker o IP
+  privada entre EC2), pero un `redirect()` de middleware lo sigue el **navegador**,
+  no el servidor, así que fuera de `localhost` esa URL nunca es alcanzable para el
+  usuario. Pasaba desapercibido en local porque ahí el default (`localhost:3012`) es
+  igual de alcanzable para servidor y navegador. Fix: usar `request.url` (relativo al
+  propio origen de la request) en vez de `ZONE_URLS.authFront` — `/login` en el propio
+  `web-shell` ya se reescribe server-side hacia `auth-front` vía `rewrites()` en
+  `next.config.ts`, así que la URL relativa sí resuelve bien. **Este fix está en el
+  working tree, sin commitear todavía** — se commitea junto con el resto una vez
+  verificado en el navegador tras el próximo redespliegue.
+- ⚙️ **Cache de build BuildKit+turbo agregada a los 11 Dockerfiles** (ver sección
+  dedicada arriba) — en código, sin commitear, sin probar todavía en ninguna
+  instancia real. Próximo paso: redesplegar con esto activo y medir si baja el tiempo
+  de build de los servicios 2do/3ro en adelante de cada host.
 - ✅ **S3 real accesible también desde local** (no solo desde los EC2) — credenciales
   temporales del Learner Lab puestas en `~/.aws/credentials`, verificado listando el
   bucket con el SDK. Ver sección "Probar contra el bucket S3 real desde local" arriba.
+- 🔲 **Sin commits todavía en esta sesión** — el trabajo de Cloudinary→S3/fixes de
+  Docker/arquitectura multi-EC2/scripts de una sesión anterior ya se commiteó (ver
+  historial de `feat/dev-desp`); el middleware fix y la cache de build de *esta*
+  sesión siguen sin commitear, a la espera de verificar en el navegador. **Sin push
+  todavía** en ningún caso — se mergea a `develop` recién cuando el despliegue
+  funcione de punta a punta en el navegador.
 
 ## Pendiente
 
-1. Terminar el redespliegue de `frontend` en Amazon Linux (en curso).
-2. Prueba real en navegador: entrar a `http://52.200.97.70`, login, al menos un flujo
+1. Redesplegar las 4 instancias desde cero (`ec2-deploy.sh <rol>` por cada una) con
+   los Dockerfiles de cache nueva — primer build en frío por host (cache vacía),
+   pero valida que la sintaxis/mounts funcionan antes de confiar en la ganancia de
+   velocidad para el 2do build en adelante.
+2. `pnpm seed` en `core` — **solo el seed**, sin datos de prueba adicionales (pedido
+   explícito del usuario: sistema limpio, nada más que lo que carga el seed) — se
+   perdió al bajar `core` con `-v`.
+3. Prueba real en navegador: entrar a la IP pública de `frontend`, login (validar que
+   el fix de `middleware.ts` realmente resuelve el redirect), y al menos un flujo
    completo (crear marca, publicación, etc.) — para confirmar que las 4 instancias
    realmente arman el sistema completo, no solo que cada una responde por separado.
-3. `pnpm seed` — **solo el seed**, sin datos de prueba adicionales (pedido explícito
-   del usuario: sistema limpio, nada más que lo que carga el seed).
-4. Una vez confirmado en el navegador: push de `feat/dev-desp` y merge a `develop`.
-5. TLS/dominio — hoy todo es HTTP plano sobre IPs públicas crudas. Sin Nginx ni
+4. Commitear el fix de `middleware.ts` y el cambio de cache de build (commits
+   separados, mensaje descriptivo, sin coautoría — mismo criterio que el resto de la
+   sesión) una vez verificado en el navegador.
+5. Una vez confirmado en el navegador: push de `feat/dev-desp` y merge a `develop`.
+6. TLS/dominio — hoy todo es HTTP plano sobre IPs públicas crudas. Sin Nginx ni
    certificados todavía en ninguna de las 4 instancias.
-6. Secretos hoy se escriben a mano por SSH — no hay Secrets Manager ni nada
+7. Secretos hoy se escriben a mano por SSH — no hay Secrets Manager ni nada
    automatizado. Aceptable para este alcance (proyecto escolar, cuenta de lab
    temporal), documentado acá para no repetir el trabajo de memoria si hay que
    rehacer una instancia.
-7. Granularidad de los security groups internos (VPC CIDR completo en vez de
+8. Granularidad de los security groups internos (VPC CIDR completo en vez de
    SG-a-SG) — ver nota en la sección de security groups arriba.
-8. La sesión del AWS Academy Learner Lab tiene un límite de tiempo (se vio un
+9. La sesión del AWS Academy Learner Lab tiene un límite de tiempo (se vio un
    contador de "tiempo restante" en el panel del lab) — cuando termine o se reinicie,
    las credenciales de `~/.aws/credentials` dejan de servir y **puede que las 4
    instancias EC2 también se detengan/pierdan** según cómo esté configurado el lab.
