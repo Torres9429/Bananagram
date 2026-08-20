@@ -29,6 +29,11 @@ interface CreateBrandDialogProps {
 // líneas no justifica una dependencia nueva.
 const DIACRITICS_REGEX = new RegExp('[̀-ͯ]', 'g'); // marcas diacríticas (acentos) tras NFD
 
+// #RGB o #RRGGBB — mismo formato que ya escribe el input type="color" de al
+// lado; el campo de texto es un atajo opcional, pero si se escribe a mano
+// debe seguir siendo un hex válido (si no, rompe el bgcolor del Avatar).
+const HEX_COLOR_REGEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
 function slugify(value: string): string {
   return value
     .normalize('NFD')
@@ -76,6 +81,12 @@ export function CreateBrandDialog({ open, onClose }: CreateBrandDialogProps) {
       showError('No se pudo subir el logo.');
     }
   }
+
+  // Bug real (2026-08-20): "Color primario" era texto completamente libre —
+  // un valor que no fuera un hex válido rompía silenciosamente el bgcolor
+  // del Avatar (CSS ignora un color inválido, se ve como si no hubiera
+  // color de fondo). Vacío sigue siendo válido (campo opcional).
+  const colorValid = !primaryColor.trim() || HEX_COLOR_REGEX.test(primaryColor.trim());
 
   function handleNameChange(value: string) {
     setName(value);
@@ -133,7 +144,7 @@ export function CreateBrandDialog({ open, onClose }: CreateBrandDialogProps) {
       title={step === 'form' ? 'Nueva marca' : 'Marca creada'}
       maxWidth="sm"
       confirmLabel={step === 'form' ? (isCreating ? 'Creando…' : 'Crear') : 'Listo'}
-      confirmDisabled={step === 'form' && (!name.trim() || !slug.trim() || isCreating)}
+      confirmDisabled={step === 'form' && (!name.trim() || !slug.trim() || !colorValid || isCreating)}
       onClose={handleClose}
       onConfirm={step === 'form' ? handleCreate : handleClose}
     >
@@ -230,6 +241,8 @@ export function CreateBrandDialog({ open, onClose }: CreateBrandDialogProps) {
                 placeholder="#E0A800"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
+                error={!colorValid}
+                helperText={!colorValid ? 'Formato inválido — usa #RGB o #RRGGBB' : ' '}
                 sx={{ flex: 1 }}
               />
             </Stack>

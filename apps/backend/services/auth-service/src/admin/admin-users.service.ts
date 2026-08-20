@@ -67,11 +67,22 @@ export class AdminUsersService {
     await this.getUser(id);
 
     try {
-      return await prisma.user.update({
+      const updated = await prisma.user.update({
         where: { id },
         data: { email: dto.email, status: dto.status as UserStatus | undefined },
         select: SELECT_SAFE,
       });
+      // Bug real (2026-08-20): suspender/despendientizar a un usuario desde
+      // el panel nunca cortaba su sesión activa — con el login/refresh ya
+      // validando status (auth.service.ts), un refresh futuro lo bloquea,
+      // pero sin esto seguía teniendo un access token válido (hasta 15 min)
+      // y, más grave, un refresh token todavía sin usar que revive la
+      // sesión en el momento en que se llame — se revoca de una vez, mismo
+      // criterio que ya usa removeUser().
+      if (dto.status && dto.status !== 'active') {
+        await prisma.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+      }
+      return updated;
     } catch (error) {
       if (this.isUniqueConstraintError(error)) throw new ConflictException('Email ya registrado');
       throw error;

@@ -73,7 +73,7 @@ export default function CampaignsPage() {
         </Stack>
       </Box>
 
-      <CreateCampaignDialog open={createOpen} brandId={brand.id} onClose={() => setCreateOpen(false)} />
+      <CreateCampaignDialog open={createOpen} brandId={brand.id} brandCategoryId={brand.categoryId} onClose={() => setCreateOpen(false)} />
     </Box>
   );
 }

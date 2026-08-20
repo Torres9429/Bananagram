@@ -231,6 +231,7 @@ export default function MyCampaignsPage() {
       <CreateCampaignDialog
         open={!!createBrandId}
         brandId={createBrandId ?? ''}
+        brandCategoryId={myBrands.find((b) => b.id === createBrandId)?.categoryId}
         onClose={() => setCreateBrandId(null)}
       />
     </Box>

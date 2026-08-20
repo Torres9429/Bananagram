@@ -36,6 +36,17 @@ export const campaignsApi = createApi({
   reducerPath: 'campaignsApi',
   baseQuery: createAuthenticatedBaseQuery(),
   tagTypes: ['Campaign'],
+  // refetchOnMountOrArgChange (2026-08-20): listEligibleCMs/listEligibleDesigners
+  // dependen de datos que cambian FUERA de este flujo (otro usuario
+  // completando su propio perfil en otra sesión) — sin esto, RTK Query
+  // servía la respuesta cacheada (hasta 60s, keepUnusedDataFor default) al
+  // reabrir el diálogo de crear campaña / asignar equipo, así que un
+  // CM/Diseñador recién dado de alta no aparecía hasta que el caché
+  // expiraba solo — indistinguible de "no aparece" para quien lo prueba en
+  // vivo. Global a nivel de slice (no solo esos 2 endpoints) porque
+  // listCampaigns/getCampaign se benefician del mismo criterio (mismo
+  // patrón ya usado en analytics.api.ts).
+  refetchOnMountOrArgChange: true,
   endpoints: (builder) => ({
     listCampaigns: builder.query<Campaign[], void>({
       // El backend ya filtra por dueño/CM/diseñador asignado o Admin — no
@@ -71,6 +82,15 @@ export const campaignsApi = createApi({
     // el buscador del diálogo necesita poder encontrar a cualquiera. Array
     // vacío = sin filtro (en vez de void/undefined, para no pelear con las
     // reglas de TS sobre acceso a propiedades en tipos void).
+    //
+    // refetchOnMountOrArgChange (2026-08-20): sin esto, RTK Query sirve la
+    // respuesta cacheada (hasta 60s, keepUnusedDataFor default) al reabrir
+    // el diálogo — un CM/Diseñador recién dado de alta que ya completó su
+    // perfil en OTRA pestaña/sesión no aparecía hasta que el caché expiraba
+    // solo, algo indistinguible de "no aparece" para quien lo prueba en
+    // vivo. Esta lista depende de un dato que cambia fuera de este flujo
+    // (otro usuario completando su perfil), así que siempre debe refrescar
+    // al montar, no confiar en el caché.
     listEligibleCMs: builder.query<EligibleCm[], string[]>({
       query: (categoryIds) =>
         categoryIds.length ? `campaigns/eligible-community-managers?categoryIds=${categoryIds.join(',')}` : 'campaigns/eligible-community-managers',
