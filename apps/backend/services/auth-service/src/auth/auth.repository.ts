@@ -29,6 +29,7 @@ type UserWithRoles = {
   id: string;
   email: string;
   passwordHash: string;
+  status: string;
   roles: { role: { id: string; name: string } }[];
 };
 

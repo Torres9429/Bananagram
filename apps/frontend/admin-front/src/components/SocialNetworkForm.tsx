@@ -34,10 +34,15 @@ export function SocialNetworkForm() {
   // se guarda internamente como fracción (0-1), igual que en modelo.txt.
   const [ratePercent, setRatePercent] = useState('');
 
+  // Bug real (2026-08-20): sin límites, se podía guardar un porcentaje
+  // negativo o mayor a 100 — sin sentido de negocio para una tasa base de
+  // engagement (alimenta el cron de métricas simuladas, ver modelo.txt).
+  const rateValue = Number(ratePercent);
+  const rateValid = ratePercent.trim() !== '' && !Number.isNaN(rateValue) && rateValue >= 0 && rateValue <= 100;
+
   async function handleAdd() {
-    if (!name.trim() || !ratePercent.trim()) return;
-    const baseEngagementRate = Number(ratePercent) / 100;
-    if (Number.isNaN(baseEngagementRate)) return;
+    if (!name.trim() || !rateValid) return;
+    const baseEngagementRate = rateValue / 100;
 
     await createSocialNetwork({ name: name.trim(), code, baseEngagementRate });
     setName('');
@@ -90,7 +95,7 @@ export function SocialNetworkForm() {
         open={open}
         title="Agregar red social"
         confirmLabel="Agregar"
-        confirmDisabled={!name.trim() || !ratePercent.trim()}
+        confirmDisabled={!name.trim() || !rateValid}
         onClose={() => setOpen(false)}
         onConfirm={handleAdd}
       >
@@ -107,6 +112,9 @@ export function SocialNetworkForm() {
           value={ratePercent}
           onChange={(e) => setRatePercent(e.target.value)}
           InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+          inputProps={{ min: 0, max: 100, step: 0.1 }}
+          error={ratePercent.trim() !== '' && !rateValid}
+          helperText={ratePercent.trim() !== '' && !rateValid ? 'Debe estar entre 0 y 100' : ' '}
         />
       </FormDialog>
     </Box>

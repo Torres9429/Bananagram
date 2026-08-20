@@ -30,7 +30,20 @@ export function CmPicker({ categoryIds, value, onChange, skip }: CmPickerProps) 
   const [search, setSearch] = useState('');
   const { data: eligibleCMs = [], isFetching: loadingCMs } = useListEligibleCMsQuery(categoryIds, { skip });
 
-  const recommendedCMs = eligibleCMs.slice(0, RECOMMENDED_COUNT);
+  // Antes "RECOMENDADOS" mostraba el top 5 sin importar matchScore — con
+  // pocos CM en el sistema, eso significaba mostrar gente sin ninguna
+  // categoría en común como si calzara (reportado en vivo: "siempre salen
+  // los mismos"). Ahora, si hay algún criterio real (categoría de campaña o
+  // de marca), solo entran los que de verdad tienen matchScore>0 — sin
+  // criterio (ninguna categoría elegida ni la marca tiene una), no hay nada
+  // que filtrar, se muestra el universo completo como antes.
+  const hasCriteria = categoryIds.length > 0;
+  const matchingCMs = hasCriteria ? eligibleCMs.filter((cm) => cm.matchScore > 0) : eligibleCMs;
+  const recommendedCMs = matchingCMs.slice(0, RECOMMENDED_COUNT);
+  // El buscador sigue sobre TODO el universo elegible, no solo los que
+  // matchean — encontrar a alguien específico no debería depender de que
+  // tenga la categoría marcada (matching es orientativo, no restrictivo,
+  // regla de negocio #8).
   const searchResults = search.trim()
     ? eligibleCMs.filter((cm) => cm.name.toLowerCase().includes(search.trim().toLowerCase()))
     : [];
@@ -81,9 +94,15 @@ export function CmPicker({ categoryIds, value, onChange, skip }: CmPickerProps) 
       <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={1}>
         RECOMENDADOS
       </Typography>
-      <Stack gap={1} mb={2}>
-        {recommendedCMs.map(renderOption)}
-      </Stack>
+      {recommendedCMs.length === 0 ? (
+        <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
+          Ningún Community Manager tiene esta categoría todavía — busca por nombre para elegir a cualquiera.
+        </Alert>
+      ) : (
+        <Stack gap={1} mb={2}>
+          {recommendedCMs.map(renderOption)}
+        </Stack>
+      )}
 
       <LabeledField
         label="¿Buscas a alguien en específico?"

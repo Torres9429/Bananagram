@@ -20,7 +20,6 @@ import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { usePermissions, PrimaryButton, StatusChip } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials, formatDateRange } from '@repo/ui/utils';
@@ -34,7 +33,7 @@ import {
 import { useGetBrandQuery } from '../../../../../store/api/brands.api';
 import { useListPostsByCampaignQuery } from '../../../../../store/api/posts.api';
 import { ReassignCmDialog } from '../../../../../components/ReassignCmDialog';
-import { GenerateIdeasDialog } from '../../../../../components/GenerateIdeasDialog';
+import { GenerateIdeasSection } from '../../../../../components/GenerateIdeasSection';
 import { CAMPAIGN_STATUS_LABEL } from '../../../../../lib/mock-data';
 
 const CM_STATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
@@ -72,7 +71,6 @@ export default function CampaignDetailPage() {
   const [refreshMetrics, { isLoading: isRefreshingMetrics }] = useRefreshCampaignMetricsMutation();
   const { data: recentPosts = [] } = useListPostsByCampaignQuery(params.campaignId);
   const [reassignOpen, setReassignOpen] = useState(false);
-  const [ideasOpen, setIdeasOpen] = useState(false);
 
   if (isLoadingCampaign) return null;
   if (!campaign) {
@@ -173,17 +171,15 @@ export default function CampaignDetailPage() {
               Crear publicación
             </PrimaryButton>
           )}
-          {can('ideas', 'crear') && (
-            <Button
-              variant="outlined"
-              startIcon={<AutoAwesomeIcon />}
-              onClick={() => setIdeasOpen(true)}
-              sx={{ borderColor: '#6A1B9A', color: '#6A1B9A' }}
-            >
-              Generar ideas con IA
-            </Button>
-          )}
         </Stack>
+
+        {/* Antes un botón que abría GenerateIdeasDialog en un modal (tapaba
+            el resto del detalle de campaña) — ahora una sección contraible
+            en el propio flujo de la página, mismo patrón que
+            AiAssistantSection/SuggestCaptionPanel en posts-front. */}
+        {can('ideas', 'crear') && (
+          <GenerateIdeasSection campaignId={campaign.id} brandName={brand?.name} />
+        )}
 
         {/* Equipo asignado — resumen inline, mismo criterio que el botón de
             arriba: visible para todo el que puede ver la campaña. */}
@@ -326,12 +322,6 @@ export default function CampaignDetailPage() {
         campaignId={campaign.id}
         categoryIds={campaign.categories?.map((c) => c.categoryId) ?? []}
         onClose={() => setReassignOpen(false)}
-      />
-      <GenerateIdeasDialog
-        open={ideasOpen}
-        campaignId={campaign.id}
-        brandName={brand?.name}
-        onClose={() => setIdeasOpen(false)}
       />
     </Box>
   );

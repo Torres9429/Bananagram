@@ -80,6 +80,16 @@ const FILTER_LABELS: Record<string, string> = {
   cancelado: 'Cancelado',
 };
 
+// Fecha/hora local (no UTC) en formato yyyy-mm-ddThh:mm, para usar como
+// `min` de un input type="datetime-local" y para comparar contra el valor
+// elegido — Date.toISOString() por sí solo puede correrse un día/hora según
+// la zona horaria del navegador.
+function nowLocalIso(): string {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 // Reescrita a datos reales (Fase N), acciones reales de 2 tramos (Fase O):
 // Diseñador crea/edita → CM aprueba/rechaza → Cliente programa/rechaza → CM
 // edita-y-reenvía o regresa al Diseñador. Se quitó el panel de "análisis IA"
@@ -115,6 +125,16 @@ export default function PostDetailPage() {
   const [cancelPost, { isLoading: isCancelling }] = useCancelPostMutation();
   const [uploadMedia, { isLoading: isUploadingMedia }] = useUploadMediaMutation();
   const [removeMedia] = useRemoveMediaMutation();
+
+  // Bug real (2026-08-20): el picker de "Programar para" no tenía ninguna
+  // restricción — se podía elegir una fecha/hora ya pasada. El backend
+  // (schedulePost) no la rechaza, la trata como "ya pasó, publica de
+  // inmediato" (delay clamp a 0), así que no rompía nada, pero el usuario
+  // veía "Publicación programada" para una fecha pasada cuando en realidad
+  // ya se publicó — confuso. Se bloquea desde la UI en vez de solo confiar
+  // en ese comportamiento de respaldo del backend.
+  const minScheduleAt = nowLocalIso();
+  const scheduledAtInvalid = !!scheduledAt && scheduledAt < minScheduleAt;
 
   if (isFetching) return null;
   if (!post) {
@@ -510,6 +530,9 @@ export default function PostDetailPage() {
                 InputLabelProps={{ shrink: true }}
                 value={scheduledAt}
                 onChange={(e) => setScheduledAt(e.target.value)}
+                inputProps={{ min: minScheduleAt }}
+                error={scheduledAtInvalid}
+                helperText={scheduledAtInvalid ? 'No puedes programar para una fecha/hora ya pasada' : ' '}
                 sx={{ mt: 2, mb: 1, minWidth: 260 }}
               />
             )}
@@ -564,7 +587,7 @@ export default function PostDetailPage() {
                         Rechazar
                       </Button>
                     )}
-                    <Button variant="contained" disabled={isScheduling} onClick={handleSchedule} sx={{ bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}>
+                    <Button variant="contained" disabled={isScheduling || scheduledAtInvalid} onClick={handleSchedule} sx={{ bgcolor: '#E65100', '&:hover': { bgcolor: '#BF360C' } }}>
                       {isScheduling ? 'Programando…' : 'Programar / Publicar ahora'}
                     </Button>
                   </>

@@ -19,6 +19,7 @@ const REGISTER_ROLE_MAP = {
 type UserWithRoles = {
   id: string;
   email: string;
+  status: string;
   roles: { role: { id: string; name: string } }[];
 };
 
@@ -94,6 +95,12 @@ export class AuthService {
     const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) throw new UnauthorizedException('Credenciales inválidas');
 
+    // Bug real (2026-08-20): el campo User.status ('pending'|'active'|
+    // 'suspended', editable desde /admin-front/users) nunca se validaba en
+    // ningún punto — "desactivar" a un usuario desde el panel de Admin no
+    // bloqueaba nada, solo lo dejaba visualmente marcado como suspendido.
+    this.assertActiveStatus(user.status);
+
     return this.issueTokens(user);
   }
 
@@ -113,7 +120,25 @@ export class AuthService {
         'Refresh token reusado o expirado: la sesión fue revocada, vuelve a iniciar sesión',
       );
     }
+    // Mismo chequeo que login() — sin esto, un usuario suspendido DESPUÉS de
+    // haber iniciado sesión seguía renovando su access token cada 15 min
+    // durante los 7 días de vida del refresh token, ignorando la suspensión
+    // por completo. Se revoca la familia entera (no solo se rechaza este
+    // intento) para que la sesión completa muera aquí, no solo esta renovación.
+    if (result.user.status !== 'active') {
+      await this.repo.revokeAllTokens(result.user.id);
+      this.assertActiveStatus(result.user.status);
+    }
     return this.issueTokens(result.user, result.refreshToken);
+  }
+
+  private assertActiveStatus(status: string): void {
+    if (status === 'suspended') {
+      throw new ForbiddenException('Esta cuenta fue suspendida. Contacta a un administrador.');
+    }
+    if (status === 'pending') {
+      throw new ForbiddenException('Esta cuenta todavía no está activa.');
+    }
   }
 
   // Compartido por login()/register() (crean sesión nueva) y refresh()

@@ -21,7 +21,7 @@ import type { StaffProfileSectionProps } from '../../interfaces/interface';
 // El backend rechaza el guardado si categorías/especialidades quedan en
 // blanco ("Las categorías son obligatorias para community manager y
 // diseñador") — mostrar ese mensaje real en vez de uno genérico, mismo
-// patrón ya usado en RegisterForm/GenerateIdeasDialog/los paneles de IA.
+// patrón ya usado en RegisterForm/GenerateIdeasSection/los paneles de IA.
 function getErrorMessage(error: unknown): string {
   if (error && typeof error === 'object' && 'data' in error) {
     const data = (error as { data?: unknown }).data;
