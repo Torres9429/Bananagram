@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Build context MUST be the repo root (not this directory), e.g.:
 #   docker build -f apps/frontend/analytics-front/Dockerfile -t analytics-front .
 #
@@ -15,7 +16,8 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json .npmrc ./
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=bananagram-pnpm-store,target=/pnpm-store \
+    pnpm install --frozen-lockfile --store-dir=/pnpm-store
 
 # ---- build: via turbo (not plain `pnpm --filter`) so @repo/ui builds first —
 # turbo.json's "build": {"dependsOn": ["^build"]} resolves that from the
@@ -27,7 +29,8 @@ FROM deps AS builder
 # apps/frontend/commons/src/config/zone-urls.ts.
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-RUN pnpm exec turbo run build --filter=@repo/analytics-front
+RUN --mount=type=cache,id=bananagram-turbo-cache,target=/app/.turbo/cache \
+    pnpm exec turbo run build --filter=@repo/analytics-front
 
 # ---- runtime: copy the whole built workspace (symlinked node_modules included) ----
 FROM node:20-alpine AS runtime

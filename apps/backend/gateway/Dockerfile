@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Build context MUST be the repo root (not this directory), e.g.:
 #   docker build -f apps/backend/gateway/Dockerfile -t api-gateway .
 #
@@ -14,7 +15,8 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=bananagram-pnpm-store,target=/pnpm-store \
+    pnpm install --frozen-lockfile --store-dir=/pnpm-store
 
 # ---- build: generate Prisma Client against the shared schema, then compile ----
 FROM deps AS builder

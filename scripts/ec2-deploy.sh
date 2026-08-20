@@ -28,10 +28,16 @@ SERVICES="$(ec2_services_for "$ROLE")"
 echo "== 1/3: sincronizando código -> $ROLE =="
 ./scripts/ec2-sync.sh "$ROLE"
 
-echo "== 2/3: build (uno por uno) + up -d en $ROLE =="
+echo "== 2/3: build (uno por uno, con cache de BuildKit) + up -d en $ROLE =="
+# DOCKER_BUILDKIT=1 + COMPOSE_DOCKER_CLI_BUILD=1: los Dockerfiles usan
+# `RUN --mount=type=cache,...` para compartir el store de pnpm y la cache de
+# turbo entre builds de distintos servicios en el mismo host — sin BuildKit
+# ese --mount no existe y el build falla. No asumir que el daemon ya lo tiene
+# de default: varía entre el Docker de apt (Ubuntu) y el binario manual
+# (Amazon Linux, ver scripts/lib/ec2-hosts.sh).
 BUILD_CMDS=""
 for svc in $SERVICES; do
-  BUILD_CMDS="$BUILD_CMDS sudo docker compose -f $COMPOSE_FILE build $svc &&"
+  BUILD_CMDS="$BUILD_CMDS sudo DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f $COMPOSE_FILE build $svc &&"
 done
 
 ./scripts/ec2-connect.sh "$ROLE" "cd $(ec2_repo_path_for "$ROLE") && rm -f build.log && nohup bash -c '
