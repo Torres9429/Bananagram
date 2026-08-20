@@ -86,7 +86,7 @@ export default function CampaignDetailPage() {
   const cm = allCMs.find((c) => c.userId === campaign.cmId) ?? null;
   const assignedDesigners = (campaign.designers ?? []).map((d) => {
     const profile = allDesigners.find((ed) => ed.userId === d.userId);
-    return { userId: d.userId, name: profile?.name ?? 'Usuario' };
+    return { userId: d.userId, name: profile?.name ?? 'Usuario', avatarUrl: profile?.avatarUrl ?? null };
   });
   const statusStyle = CAMPAIGN_STATUS_LABEL[campaign.status];
   const cmStatusStyle = CM_STATUS_LABEL[campaign.cmStatus];
@@ -195,7 +195,7 @@ export default function CampaignDetailPage() {
               <Stack gap={1.25}>
                 {cm && (
                   <Stack direction="row" gap={1.5} alignItems="center">
-                    <Avatar sx={{ width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{getInitials(cm.name)}</Avatar>
+                    <Avatar src={cm.avatarUrl ?? undefined} sx={{ width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{getInitials(cm.name)}</Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" fontWeight={600}>{cm.name}</Typography>
                       <Typography variant="caption" color="text.secondary">Community Manager</Typography>
@@ -204,7 +204,7 @@ export default function CampaignDetailPage() {
                 )}
                 {assignedDesigners.slice(0, 2).map((d) => (
                   <Stack key={d.userId} direction="row" gap={1.5} alignItems="center">
-                    <Avatar sx={{ width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{getInitials(d.name)}</Avatar>
+                    <Avatar src={d.avatarUrl ?? undefined} sx={{ width: 32, height: 32, fontSize: 12, fontWeight: 700 }}>{getInitials(d.name)}</Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" fontWeight={600}>{d.name}</Typography>
                       <Typography variant="caption" color="text.secondary">Diseñador</Typography>

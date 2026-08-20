@@ -17,6 +17,7 @@ import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
+import Skeleton from '@mui/material/Skeleton';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
@@ -24,7 +25,7 @@ import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
-import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, useToast, usePermissions } from '@repo/ui/ui';
+import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, ScoreGauge, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser, useListCategoriesQuery } from '@repo/ui/state';
 import { getInitials, formatDateRange } from '@repo/ui/utils';
 import { ZONE_URLS } from '@repo/ui/config';
@@ -32,6 +33,7 @@ import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CreateBrandDialog } from '../CreateBrandDialog';
 import { useUpdateBrandMutation, useCreateConnectUrlMutation, useUploadLogoMutation } from '../../store/api/brands.api';
 import { useListCampaignsQuery } from '../../store/api/campaigns.api';
+import { useGetBrandScoreQuery } from '../../store/api/metrics.api';
 import {
   useListSocialAccountsQuery,
   useSyncSocialAccountsMutation,
@@ -61,10 +63,11 @@ const SOCIAL_NETWORK_COLORS: Record<string, string> = {
 // esta misma sección (§A.1 — el tipo nunca bifurca flujo).
 //
 // Identidad del Hero (nombre/tipo/categoría/logo/color), redes sociales y
-// campañas ya son datos reales. El score digital sigue sin backend
-// (score.service.ts existe pero no tiene controller, ver CLAUDE.md "Sigue
-// faltando por completo") así que se muestra un placeholder honesto en vez
-// de un número inventado.
+// campañas ya son datos reales. El score digital TAMBIÉN es real —
+// GET brands/:id/score (ScoreController) existe desde hace tiempo y ya lo
+// consume analytics-front (ScoreExplanationPanel), pero esta sección nunca
+// lo llamaba: mostraba "Aún no disponible" hardcodeado pese a tener el
+// permiso score:ver ya gateando el bloque (hallazgo real, reportado en vivo).
 export function ClientSection() {
   const router = useRouter();
   const user = useSelector(selectUser);
@@ -79,6 +82,13 @@ export function ClientSection() {
   const realBrandId = realBrand?.id;
   const { data: categories = [] } = useListCategoriesQuery();
   const categoryName = categories.find((c) => c.id === realBrand?.categoryId)?.name;
+
+  // Score real (GET brands/:id/score) — antes esta sección nunca lo pedía,
+  // ver comentario arriba. skip también por permiso: el backend ya exige
+  // score:ver (403 si no), esto solo evita la llamada innecesaria.
+  const { data: score, isFetching: isLoadingScore } = useGetBrandScoreQuery(realBrandId ?? '', {
+    skip: !realBrandId || !can('score', 'ver'),
+  });
 
   const { data: allCampaigns = [] } = useListCampaignsQuery();
   const campaigns = realBrandId ? allCampaigns.filter((c) => c.brandId === realBrandId) : [];
@@ -310,15 +320,21 @@ export function ClientSection() {
               )}
             </Box>
           </Stack>
-          {/* Score digital real: falta el endpoint (score.service.ts existe
-              pero sin controller, ver CLAUDE.md) — se muestra un placeholder
-              en vez de inventar un número. Gateado por score:ver aunque hoy
-              sea solo texto — para no dejarlo sin permiso el día que se
-              conecte a datos reales. */}
+          {/* Score digital real (GET brands/:id/score) — antes placeholder
+              hardcodeado pese a que el endpoint ya existía y funcionaba
+              (analytics-front ya lo usa, ver ScoreExplanationPanel). */}
           {can('score', 'ver') && (
             <Box sx={{ textAlign: 'center', minWidth: 140 }}>
-              <Typography variant="body2" color="text.secondary">Score Digital</Typography>
-              <Typography variant="caption" color="text.secondary">Aún no disponible</Typography>
+              {isLoadingScore && !score ? (
+                <Skeleton variant="circular" width={90} height={90} sx={{ mx: 'auto' }} />
+              ) : score ? (
+                <ScoreGauge score={score.score} classification={score.classification} />
+              ) : (
+                <>
+                  <Typography variant="body2" color="text.secondary">Score Digital</Typography>
+                  <Typography variant="caption" color="text.secondary">Aún no disponible</Typography>
+                </>
+              )}
             </Box>
           )}
         </Stack>

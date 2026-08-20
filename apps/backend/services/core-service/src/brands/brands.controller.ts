@@ -46,6 +46,22 @@ export class BrandsController {
     return this.brands.createBrand(dto, user);
   }
 
+  // Sube el logo ANTES de que la marca exista (formulario de creación, no
+  // hay :id todavía) — por eso no puede ser :id/logo ni llevar
+  // BrandAccessGuard (nada que verificar ownership todavía). Se gatea con
+  // el mismo permiso que crear la marca en sí (marcas:crear), no marcas:editar.
+  // Ruta de 2 segmentos ('brands/logo') — no colisiona con POST :id/logo
+  // (3 segmentos) ni con ningún otro verbo sobre brands/:id.
+  @Post('logo')
+  @ApiConsumes('multipart/form-data')
+  @RequirePermission('marcas', 'crear')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5_000_000 } }))
+  async uploadLogoForNewBrand(@UploadedFile() file: UploadableFile) {
+    if (!file) throw new BadRequestException('Falta el archivo de imagen');
+    const result = await this.cloudinary.uploadFile(file, 'bananagram/brands');
+    return { logoUrl: result.secure_url };
+  }
+
   @Patch(':id')
   @RequirePermission('marcas', 'editar')
   @UseGuards(BrandAccessGuard)

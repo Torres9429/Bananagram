@@ -74,6 +74,16 @@ export const brandsApi = createApi({
         return { url: `brands/${id}/logo`, method: 'POST', body: formData };
       },
     }),
+    // Mismo patrón que uploadLogo, pero sin brandId — para el formulario de
+    // CREAR marca, donde todavía no existe un id al que subirle el logo
+    // (POST brands/logo, ver brands.controller.ts).
+    uploadLogoForNewBrand: builder.mutation<{ logoUrl: string }, File>({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return { url: 'brands/logo', method: 'POST', body: formData };
+      },
+    }),
   }),
 });
 
@@ -84,4 +94,5 @@ export const {
   useUpdateBrandMutation,
   useCreateConnectUrlMutation,
   useUploadLogoMutation,
+  useUploadLogoForNewBrandMutation,
 } = brandsApi;
