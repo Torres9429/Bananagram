@@ -1,0 +1,45 @@
+# Instancia "core" (arquitectura multi-EC2, ver docs/todos/deployment.md).
+# Postgres + Redis + core-service en el mismo host — core-service es el más
+# pesado y el más acoplado a la base, mejor sin latencia de red entre ambos.
+#
+# Uso: docker compose -f docker-compose.core.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gestor_redes
+    ports: ["5432:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  core-service:
+    build:
+      context: .
+      dockerfile: apps/backend/services/core-service/Dockerfile
+    env_file: ./apps/backend/services/core-service/.env
+    environment:
+      # Postgres/Redis: mismo host, se resuelven por nombre de servicio de
+      # Docker Compose — no necesitan IP real.
+      DATABASE_URL_CORE: postgresql://postgres:postgres@postgres:5432/gestor_redes_core
+      REDIS_URL: redis://redis:6379
+      # auth-service vive en otro EC2 ("auth-gateway") — acá sí hace falta la
+      # IP privada real (misma VPC, tráfico nunca sale a Internet).
+      AUTH_JWKS_URL: http://172.31.1.153:3001/.well-known/jwks.json
+      AUTH_SERVICE_URL: http://172.31.1.153:3001
+    # Publicado sin restringir a 127.0.0.1 (a diferencia del setup de un solo
+    # EC2) porque auth-gateway y extras necesitan alcanzarlo desde otro host —
+    # la restricción real ahora es el security group (solo VPC CIDR
+    # 172.31.0.0/16, nunca 0.0.0.0/0).
+    ports: ["3002:3002"]
+    depends_on: [postgres, redis]
+
+volumes:
+  postgres_data:

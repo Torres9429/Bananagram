@@ -1,0 +1,70 @@
+# Instancia "frontend" (arquitectura multi-EC2, ver docs/todos/deployment.md).
+# web-shell + las 5 zonas de Multi-Zones en el mismo host — web-shell hace
+# proxy en el SERVIDOR hacia cada zona (next.config.ts rewrites()) en cada
+# request, así que conviene que sea red interna de Docker (rápida), no otro
+# EC2. NEXT_PUBLIC_API_URL sí cruza a otro host (EC2 "auth-gateway", IP
+# pública) porque esa la usa el NAVEGADOR del usuario, no el servidor — ver
+# el build.args de web-shell más abajo y el .env raíz de este host.
+#
+# Uso: docker compose -f docker-compose.frontend.yml up -d --build
+
+services:
+  admin-front:
+    build:
+      context: .
+      dockerfile: apps/frontend/admin-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3010:3010"]
+
+  analytics-front:
+    build:
+      context: .
+      dockerfile: apps/frontend/analytics-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3011:3011"]
+
+  auth-front:
+    build:
+      context: .
+      dockerfile: apps/frontend/auth-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3012:3012"]
+
+  brands-front:
+    build:
+      context: .
+      dockerfile: apps/frontend/brands-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3013:3013"]
+
+  posts-front:
+    build:
+      context: .
+      dockerfile: apps/frontend/posts-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3014:3014"]
+
+  web-shell:
+    build:
+      context: .
+      dockerfile: apps/frontend/web-shell/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    environment:
+      # Server-side (next.config.ts rewrites(), corre en ESTE contenedor) —
+      # todas las zonas están en el mismo host, se resuelven por nombre de
+      # servicio de Compose, igual que en el setup de un solo EC2.
+      NEXT_PUBLIC_ADMIN_FRONT_URL: http://admin-front:3010
+      NEXT_PUBLIC_ANALYTICS_FRONT_URL: http://analytics-front:3011
+      NEXT_PUBLIC_AUTH_FRONT_URL: http://auth-front:3012
+      NEXT_PUBLIC_BRANDS_FRONT_URL: http://brands-front:3013
+      NEXT_PUBLIC_POSTS_FRONT_URL: http://posts-front:3014
+    # Expuesto directo en el 80 (sin Nginx todavía) — evita que el usuario
+    # tenga que escribir :3000 en la URL.
+    ports: ["80:3000"]
+    depends_on: [admin-front, analytics-front, auth-front, brands-front, posts-front]
