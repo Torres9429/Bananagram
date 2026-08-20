@@ -76,10 +76,16 @@ export function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
           <MenuItem key={r.id} value={r.name}>{formatRoleName(r.name)}</MenuItem>
         ))}
       </LabeledSelect>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" display="block" mb={1}>
         La cuenta queda activa de inmediato con esta contraseña — comunícasela al usuario por un canal
         seguro.
       </Typography>
+      {(roleName === 'community_manager' || roleName === 'disenador') && (
+        <Typography variant="caption" color="text.secondary" display="block">
+          Para aparecer en las listas de asignación de campaña, el usuario debe iniciar sesión y completar
+          su perfil (nombre, categorías y especialidades) desde "Mi perfil" — no aparece de inmediato.
+        </Typography>
+      )}
     </FormDialog>
   );
 }

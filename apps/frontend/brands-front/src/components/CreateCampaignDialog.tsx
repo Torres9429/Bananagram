@@ -24,6 +24,25 @@ interface CreateCampaignDialogProps {
   onCreated?: () => void;
 }
 
+// Fecha local (no UTC) en formato yyyy-mm-dd, para usar como `min` de un
+// input type="date" — Date.toISOString() por sí solo puede correrse un día
+// según la zona horaria del navegador.
+function todayIso(): string {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+// dateIso en formato yyyy-mm-dd — parseo manual (no `new Date(dateIso)`
+// directo) porque ese constructor interpreta la fecha como UTC medianoche,
+// que al convertir de vuelta a local puede caer un día antes según la zona
+// horaria del navegador.
+function addDaysIso(dateIso: string, days: number): string {
+  const [year, month, day] = dateIso.split('-').map(Number);
+  const date = new Date(year, month - 1, day + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 // Fase J: el CM ahora debe ACEPTAR la campaña antes de que nada más pase —
 // ya no se le asignan Diseñadores aquí (ese paso era en realidad un bug:
 // CampaignsService.assignDesigner exige ser el CM asignado, el Cliente no
@@ -51,6 +70,25 @@ export function CreateCampaignDialog({ open, brandId, brandCategoryId, onClose, 
   const { showSuccess, showError } = useToast();
 
   const selectedCm = eligibleCMs.find((cm) => cm.userId === cmId) ?? null;
+
+  // Bug real (2026-08-20): no había ninguna validación de fechas — se podía
+  // crear una campaña con fecha de fin anterior (o igual) a la de inicio, o
+  // con fechas en el pasado. Ambos campos son opcionales (se puede crear
+  // sin fechas), así que la validación solo aplica cuando el campo tiene
+  // valor. Fin debe ser ESTRICTAMENTE posterior al inicio (decisión
+  // confirmada — no se permite una campaña de un solo día).
+  const minStartDate = todayIso();
+  const minEndDate = startDate ? addDaysIso(startDate, 1) : minStartDate;
+  const datesValid = !endDate || !startDate || endDate > startDate;
+
+  function handleStartDateChange(value: string) {
+    setStartDate(value);
+    // Si ya había una fecha de fin y quedó en o antes del nuevo inicio, se
+    // limpia en vez de dejar el formulario en un estado inválido
+    // silencioso — el usuario tiene que volver a elegirla, ahora sí después
+    // del inicio.
+    if (endDate && value && endDate <= value) setEndDate('');
+  }
 
   function toggleCategory(id: string) {
     setCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
@@ -103,7 +141,7 @@ export function CreateCampaignDialog({ open, brandId, brandCategoryId, onClose, 
       title="Nueva campaña"
       maxWidth="sm"
       confirmLabel={isCreating ? 'Creando…' : 'Crear'}
-      confirmDisabled={!name.trim() || !selectedCm || isCreating}
+      confirmDisabled={!name.trim() || !selectedCm || !datesValid || isCreating}
       onClose={handleClose}
       onConfirm={handleCreate}
     >
@@ -114,10 +152,26 @@ export function CreateCampaignDialog({ open, brandId, brandCategoryId, onClose, 
       <LabeledField label="Descripción (opcional)" placeholder="Ej. Contenido semanal en Instagram y TikTok" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={2} />
       <Stack direction="row" gap={2}>
         <Box sx={{ flex: 1 }}>
-          <LabeledField label="Inicio" type="date" placeholder="dd/mm/aaaa" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <LabeledField
+            label="Inicio"
+            type="date"
+            placeholder="dd/mm/aaaa"
+            value={startDate}
+            onChange={(e) => handleStartDateChange(e.target.value)}
+            inputProps={{ min: minStartDate }}
+          />
         </Box>
         <Box sx={{ flex: 1 }}>
-          <LabeledField label="Fin" type="date" placeholder="dd/mm/aaaa" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <LabeledField
+            label="Fin"
+            type="date"
+            placeholder="dd/mm/aaaa"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            inputProps={{ min: minEndDate }}
+            error={!datesValid}
+            helperText={!datesValid ? 'La fecha de fin debe ser posterior a la de inicio' : ' '}
+          />
         </Box>
       </Stack>
 
