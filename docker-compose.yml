@@ -53,13 +53,24 @@ services:
       # auditoría, nunca antes documentado.
       CORE_SERVICE_URL: http://core-service:3002
       # Compartido con core-service (mismo valor en ambos) para
-      # InternalAuthGuard en las rutas /internal/*.
-      INTERNAL_SERVICE_SECRET: dev-internal-secret-change-me
+      # InternalAuthGuard en las rutas /internal/*. Overridable desde el .env
+      # raíz (${INTERNAL_SERVICE_SECRET}) — sin esto, un valor real puesto en
+      # el .env de cada servicio quedaría igual pisado por este default, ya
+      # que `environment:` de compose tiene prioridad sobre `env_file:`.
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-dev-internal-secret-change-me}
     volumes:
       # Llave privada RS256 — solo auth-service la necesita, montada en
       # runtime (nunca por COPY en el Dockerfile, para que no quede horneada
       # en ninguna capa de la imagen). Generar antes con `pnpm generate-keys`.
-      - ./keys:/repo/keys:ro
+      # Bug real (encontrado en vivo desplegando en EC2, 2026-08-20):
+      # JWT_PRIVATE_KEY_PATH/JWT_PUBLIC_KEY_PATH son rutas relativas que Node
+      # resuelve contra el WORKDIR final del contenedor (WORKDIR
+      # /app/apps/backend/services/auth-service en el Dockerfile, no /repo) —
+      # montar en /repo/keys nunca coincidía y el proceso crasheaba con ENOENT
+      # al arrancar (TokenSignerService.onModuleInit). Nunca se detectó antes
+      # porque este servicio nunca se había llegado a *correr* de verdad bajo
+      # `--profile full`, solo a construir.
+      - ./keys:/app/apps/backend/services/auth-service/keys:ro
     # Solo accesible desde el propio host (127.0.0.1), no desde fuera de la
     # máquina — la comunicación real contenedor-a-contenedor (core-service,
     # api-gateway) va por la red interna de Docker, no por este puerto
@@ -88,7 +99,7 @@ services:
       # como error — las notificaciones cross-servicio simplemente nunca
       # llegaban.
       AUTH_SERVICE_URL: http://auth-service:3001
-      INTERNAL_SERVICE_SECRET: dev-internal-secret-change-me
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-dev-internal-secret-change-me}
     ports: ["127.0.0.1:3002:3002"]
     depends_on: [postgres, redis, auth-service]
 
@@ -172,6 +183,14 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/admin-front/Dockerfile
+      # NEXT_PUBLIC_API_URL gets inlined into the browser bundle at build
+      # time (see the Dockerfile's ARG/ENV) — must resolve from wherever the
+      # USER'S BROWSER can reach the gateway (public IP/domain), never a
+      # Docker-network hostname. Falls back to localhost:4000/api (the
+      # code-level default in zone-urls.ts) when unset, so local
+      # `--profile full` runs keep working unchanged.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports: ["3010:3010"]
     depends_on: [api-gateway]
 
@@ -180,6 +199,8 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/analytics-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports: ["3011:3011"]
     depends_on: [api-gateway]
 
@@ -188,6 +209,8 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/auth-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports: ["3012:3012"]
     depends_on: [api-gateway]
 
@@ -196,6 +219,8 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/brands-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports: ["3013:3013"]
     depends_on: [api-gateway]
 
@@ -204,6 +229,8 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/posts-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports: ["3014:3014"]
     depends_on: [api-gateway]
 
@@ -212,6 +239,8 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/web-shell/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     environment:
       # OJO — asimetría deliberada, no un descuido: estos NEXT_PUBLIC_* solo
       # los lee next.config.ts (rewrites(), corre en el SERVIDOR de este
