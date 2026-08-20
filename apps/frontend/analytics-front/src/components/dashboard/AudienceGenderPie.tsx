@@ -5,7 +5,7 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Skeleton from '@mui/material/Skeleton';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useActiveBrandId } from './useActiveBrandId';
 import { useDateRangeParams } from './useDateRangeParams';
@@ -59,7 +59,12 @@ export function AudienceGenderPie({ networkCode }: { networkCode?: string } = {}
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Distribución de género</Typography>
+      <ChartTitle
+        title="Distribución de género"
+        description="Qué porcentaje de tu audiencia es hombre, mujer o no especifica género."
+        info="Mismo dato que el gráfico de edad y género, sumado solo por género. Disponible hoy únicamente en Instagram."
+        mb={0.5}
+      />
       {!networkCode && sourceLabel && (
         <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
           Datos de {sourceLabel}
@@ -72,7 +77,11 @@ export function AudienceGenderPie({ networkCode }: { networkCode?: string } = {}
               <Cell key={entry.gender} fill={GENDER_COLOR[entry.gender] ?? '#9E9E9E'} />
             ))}
           </Pie>
-          <RechartsTooltip />
+          {/* La etiqueta fija en cada rebanada ya trae el "%", pero el
+              tooltip interactivo (lo que se lee al pasar el mouse) usaba el
+              formato default de Recharts, sin unidad — mismo tipo de
+              confusión ya reportada en el radar de comparación de redes. */}
+          <RechartsTooltip formatter={(value: number) => [`${value}%`, undefined]} />
           <Legend />
         </PieChart>
       </ResponsiveContainer>

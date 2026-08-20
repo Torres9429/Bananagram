@@ -6,7 +6,7 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MenuItem from '@mui/material/MenuItem';
-import { EmptyState, LabeledSelect } from '@repo/ui/ui';
+import { EmptyState, LabeledSelect, ChartTitle } from '@repo/ui/ui';
 import { scopedMetrics } from '../../lib/analytics/real-metrics';
 import { useSelectedNetwork } from './useSelectedNetwork';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
@@ -54,7 +54,11 @@ export function CampaignComparison() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Comparación entre campañas</Typography>
+      <ChartTitle
+        title="Comparación entre campañas"
+        description="Compara alcance, engagement, publicaciones e interacciones entre 2 campañas."
+        info="'—' significa que no hay dato de alcance disponible para esa campaña/red (no es un 0 real). El Score Digital no se compara aquí porque es a nivel de marca, no de campaña."
+      />
 
       <Grid container spacing={2} mb={2}>
         <Grid item xs={12} sm={6}>

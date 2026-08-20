@@ -3,11 +3,10 @@
 import { useMemo } from 'react';
 import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
-import Typography from '@mui/material/Typography';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import PersonSearchOutlinedIcon from '@mui/icons-material/PersonSearchOutlined';
 import PersonAddAltOutlinedIcon from '@mui/icons-material/PersonAddAltOutlined';
-import { EmptyState, MetricCard } from '@repo/ui/ui';
+import { EmptyState, MetricCard, ChartTitle } from '@repo/ui/ui';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
 import { useSelectedNetwork } from './useSelectedNetwork';
 
@@ -54,16 +53,11 @@ export function NetworkMetricCards() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Métricas específicas de la red</Typography>
-      {/* Descripción actualizada (2026-08-20): "solo se muestran los que
-          Ayrshare devuelve" sonaba a que era una elección de Ayrshare — en
-          varios casos (ej. Facebook) el dato ya no existe en la plataforma
-          de origen (Meta retiró varias métricas de su Graph API el 15 de
-          junio de 2026), no es algo que Ayrshare esté ocultando. */}
-      <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-        Cada red expone campos distintos, y algunos ya no existen en la plataforma de origen (ej. Meta
-        retiró varias métricas de Facebook en 2026) — solo se muestran los que sí están disponibles hoy.
-      </Typography>
+      <ChartTitle
+        title="Métricas específicas de la red"
+        description="Guardados, visitas al perfil y seguidores ganados — solo lo que esta red expone hoy."
+        info="Cada red social expone campos distintos de forma nativa; algunos ya no existen en la plataforma de origen (ej. Meta retiró varias métricas de Facebook en 2026, no es algo que Bananagram esté ocultando). Solo se muestran los campos disponibles para la red seleccionada."
+      />
       {cards.length === 0 ? (
         <EmptyState
           title="Sin métricas propias de esta red"

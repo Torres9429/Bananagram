@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell, ReferenceLine } from 'recharts';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
 import { useSelectedNetwork } from './useSelectedNetwork';
@@ -60,12 +60,12 @@ export function ReachEngagementScatter() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Alcance vs. engagement</Typography>
-      <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-        Cada punto es una publicación real: más a la derecha = llegó a más gente; más arriba = generó más
-        interacción en relación a esa gente. La línea punteada marca el engagement promedio de lo que ves
-        acá — los puntos por encima funcionaron mejor que el promedio. Click en un punto para ver su detalle.
-      </Typography>
+      <ChartTitle
+        title="Alcance vs. engagement"
+        description="Cada punto es una publicación — más a la derecha llegó a más gente, más arriba generó más interacción."
+        info="Eje X (Alcance): a cuánta gente le llegó la publicación. Eje Y (Engagement): qué tanto interactuó esa gente (interacciones ÷ alcance). La línea punteada es el promedio de lo que ves — los puntos por encima funcionaron mejor que el promedio. Haz clic en un punto para ver su detalle completo."
+        mb={1.5}
+      />
       {networksShown.length > 1 && (
         <Stack direction="row" gap={2} flexWrap="wrap" mb={1.5}>
           {networksShown.map((code) => {

@@ -2,10 +2,9 @@
 
 import { useMemo } from 'react';
 import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
 import Skeleton from '@mui/material/Skeleton';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { useFilteredCampaignsResult } from './useFilteredCampaigns';
 
 const TYPE_LABEL: Record<string, string> = { imagen: 'Imagen', video: 'Video', carrusel: 'Carrusel', sin_media: 'Solo texto' };
@@ -47,10 +46,19 @@ export function ContentTypeBreakdown() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Tipo de contenido publicado (campañas en Bananagram)</Typography>
-      <ResponsiveContainer width="100%" height={240}>
-        <PieChart>
-          <Pie data={data} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={80} label={(entry) => `${entry.label} (${entry.count})`}>
+      <ChartTitle
+        title="Tipo de contenido publicado"
+        description="Cuántas publicaciones de cada tipo, en las campañas visibles."
+        info="Imagen: 1 foto. Video: 1 clip. Carrusel: 2 o más archivos en la misma publicación. Solo texto: sin ninguna imagen o video adjunto."
+      />
+      {/* Bug real: las etiquetas de la torta se dibujan FUERA del radio
+          (comportamiento default de Recharts) — con outerRadius:80 y
+          height:240 la etiqueta de arriba no tenía espacio y quedaba
+          cortada contra el borde del contenedor. margin+height+radio
+          más chico le dan el aire que falta. */}
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart margin={{ top: 24, right: 8, bottom: 0, left: 8 }}>
+          <Pie data={data} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70} label={(entry) => `${entry.label} (${entry.count})`}>
             {data.map((entry) => (
               <Cell key={entry.type} fill={TYPE_COLOR[entry.type] ?? '#9E9E9E'} />
             ))}

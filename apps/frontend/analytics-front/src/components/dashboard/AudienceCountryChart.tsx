@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Skeleton from '@mui/material/Skeleton';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useActiveBrandId } from './useActiveBrandId';
 import { useDateRangeParams } from './useDateRangeParams';
@@ -73,7 +73,12 @@ export function AudienceCountryChart({ networkCode }: { networkCode?: string } =
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Países principales de la audiencia</Typography>
+      <ChartTitle
+        title="Países principales de la audiencia"
+        description="De dónde es tu audiencia, por país."
+        info="Solo Instagram expone este dato hoy, y solo cuando la cuenta acumula al menos 100 interacciones en los últimos 30 días. Muestra los 8 países principales."
+        mb={0.5}
+      />
       {!networkCode && sourceLabel && (
         <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
           Datos de {sourceLabel} — otras redes conectadas pueden no exponer este dato todavía.

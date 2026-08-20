@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
-import { EmptyState, LabeledSelect } from '@repo/ui/ui';
+import { EmptyState, LabeledSelect, ChartTitle } from '@repo/ui/ui';
 import { useGetCampaignMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useDateRangeParams } from './useDateRangeParams';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
@@ -54,7 +54,12 @@ export function PostingHeatMap({ networkCode }: { networkCode?: string } = {}) {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={1}>Mapa de calor de publicación</Typography>
+      <ChartTitle
+        title="Mapa de calor de publicación"
+        description="En qué días y horas tuviste más interacción, según tus publicaciones reales."
+        info="Cada celda es un día×hora; mientras más oscura, más interacciones tuvo en total en ese cruce. Basado en la hora de publicación real de la campaña seleccionada."
+        mb={1}
+      />
       {campaigns.length > 1 && (
         <LabeledSelect label="Campaña" value={activeCampaignId ?? ''} onChange={(e) => setCampaignId((e.target.value as string) || null)} sx={{ mb: 2, maxWidth: 280 }}>
           {campaigns.map((c) => <MenuItem key={c.campaignId} value={c.campaignId}>{c.name}</MenuItem>)}

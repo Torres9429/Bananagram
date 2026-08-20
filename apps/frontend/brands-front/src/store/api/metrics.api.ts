@@ -67,7 +67,25 @@ export const metricsApi = createApi({
       query: (brandId) => `brands/${brandId}/score`,
       providesTags: ['BrandScore'],
     }),
+    // Antes: el botón "Sincronizar" de ClientSection solo llamaba a
+    // syncSocialAccounts (GET /user de Ayrshare — qué redes están
+    // conectadas + seguidores), nunca a esto. Un usuario que le daba
+    // "Sincronizar" esperando ver likes/comments/shares/views actualizados
+    // nunca los iba a conseguir por ahí — esto es lo que de verdad dispara
+    // AccountMetricsCronService.generateAccountMetrics con
+    // ignoreRecentWindow:true (mismo endpoint que "Actualizar" en
+    // analytics-front). También recalcula el Score (mismo ciclo en el
+    // backend), por eso invalida BrandScore también.
+    refreshBrandAccountMetrics: builder.mutation<unknown, string>({
+      query: (brandId) => ({ url: `brands/${brandId}/metrics-history/refresh`, method: 'POST' }),
+      invalidatesTags: ['BrandScore'],
+    }),
   }),
 });
 
-export const { useGetCampaignMetricsQuery, useRefreshCampaignMetricsMutation, useGetBrandScoreQuery } = metricsApi;
+export const {
+  useGetCampaignMetricsQuery,
+  useRefreshCampaignMetricsMutation,
+  useGetBrandScoreQuery,
+  useRefreshBrandAccountMetricsMutation,
+} = metricsApi;

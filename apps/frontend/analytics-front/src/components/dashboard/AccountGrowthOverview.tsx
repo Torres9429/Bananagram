@@ -8,6 +8,8 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import Skeleton from '@mui/material/Skeleton';
+import MuiTooltip from '@mui/material/Tooltip';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined';
@@ -102,18 +104,21 @@ export function AccountGrowthOverview({ networkCode = null }: { networkCode?: st
         <Typography variant="subtitle1" fontWeight={700}>
           {networkCode ? `${display.label} — Resumen de cuenta` : 'Cuenta — panorama general'}
         </Typography>
+        <MuiTooltip
+          title={
+            networkCode === 'tiktok'
+              ? 'Datos tal cual los reporta la red conectada, incluye toda la actividad de la cuenta, no solo lo publicado desde Bananagram. Los totales de TikTok son históricos completos (de por vida), a diferencia de Instagram, que es una ventana de 90 días.'
+              : 'Datos tal cual los reporta la red conectada (seguidores, engagement, interacciones) — incluye toda la actividad de la cuenta, no solo lo publicado desde Bananagram.'
+          }
+          arrow
+          placement="top"
+          enterTouchDelay={0}
+        >
+          <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
+        </MuiTooltip>
       </Stack>
       <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-        Cuenta completa conectada — con o sin campañas, no solo lo publicado desde Bananagram.
-        {networkCode === 'tiktok' && (
-          // TikTok es la única red donde likes/comments/shares/views a nivel
-          // de cuenta son totales DE POR VIDA reales (confirmado contra
-          // documentación oficial de Ayrshare) — a diferencia de Instagram,
-          // que es una ventana de 90 días. Aporta información real que las
-          // otras tabs no tienen, vale la pena decirlo explícitamente
-          // (Sección F/9 de la auditoría).
-          ' Los totales de esta cuenta son históricos completos (de por vida), no una ventana reciente.'
-        )}
+        Cuenta completa conectada, con o sin campañas.
       </Typography>
 
       {/* Bug real (2026-08-20): con xs={6} (2 columnas en celular) el valor de

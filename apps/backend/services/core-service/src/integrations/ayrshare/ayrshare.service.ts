@@ -353,22 +353,32 @@ export class AyrshareService implements SocialProvider {
     const mapper = getAccountMapperForNetwork(networkCode);
     const mapped = mapper(analytics);
 
-    // Facebook-específico (2026-08-19): /analytics/social acota por
-    // `quarters` (ver body del fetch de arriba) — para Facebook eso deja
-    // `reactions`/`pageMediaView` casi en 0 cuando las publicaciones reales
-    // son más viejas que esa ventana (confirmado en vivo: reactions.total=0
-    // ahí mismo, mientras /history/facebook mostró 33 posts reales con 189
-    // likes/3 comments/47 shares acumulados desde 2023 — Instagram/TikTok no
-    // tienen este problema porque sus campos de posts/likes ya son acumulados
-    // de toda la cuenta, no acotados por `quarters`). Se enriquece con el
-    // historial completo de posts (fuente única y coherente para Facebook:
-    // todo all-time, no se mezcla con datos acotados por ventana) — si esa
-    // llamada falla, se degrada de vuelta a `mapped` (fetchFacebookHistorySummary
-    // nunca lanza).
+    // Facebook e Instagram: /analytics/social acota `likes`/`comments`/etc.
+    // por `quarters` (ver body del fetch de arriba), y esa ventana es real
+    // del lado de Ayrshare/Meta, no solo del parámetro que mandamos —
+    // confirmado oficialmente para Instagram (likeCount/commentsCount:
+    // ventana de 90 días) y en vivo para Facebook (reactions.total=0 con
+    // `quarters`, mientras /history/facebook mostró 33 posts reales con 189
+    // likes/3 comments/47 shares acumulados desde 2023). TikTok NO tiene este
+    // problema — sus campos son *Total (likeCountTotal, etc.), confirmados
+    // en vivo como lifetime real, no acotados — así que se deja tal cual
+    // viene de `mapped`, sin enriquecer.
+    //
+    // Instagram (2026-08-20, hallazgo real reportado en vivo: "por más que
+    // sincronizo siguen saliendo menos cosas que en la red real"): mismo
+    // enriquecimiento que Facebook, pero SOLO para likes/comments —
+    // confirmado en vivo contra 8 posts reales (incluido un video) que
+    // GET /history/instagram nunca trae shareCount ni viewsCount por post
+    // (esos 2 campos no existen ahí, ni en posts de video) — para esos y
+    // para `posts` (Instagram's `mediaCount` de /analytics/social ya es
+    // lifetime real) se conserva `mapped` tal cual, no se inventan sumando
+    // un campo que no viene en la respuesta.
     const enriched =
       networkCode === 'facebook'
         ? { ...mapped, ...(await this.fetchFacebookHistorySummary(profileKey)) }
-        : mapped;
+        : networkCode === 'instagram'
+          ? { ...mapped, ...(await this.fetchInstagramHistorySummary(profileKey)) }
+          : mapped;
 
     return {
       ...enriched,
@@ -448,6 +458,54 @@ export class AyrshareService implements SocialProvider {
       comments: posts.reduce((sum, p) => sum + (p.commentsCount ?? 0), 0),
       shares: posts.reduce((sum, p) => sum + (p.sharesCount ?? 0), 0),
       views: posts.reduce((sum, p) => sum + (p.mediaView ?? 0), 0),
+    };
+  }
+
+  // Análogo a fetchFacebookHistorySummary, pero solo para likes/comments —
+  // confirmado en vivo (2026-08-20, 8 posts reales de una cuenta conectada,
+  // incluido un video) que GET /history/instagram nunca trae shareCount ni
+  // viewsCount por post (esos campos no existen en la respuesta para
+  // Instagram, a diferencia de Facebook) — sumar un campo ausente con `?? 0`
+  // habría dado "0 shares/views" siempre, peor que dejar el dato real (aunque
+  // acotado a 90 días) que sí trae /analytics/social para esos 2 campos.
+  // `posts` tampoco se toca: Instagram's `mediaCount` de /analytics/social ya
+  // es lifetime real (a diferencia de likes/comments), re-contar desde el
+  // historial (tope 500) lo subcontaría en una cuenta con más publicaciones.
+  private async fetchInstagramHistorySummary(profileKey: string): Promise<Pick<AccountMetrics, 'likes' | 'comments'>> {
+    const { apiKey, baseUrl } = getAyrshareConfig();
+    const empty = { likes: null, comments: null };
+
+    const attempt = async () => {
+      const breaker = createCircuitBreaker(
+        async () => {
+          const response = await fetch(`${baseUrl}/history/instagram?limit=500`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${apiKey}`, 'Profile-Key': profileKey },
+          });
+          const payload = (await response.json().catch(() => ({}))) as AyrshareHistoryResponse;
+          return { ok: response.ok, payload };
+        },
+        { timeout: 15000 },
+      );
+      return (await breaker.fire()) as { ok: boolean; payload: AyrshareHistoryResponse };
+    };
+
+    let result: { ok: boolean; payload: AyrshareHistoryResponse } | null = null;
+    for (let i = 0; i < 2 && !result; i++) {
+      try {
+        result = await attempt();
+      } catch {
+        if (i === 1) return empty;
+      }
+    }
+    if (!result || !result.ok || result.payload.status !== 'success' || !result.payload.posts) {
+      return empty;
+    }
+
+    const posts = result.payload.posts;
+    return {
+      likes: posts.reduce((sum, p) => sum + (p.likeCount ?? 0), 0),
+      comments: posts.reduce((sum, p) => sum + (p.commentsCount ?? 0), 0),
     };
   }
 

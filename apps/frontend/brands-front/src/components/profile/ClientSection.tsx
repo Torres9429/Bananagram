@@ -33,7 +33,7 @@ import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CreateBrandDialog } from '../CreateBrandDialog';
 import { useUpdateBrandMutation, useCreateConnectUrlMutation, useUploadLogoMutation } from '../../store/api/brands.api';
 import { useListCampaignsQuery } from '../../store/api/campaigns.api';
-import { useGetBrandScoreQuery } from '../../store/api/metrics.api';
+import { useGetBrandScoreQuery, useRefreshBrandAccountMetricsMutation } from '../../store/api/metrics.api';
 import {
   useListSocialAccountsQuery,
   useSyncSocialAccountsMutation,
@@ -100,6 +100,8 @@ export function ClientSection() {
     { skip: !realBrandId },
   );
   const [syncSocialAccounts, { isLoading: isSyncing }] = useSyncSocialAccountsMutation();
+  const [refreshBrandAccountMetrics, { isLoading: isRefreshingMetrics }] = useRefreshBrandAccountMetricsMutation();
+  const isSyncingAll = isSyncing || isRefreshingMetrics;
   const [createConnectUrl] = useCreateConnectUrlMutation();
   const [disconnectSocialAccount, { isLoading: isDisconnecting }] = useDisconnectSocialAccountMutation();
   const { showSuccess, showError, showInfo } = useToast();
@@ -107,8 +109,17 @@ export function ClientSection() {
   async function handleSync() {
     if (!realBrandId) return;
     try {
-      await syncSocialAccounts(realBrandId).unwrap();
-      showSuccess('Cuentas sincronizadas con Ayrshare.');
+      // syncSocialAccounts: qué redes están conectadas + seguidores (GET
+      // /user de Ayrshare). refreshBrandAccountMetrics: likes/comments/
+      // shares/views/reach reales (antes este botón nunca los tocaba —
+      // hallazgo real, reportado en vivo: "por más que sincronizo siguen
+      // saliendo menos cosas"). Se corren juntas porque para el usuario
+      // "Sincronizar" es una sola acción, no dos con nombres distintos.
+      await Promise.all([
+        syncSocialAccounts(realBrandId).unwrap(),
+        refreshBrandAccountMetrics(realBrandId).unwrap(),
+      ]);
+      showSuccess('Cuentas y métricas sincronizadas con Ayrshare.');
     } catch {
       showError('No se pudo sincronizar con Ayrshare.');
     }
@@ -407,10 +418,10 @@ export function ClientSection() {
                 variant="outlined"
                 startIcon={<SyncOutlinedIcon />}
                 onClick={handleSync}
-                disabled={!realBrandId || isSyncing}
+                disabled={!realBrandId || isSyncingAll}
                 sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
               >
-                {isSyncing ? 'Sincronizando…' : 'Sincronizar'}
+                {isSyncingAll ? 'Sincronizando…' : 'Sincronizar'}
               </Button>
             </Stack>
           )}

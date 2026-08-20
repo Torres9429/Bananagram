@@ -5,7 +5,7 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Skeleton from '@mui/material/Skeleton';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { useGetBrandMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useActiveBrandId } from './useActiveBrandId';
 import { useDateRangeParams } from './useDateRangeParams';
@@ -78,7 +78,12 @@ export function AudienceGenderAgeChart({ networkCode }: { networkCode?: string }
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={0.5}>Audiencia por edad y género</Typography>
+      <ChartTitle
+        title="Audiencia por edad y género"
+        description="Qué edades y géneros forman tu audiencia, según Instagram."
+        info="Solo Instagram expone este cruce de edad y género hoy, y solo cuando la cuenta acumula al menos 100 interacciones en los últimos 30 días. Las barras están apiladas por género dentro de cada rango de edad."
+        mb={0.5}
+      />
       {!networkCode && sourceLabel && (
         <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
           Datos de {sourceLabel} — otras redes conectadas pueden no exponer este dato todavía.

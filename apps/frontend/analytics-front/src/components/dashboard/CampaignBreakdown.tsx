@@ -2,8 +2,7 @@
 
 import { useDispatch } from 'react-redux';
 import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { scopedMetrics } from '../../lib/analytics/real-metrics';
 import { useSelectedNetwork } from './useSelectedNetwork';
@@ -59,7 +58,11 @@ export function CampaignBreakdown() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Rendimiento por campaña</Typography>
+      <ChartTitle
+        title="Rendimiento por campaña"
+        description="Interacciones totales de cada campaña. Haz clic en una barra para filtrar por esa campaña."
+        info="Suma likes, comentarios y compartidos de todas las publicaciones de la campaña en la red seleccionada. No es alcance ni impresiones — solo interacción directa."
+      />
       <ResponsiveContainer width="100%" height={240}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E8E8E8" />
@@ -68,6 +71,7 @@ export function CampaignBreakdown() {
           <RechartsTooltip />
           <Bar
             dataKey="interactions"
+            name="Interacciones"
             radius={[4, 4, 0, 0]}
             onClick={(entry) => dispatch(selectCampaign(entry.campaignId))}
             style={{ cursor: 'pointer' }}

@@ -8,7 +8,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { NETWORK_DISPLAY } from '../../lib/analytics/network-config';
 import { useFilteredCampaignsResult } from './useFilteredCampaigns';
 import { useSelectedNetwork } from './useSelectedNetwork';
@@ -60,7 +60,11 @@ export function TopContent() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Publicaciones destacadas</Typography>
+      <ChartTitle
+        title="Publicaciones destacadas"
+        description="Tus 5 publicaciones con mejor engagement. Haz clic en una para ver el detalle completo."
+        info="Se ordenan por tasa de engagement (interacciones ÷ alcance), dentro de las campañas y la red que tienes filtrada."
+      />
       <Stack gap={1.25}>
         {topPosts.map((post, i) => {
           const network = NETWORK_DISPLAY[post.network as keyof typeof NETWORK_DISPLAY];

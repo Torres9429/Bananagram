@@ -8,7 +8,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
-import { EmptyState, LabeledSelect, MetricCard } from '@repo/ui/ui';
+import { EmptyState, LabeledSelect, MetricCard, ChartTitle } from '@repo/ui/ui';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
@@ -70,7 +70,11 @@ export function SelectedPostDetail() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Detalle de publicación</Typography>
+      <ChartTitle
+        title="Detalle de publicación"
+        description="Likes, comentarios, compartidos y vistas de una publicación específica."
+        info="Elige la campaña y la publicación para ver su detalle completo. Si no hay métricas capturadas todavía, la sincronización con la red corre cada 6 horas."
+      />
       <Stack direction="row" gap={2} flexWrap="wrap" mb={2}>
         {campaigns.length > 1 && (
           <LabeledSelect

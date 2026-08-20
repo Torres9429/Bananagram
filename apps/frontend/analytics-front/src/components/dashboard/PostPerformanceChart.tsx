@@ -6,7 +6,7 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { EmptyState } from '@repo/ui/ui';
+import { EmptyState, ChartTitle } from '@repo/ui/ui';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
 import { useSelectedNetwork } from './useSelectedNetwork';
 import { selectCampaign, selectPost } from '../../store/analyticsFilters.slice';
@@ -55,7 +55,11 @@ export function PostPerformanceChart() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={2}>Rendimiento por publicación</Typography>
+      <ChartTitle
+        title="Rendimiento por publicación"
+        description="Likes, comentarios y compartidos de tus 5 publicaciones con mejor engagement. Haz clic en una barra para ver el detalle."
+        info="Se ordenan por tasa de engagement (interacciones ÷ alcance) y se muestran las 5 mejores de las campañas visibles, en la red seleccionada."
+      />
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E8E8E8" />

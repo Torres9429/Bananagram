@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
 import MenuItem from '@mui/material/MenuItem';
 import Chip from '@mui/material/Chip';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
-import { EmptyState, LabeledSelect } from '@repo/ui/ui';
+import { EmptyState, LabeledSelect, ChartTitle } from '@repo/ui/ui';
 import { useGetCampaignMetricsHistoryQuery } from '../../store/api/analytics.api';
 import { useDateRangeParams } from './useDateRangeParams';
 import { useFilteredCampaigns } from './useFilteredCampaigns';
@@ -55,7 +54,12 @@ export function EngagementChart() {
 
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight={700} mb={1}>Tendencia de engagement</Typography>
+      <ChartTitle
+        title="Tendencia de engagement"
+        description="Cómo cambió el engagement día a día. Haz clic en un punto para filtrar el dashboard a ese día."
+        info="Engagement = interacciones ÷ alcance, expresado en porcentaje. Se necesitan al menos 2 días con métricas capturadas para trazar la línea."
+        mb={1}
+      />
       {campaigns.length > 1 && (
         <LabeledSelect
           label="Campaña"
