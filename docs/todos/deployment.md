@@ -441,76 +441,85 @@ levanta cada instancia — no hay un mecanismo automático de secretos todavía 
   (IP pública de auth-gateway) y `NODE_ENV=production` — ningún backend corre acá, no
   necesita más.
 
-## Estado a esta fecha (2026-08-20, sesión en curso)
+## Estado a esta fecha (2026-08-20/21)
 
-- 🔻 **Las 4 instancias están intencionalmente abajo ahora mismo**: `./scripts/ec2-down.sh <rol> -v`
-  corrido en las 4 (frontend, core, auth-gateway, extras) — contenedores, redes y
-  volúmenes eliminados, **incluida la base de Postgres en `core`** (se pierden los
-  datos del seed anterior; hay que correr `pnpm seed` de nuevo después del próximo
-  `up`). Fue un paso deliberado antes de aplicar el cambio de cache de build (sección
-  de arriba) para redesplegar limpio con los Dockerfiles nuevos, no un fallo.
-- ✅ Antes de bajarlos, ya se había verificado funcionando de punta a punta al menos
-  una vez: **core** (Postgres+Redis+`core-service`, 12 migraciones), **auth-gateway**
+- ✅ **Las 4 instancias están arriba y verificadas de punta a punta**: `core`
+  (Postgres+Redis+`core-service`, 12 migraciones), `auth-gateway`
   (`auth-service`+`api-gateway`, 4 migraciones, `GET /health` 200 desde fuera de la
-  VPC), **networking cross-instance** (`api-gateway`→`core-service` por IP privada,
-  confirmado con `/api/catalogs/social-networks` → 401 pero petición ida y vuelta
-  real), **extras** (`alexa-service`+`ai-service` estables), y **frontend** recreada
-  en Amazon Linux 2023 con las 6 apps arriba tras el redespliegue secuencial.
-- 🐛 **Bug real encontrado y corregido en código, pendiente de redesplegar**:
-  `apps/frontend/web-shell/middleware.ts` redirigía el login con
-  `NextResponse.redirect(new URL('/login', ZONE_URLS.authFront))` — `ZONE_URLS.authFront`
-  es una URL pensada para el proxy del servidor (nombre de servicio Docker o IP
-  privada entre EC2), pero un `redirect()` de middleware lo sigue el **navegador**,
-  no el servidor, así que fuera de `localhost` esa URL nunca es alcanzable para el
-  usuario. Pasaba desapercibido en local porque ahí el default (`localhost:3012`) es
-  igual de alcanzable para servidor y navegador. Fix: usar `request.url` (relativo al
-  propio origen de la request) en vez de `ZONE_URLS.authFront` — `/login` en el propio
-  `web-shell` ya se reescribe server-side hacia `auth-front` vía `rewrites()` en
-  `next.config.ts`, así que la URL relativa sí resuelve bien. **Este fix está en el
-  working tree, sin commitear todavía** — se commitea junto con el resto una vez
-  verificado en el navegador tras el próximo redespliegue.
-- ⚙️ **Cache de build BuildKit+turbo agregada a los 11 Dockerfiles** (ver sección
-  dedicada arriba) — en código, sin commitear, sin probar todavía en ninguna
-  instancia real. Próximo paso: redesplegar con esto activo y medir si baja el tiempo
-  de build de los servicios 2do/3ro en adelante de cada host.
+  VPC), `extras` (`alexa-service`+`ai-service`), `frontend` (las 6 apps Next.js
+  arriba, incluido `web-shell` sirviendo en el puerto 80).
+- ✅ **`pnpm seed` corrido con éxito** contra las 2 bases reales (túnel SSH local →
+  Postgres de `core`, ver procedimiento abajo). Cuentas de prueba disponibles (mismas
+  que el modo mock del frontend, ver `packages/seed/src/index.js`):
+  `20233tn102@utez.edu.mx` / `admin123` (administrador), `cm@bananagram.mx` /
+  `cm123456` (community_manager), `disenador@bananagram.mx` / `diseno123`,
+  `cliente@bananagram.mx` / `cliente123`, `alex@bananagram.mx` / `alex12345`,
+  `multi@bananagram.mx` / `multi12345` (multi-rol).
+- ✅ **Bug real encontrado y corregido**: `apps/frontend/web-shell/middleware.ts`
+  redirigía el login con `NextResponse.redirect(new URL('/login', ZONE_URLS.authFront))`
+  — `ZONE_URLS.authFront` es una URL pensada para el proxy del servidor, pero el
+  redirect lo sigue el navegador, así que fuera de `localhost` nunca era alcanzable.
+  Fix: `new URL('/login', request.url)` (relativo al origen de la request). **Verificado
+  en producción** vía `curl -D - http://52.200.97.70/` → `Location: /login` (antes:
+  `Location: http://auth-front:3012/login`, inalcanzable). Commiteado (`56a7d4f`).
+- ✅ **Bug real encontrado y corregido**: la cache de BuildKit+turbo (ver sección
+  dedicada arriba) rompía `core-service` — `turbo.json` no declaraba el cliente de
+  Prisma como output cacheable, así que un cache-hit no lo regeneraba y el contenedor
+  crasheaba con `Cannot find module '.../node_modules/.prisma-client'`. Fix en
+  `turbo.json` (agrega `node_modules/.prisma-client/**` a los outputs). Commiteado
+  (`fc68939`).
 - ✅ **S3 real accesible también desde local** (no solo desde los EC2) — credenciales
   temporales del Learner Lab puestas en `~/.aws/credentials`, verificado listando el
   bucket con el SDK. Ver sección "Probar contra el bucket S3 real desde local" arriba.
-- 🔲 **Sin commits todavía en esta sesión** — el trabajo de Cloudinary→S3/fixes de
-  Docker/arquitectura multi-EC2/scripts de una sesión anterior ya se commiteó (ver
-  historial de `feat/dev-desp`); el middleware fix y la cache de build de *esta*
-  sesión siguen sin commitear, a la espera de verificar en el navegador. **Sin push
-  todavía** en ningún caso — se mergea a `develop` recién cuando el despliegue
-  funcione de punta a punta en el navegador.
+- ⚠️ **Interrupción real de la sesión del Learner Lab a mitad del redespliegue**
+  (ver detalle en "Pendiente" más abajo) — las 4 instancias se volvieron
+  inalcanzables simultáneamente y luego volvieron al reiniciar la sesión del lab,
+  con contenedores parados pero imágenes/volúmenes intactos (sin pérdida de datos:
+  ni las migraciones ni, después, el seed se perdieron). El build de `frontend` se
+  había cortado a mitad (en `posts-front`), dejando a `web-shell` corriendo una
+  imagen vieja **sin** el fix del redirect — se detectó por curl mostrando la URL
+  interna vieja, se reconstruyeron `posts-front`+`web-shell` a mano y se verificó de
+  nuevo. Lección: después de una interrupción de este tipo, no asumir que
+  `docker compose up -d` por sí solo deja todo con el código más reciente — hay que
+  confirmar que las imágenes realmente se reconstruyeron completas antes de asumir
+  que el fix desplegado es el que está corriendo.
+- 🔲 **Sin push todavía** — el trabajo de esta sesión (fix de cache Turbo/Prisma, fix
+  de middleware, documentación) ya está commiteado en `feat/dev-desp` en commits
+  separados, sin coautoría. Falta: probar el flujo completo en el navegador
+  (login + al menos una acción real) antes de hacer push y mergear a `develop`.
 
 ## Pendiente
 
-1. Redesplegar las 4 instancias desde cero (`ec2-deploy.sh <rol>` por cada una) con
-   los Dockerfiles de cache nueva — primer build en frío por host (cache vacía),
-   pero valida que la sintaxis/mounts funcionan antes de confiar en la ganancia de
-   velocidad para el 2do build en adelante.
-2. `pnpm seed` en `core` — **solo el seed**, sin datos de prueba adicionales (pedido
-   explícito del usuario: sistema limpio, nada más que lo que carga el seed) — se
-   perdió al bajar `core` con `-v`.
-3. Prueba real en navegador: entrar a la IP pública de `frontend`, login (validar que
-   el fix de `middleware.ts` realmente resuelve el redirect), y al menos un flujo
-   completo (crear marca, publicación, etc.) — para confirmar que las 4 instancias
-   realmente arman el sistema completo, no solo que cada una responde por separado.
-4. Commitear el fix de `middleware.ts` y el cambio de cache de build (commits
-   separados, mensaje descriptivo, sin coautoría — mismo criterio que el resto de la
-   sesión) una vez verificado en el navegador.
-5. Una vez confirmado en el navegador: push de `feat/dev-desp` y merge a `develop`.
-6. TLS/dominio — hoy todo es HTTP plano sobre IPs públicas crudas. Sin Nginx ni
+1. Prueba real en navegador: entrar a `http://52.200.97.70`, login con una de las
+   cuentas de prueba de arriba, y al menos un flujo completo (crear marca,
+   publicación, etc.) — para confirmar que las 4 instancias realmente arman el
+   sistema completo, no solo que cada una responde por separado.
+2. Una vez confirmado en el navegador: push de `feat/dev-desp` y merge a `develop`.
+3. TLS/dominio — hoy todo es HTTP plano sobre IPs públicas crudas. Sin Nginx ni
    certificados todavía en ninguna de las 4 instancias.
-7. Secretos hoy se escriben a mano por SSH — no hay Secrets Manager ni nada
+4. Secretos hoy se escriben a mano por SSH — no hay Secrets Manager ni nada
    automatizado. Aceptable para este alcance (proyecto escolar, cuenta de lab
    temporal), documentado acá para no repetir el trabajo de memoria si hay que
    rehacer una instancia.
-8. Granularidad de los security groups internos (VPC CIDR completo en vez de
+5. Granularidad de los security groups internos (VPC CIDR completo en vez de
    SG-a-SG) — ver nota en la sección de security groups arriba.
-9. La sesión del AWS Academy Learner Lab tiene un límite de tiempo (se vio un
+6. La sesión del AWS Academy Learner Lab tiene un límite de tiempo (se vio un
    contador de "tiempo restante" en el panel del lab) — cuando termine o se reinicie,
    las credenciales de `~/.aws/credentials` dejan de servir y **puede que las 4
    instancias EC2 también se detengan/pierdan** según cómo esté configurado el lab.
-   Sin confirmar todavía qué pasa exactamente al llegar ese límite — a tener en
-   cuenta si el despliegue "desaparece" sin razón aparente.
+   **Confirmado en vivo (2026-08-20)**: a mitad de este mismo redespliegue, con
+   `core` y `auth-gateway` ya sanos y verificados (containers arriba, migraciones
+   aplicadas), las 4 instancias se volvieron inalcanzables al mismo tiempo — SSH,
+   HTTP y hasta el puerto 22 crudo dejaron de responder en las 4, mientras la
+   conexión a internet local seguía funcionando normal (verificado con
+   `curl https://www.google.com` → 200 en el mismo momento). Esto pasó sin ninguna
+   acción de nuestro lado sobre las instancias — coincide con el límite de tiempo de
+   la sesión del lab. **Resuelto en el momento**: el usuario reinició la sesión desde
+   el panel del Learner Lab y, sin ninguna acción adicional nuestra, las 4 instancias
+   volvieron a responder por SSH/HTTP con las **mismas IPs públicas** (no hizo falta
+   reasociar Elastic IP ni reescribir `~/.aws/credentials` esta vez) — resultaron
+   estar *paradas* (containers detenidos) pero no *perdidas*: las imágenes Docker y
+   el volumen de Postgres (con las migraciones ya aplicadas) seguían intactos, así
+   que alcanzó con `docker compose up -d` en las 4, sin rebuild. No confirmado si
+   esto es el comportamiento garantizado del lab o si tuvimos suerte esta vez — seguir
+   tratando cualquier interrupción de sesión como un riesgo real de pérdida.
