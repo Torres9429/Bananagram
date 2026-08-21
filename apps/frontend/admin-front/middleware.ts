@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // arma la respuesta (Next exige middleware.ts en la raíz de cada app, no se
 // puede compartir el archivo en sí).
 import { resolveSessionAction } from '@repo/ui/session-middleware';
-import { ZONE_URLS } from '@repo/ui/config';
 
 // Bloqueo de sesión real (login ya conectado a auth-service, ver
 // LoginForm.tsx/ADR-0004): sin cookie o con JWT expirado (y sin poder
@@ -38,7 +37,18 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  return NextResponse.redirect(new URL('/login', ZONE_URLS.authFront));
+  // Relativo al origen de la propia request (nunca ZONE_URLS.authFront
+  // directo) — bug real encontrado en vivo (2026-08-21): cuando web-shell
+  // renueva el access token en su propio middleware (rama "refresh" de
+  // arriba), esa cookie nueva solo queda en la respuesta que vuelve al
+  // navegador — el rewrite server-to-server hacia esta zona sigue llevando
+  // la cookie VIEJA de la request original. Esta zona entonces evalúa esa
+  // cookie vieja como inválida y cae en este redirect — con
+  // ZONE_URLS.authFront terminaba mandando al usuario a localhost:3012,
+  // inalcanzable fuera de dev local. Mismo hallazgo que
+  // web-shell/middleware.ts, aplicado acá porque SÍ se demostró alcanzable
+  // en producción (no es código muerto como se asumió al principio).
+  return NextResponse.redirect(new URL('/login', request.url));
 }
 
 // Bug real encontrado en vivo (mismo hallazgo en web-shell/middleware.ts):
