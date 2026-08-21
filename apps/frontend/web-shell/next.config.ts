@@ -53,9 +53,33 @@ const nextConfig: NextConfig = {
 
         // analytics-front
         { source: '/metrics',          destination: `${ZONES.ANALYTICS}/metrics` },
+
+        // Bug real encontrado en vivo (2026-08-21): el único rewrite de
+        // /_next/* que había (ver "fallback" más abajo) mandaba TODOS los
+        // assets estáticos a auth-front sin importar qué zona los pidiera
+        // de verdad — la URL de un chunk (/_next/static/chunks/HASH.js) no
+        // dice a qué zona pertenece. Cualquier página de una zona que no
+        // fuera auth-front cargaba el HTML pero sus propios chunks JS
+        // resolvían 404 vía este proxy, así que la app nunca hidrataba
+        // (pantalla en blanco / esqueletos que nunca cargan, sin error
+        // visible en consola porque un <script> con 404 no lanza excepción
+        // JS — solo se nota mirando la pestaña Network). Fix: cada zona
+        // ahora declara su propio `assetPrefix` (ver next.config.ts de
+        // cada una) — el HTML que arma cada zona pide sus assets bajo un
+        // path único, así que acá sí podemos rutear cada uno a su zona
+        // real en vez de adivinar.
+        { source: '/admin-front-static/_next/:path*',     destination: `${ZONES.ADMIN}/admin-front-static/_next/:path*` },
+        { source: '/analytics-front-static/_next/:path*', destination: `${ZONES.ANALYTICS}/analytics-front-static/_next/:path*` },
+        { source: '/auth-front-static/_next/:path*',      destination: `${ZONES.AUTH}/auth-front-static/_next/:path*` },
+        { source: '/brands-front-static/_next/:path*',    destination: `${ZONES.BRANDS}/brands-front-static/_next/:path*` },
+        { source: '/posts-front-static/_next/:path*',     destination: `${ZONES.POSTS}/posts-front-static/_next/:path*` },
       ],
 
-      // fallback: assets estáticos de cada *-front
+      // fallback: último recurso para /_next/* sin prefijo de zona — ya no
+      // debería alcanzarse en la práctica una vez que las 5 zonas usan su
+      // propio assetPrefix (ver arriba), pero se deja como default inerte
+      // en vez de borrarlo, por si queda alguna referencia vieja cacheada
+      // en un navegador de una build anterior a este fix.
       fallback: [
         { source: '/_next/:path*',     destination: `${ZONES.AUTH}/_next/:path*` },
       ],
