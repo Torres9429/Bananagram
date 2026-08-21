@@ -21,7 +21,15 @@ jobs:
   deploy:
     name: Deploy ${{ matrix.role }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Bug real encontrado en vivo (2026-08-21, primer run real): con 25 los 4
+    # jobs se cancelaron por timeout — las imágenes ya se habían terminado de
+    # construir Y los contenedores ya estaban arriba (confirmado por SSH
+    # directo, con datos/timestamps que lo probaban), el script remoto
+    # simplemente no llegó a escribir DEPLOY_DONE antes del corte. `frontend`
+    # en particular (6 apps secuenciales) puede tardar más de 25min en un
+    # build en frío desde un runner de GitHub, sin la cache tibia que sí
+    # tenía en las corridas manuales anteriores de esta sesión.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
