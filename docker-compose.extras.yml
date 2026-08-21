@@ -9,6 +9,10 @@ services:
     build:
       context: .
       dockerfile: apps/backend/services/alexa-service/Dockerfile
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
     env_file: ./apps/backend/services/alexa-service/.env
     environment:
       # Prisma Client propio de alexa-service (dueño de ContentIdea) apunta
@@ -29,6 +33,7 @@ services:
     build:
       context: .
       dockerfile: apps/backend/services/ai-service/Dockerfile
+    restart: unless-stopped
     env_file: ./apps/backend/services/ai-service/.env
     environment:
       REDIS_URL: redis://172.31.12.54:6379

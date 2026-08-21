@@ -15,6 +15,10 @@ services:
       dockerfile: apps/frontend/admin-front/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
     ports: ["3010:3010"]
 
   analytics-front:
@@ -23,6 +27,10 @@ services:
       dockerfile: apps/frontend/analytics-front/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
     ports: ["3011:3011"]
 
   auth-front:
@@ -31,6 +39,10 @@ services:
       dockerfile: apps/frontend/auth-front/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
     ports: ["3012:3012"]
 
   brands-front:
@@ -39,6 +51,10 @@ services:
       dockerfile: apps/frontend/brands-front/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
     ports: ["3013:3013"]
 
   posts-front:
@@ -47,6 +63,10 @@ services:
       dockerfile: apps/frontend/posts-front/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
     ports: ["3014:3014"]
 
   web-shell:
@@ -78,6 +98,10 @@ services:
       NEXT_PUBLIC_AUTH_FRONT_URL: http://auth-front:3012
       NEXT_PUBLIC_BRANDS_FRONT_URL: http://brands-front:3013
       NEXT_PUBLIC_POSTS_FRONT_URL: http://posts-front:3014
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
     # Expuesto directo en el 80 (sin Nginx todavía) — evita que el usuario
     # tenga que escribir :3000 en la URL.
     ports: ["80:3000"]
