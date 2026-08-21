@@ -29,6 +29,25 @@ FROM deps AS builder
 # apps/frontend/commons/src/config/zone-urls.ts.
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Bug real encontrado en vivo: a diferencia de NEXT_PUBLIC_API_URL (que solo
+# se usa en el bundle de cliente), estas 5 las lee next.config.ts's
+# rewrites() — y Next.js RESUELVE y serializa rewrites()/redirects()/headers()
+# una sola vez durante `next build` (queda "horneado" en .next/routes-manifest.json),
+# no las vuelve a evaluar en `next start`. Ponerlas solo en el `environment:`
+# de docker-compose (runtime) no alcanza — el rewrite ya quedó fijo apuntando
+# al fallback de ZONE_URLS (localhost:PUERTO) desde el build, y el contenedor
+# terminaba con "ECONNREFUSED 127.0.0.1:3012" al intentar proxear /login pese
+# a tener la env var correcta en runtime.
+ARG NEXT_PUBLIC_ADMIN_FRONT_URL
+ARG NEXT_PUBLIC_ANALYTICS_FRONT_URL
+ARG NEXT_PUBLIC_AUTH_FRONT_URL
+ARG NEXT_PUBLIC_BRANDS_FRONT_URL
+ARG NEXT_PUBLIC_POSTS_FRONT_URL
+ENV NEXT_PUBLIC_ADMIN_FRONT_URL=$NEXT_PUBLIC_ADMIN_FRONT_URL
+ENV NEXT_PUBLIC_ANALYTICS_FRONT_URL=$NEXT_PUBLIC_ANALYTICS_FRONT_URL
+ENV NEXT_PUBLIC_AUTH_FRONT_URL=$NEXT_PUBLIC_AUTH_FRONT_URL
+ENV NEXT_PUBLIC_BRANDS_FRONT_URL=$NEXT_PUBLIC_BRANDS_FRONT_URL
+ENV NEXT_PUBLIC_POSTS_FRONT_URL=$NEXT_PUBLIC_POSTS_FRONT_URL
 RUN --mount=type=cache,id=bananagram-turbo-cache,target=/app/.turbo/cache \
     pnpm exec turbo run build --filter=@repo/web-shell
 

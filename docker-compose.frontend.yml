@@ -55,6 +55,20 @@ services:
       dockerfile: apps/frontend/web-shell/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        # Mismos valores que el `environment:` de abajo — necesarios también
+        # como build args porque next.config.ts's rewrites() se resuelve y
+        # queda serializado en .next/routes-manifest.json durante `next
+        # build`, no se vuelve a evaluar en runtime (`next start`). Bug real
+        # encontrado en vivo: sin esto, el build usaba el fallback de
+        # ZONE_URLS (localhost:PUERTO) y el contenedor terminaba con
+        # ECONNREFUSED al proxear /login, pese a tener la env var runtime
+        # correcta (que sí sirve para cualquier código que SÍ se re-evalúe
+        # en cada request).
+        NEXT_PUBLIC_ADMIN_FRONT_URL: http://admin-front:3010
+        NEXT_PUBLIC_ANALYTICS_FRONT_URL: http://analytics-front:3011
+        NEXT_PUBLIC_AUTH_FRONT_URL: http://auth-front:3012
+        NEXT_PUBLIC_BRANDS_FRONT_URL: http://brands-front:3013
+        NEXT_PUBLIC_POSTS_FRONT_URL: http://posts-front:3014
     environment:
       # Server-side (next.config.ts rewrites(), corre en ESTE contenedor) —
       # todas las zonas están en el mismo host, se resuelven por nombre de
