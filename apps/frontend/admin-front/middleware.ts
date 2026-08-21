@@ -41,4 +41,10 @@ export async function middleware(request: NextRequest) {
   return NextResponse.redirect(new URL('/login', ZONE_URLS.authFront));
 }
 
-export const config = { matcher: ['/((?!api|_next|favicon.ico|public).*)'] };
+// Bug real encontrado en vivo (mismo hallazgo en web-shell/middleware.ts):
+// "public" en este patrón excluye la RUTA literal /public/*, que no existe
+// — Next.js sirve los archivos de public/ en la RAÍZ (ej. public/Logo.png
+// -> /Logo.png). Sin una exclusión por extensión de archivo, next/image
+// pidiéndose a sí mismo la imagen fuente sin sesión activa se topaba con
+// este middleware y recibía un redirect a /login en vez del PNG.
+export const config = { matcher: ['/((?!api|_next|favicon.ico|public|.*\\.[a-zA-Z0-9]+$).*)'] };

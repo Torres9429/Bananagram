@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useDispatch } from 'react-redux';
 import Box from '@mui/material/Box';
@@ -10,7 +10,6 @@ import Alert from '@mui/material/Alert';
 import { LabeledField } from '@repo/ui/ui';
 import { PasswordField } from './PasswordField';
 import { setCredentials, setCookieToken, setRefreshCookieToken, useLoginMutation, decodeJwt } from '@repo/ui/state';
-import { theme } from '@repo/ui/theme';
 import { getPostAuthDestination } from '@repo/ui/utils';
 
 export function LoginForm() {
@@ -19,19 +18,6 @@ export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
-
-  useEffect(() => {
-    console.info(
-      '%cCuentas de prueba (seed real, apps/backend)',
-      `font-weight:bold; color:${theme.palette.primary.contrastTextMuted}`,
-      '\n  admin@bananagram.mx / admin123',
-      '\n  cm@bananagram.mx / cm123456',
-      '\n  disenador@bananagram.mx / diseno123',
-      '\n  cliente@bananagram.mx / cliente123',
-      '\n  alex@bananagram.mx / alex12345 (Cliente, perfil personal)',
-      '\n  multi@bananagram.mx / multi12345 (CM + Diseñador, multi-rol)',
-    );
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

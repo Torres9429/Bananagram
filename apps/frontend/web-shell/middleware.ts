@@ -58,6 +58,19 @@ export async function middleware(request: NextRequest) {
 // Bug real encontrado en vivo: no se notaba antes de relativizar el
 // redirect (ver arriba) porque ZONE_URLS.authFront apuntaba a otro origen —
 // esa página nunca volvía a pasar por el middleware de web-shell.
+//
+// El "public" de este patrón excluye la RUTA literal /public/*, que no
+// existe — Next.js sirve los archivos de la carpeta public/ en la RAÍZ
+// (public/LogoNameMonkey.png -> /LogoNameMonkey.png), así que ese término
+// nunca excluye nada real. Bug real encontrado en vivo: next/image, al
+// optimizar el logo, vuelve a pedirle a este mismo servidor
+// /LogoNameMonkey.png — sin sesión, ESTE middleware interceptaba esa
+// petición interna y la redirigía a /login (una respuesta HTML, no una
+// imagen), y next/image fallaba con 400 "The requested resource isn't a
+// valid image" en /login (logo roto en la propia pantalla de login).
+// Se agrega una exclusión genérica por extensión de archivo
+// (\.[a-zA-Z0-9]+$) — ninguna ruta de página real termina en punto+extensión
+// en este proyecto, así que es seguro excluir cualquier request que sí.
 export const config = {
-  matcher: ['/((?!api|_next|favicon.ico|public|login|register|forgot-password|reset-password).*)'],
+  matcher: ['/((?!api|_next|favicon.ico|public|login|register|forgot-password|reset-password|.*\\.[a-zA-Z0-9]+$).*)'],
 };
