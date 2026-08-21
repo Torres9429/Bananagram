@@ -83,15 +83,20 @@ async function bootstrap() {
   // alexa-service (acceso directo a la misma BD física, ver
   // docs/todos/2026-08-10-ayrshare-pipeline-alexa-endpoints-plan.md Fase 6).
   // Mismo prefijo de URL para el cliente (web o Lambda), dueño distinto detrás.
-  // No se agrega un proxy /api/alexa: alexa-service expone /campaigns e
-  // /ideas bajo el mismo prefijo 'api' que core-service (ver alexa-service
-  // src/main.ts), y /api/campaigns ya está tomado por core-service arriba —
-  // agregar /api/alexa sin re-mapear las rutas de alexa-service no
-  // apuntaría a nada real. El Lambda llama a alexa-service directo
-  // (puerto 3004, no proxeado hoy) para campañas/métricas; solo /api/ideas
-  // cambia de dueño porque ese prefijo no colisiona con nada más.
+  // Este prefijo no colisiona con nada más, así que sí se pudo reusar tal cual.
   app.use(
     createProxyMiddleware({ pathFilter: '/api/ideas', target: alexaServiceUrl, changeOrigin: true }),
+  );
+  // alexa-service también compone campañas/métricas/recomendaciones para la
+  // Skill (totalPosts/score/topPost, etc. — ver CampaignsController ahí),
+  // pero /api/campaigns ya está tomado por core-service arriba (el modelo
+  // crudo que usan brands-front/analytics-front) — con el mismo prefijo ese
+  // controller quedaba inalcanzable vía gateway. Montado en un prefijo propio
+  // sin colisión (2026-08-21) en vez de exigirle al Lambda pegarle directo a
+  // alexa-service en otro puerto — verificado en vivo que el puerto directo
+  // no estaba expuesto públicamente en el despliegue real.
+  app.use(
+    createProxyMiddleware({ pathFilter: '/api/skill-campaigns', target: alexaServiceUrl, changeOrigin: true }),
   );
   // AI Service — único punto del backend que habla con OpenRouter. El
   // frontend nunca lo llama directo, solo vía este proxy (mismo patrón que
