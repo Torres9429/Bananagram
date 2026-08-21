@@ -324,9 +324,64 @@ consigo mismo. Le pasó **dos veces** a `frontend` (una por instancia Ubuntu, ot
 corregido el script pero por las dudas se repitió la prueba en la instancia Amazon
 Linux nueva) — con el build secuencial no volvió a pasar.
 
+**Bug real corregido en vivo (2026-08-21)**: el loop final que espera `DEPLOY_DONE`
+en el `build.log` remoto no tenía forma de detectar que el build había *fallado* —
+si el script remoto moría a mitad de camino (pasó de verdad: un `EOF` real de
+BuildKit cortó un build de `brands-front`), nunca escribía `DEPLOY_DONE` y el loop se
+quedaba esperando para siempre, sin avisar. El script remoto ahora escribe siempre
+uno de dos sentinels (`DEPLOY_DONE` o `DEPLOY_FAILED`, vía `(...) && echo A || echo
+B`), y el loop corta y falla (`exit 1`) apenas ve `DEPLOY_FAILED` — necesario tanto
+para uso interactivo como para que CI (ver sección siguiente) no se cuelgue ni
+reporte éxito falso.
+
+## CI/CD — GitHub Actions (`.github/workflows/deploy.yml`)
+
+Desde 2026-08-21, un push a `develop` (**solo esa rama**, ningún otro push ni PR
+dispara nada) redespliega las 4 instancias automáticamente, reusando
+`scripts/ec2-deploy.sh` tal cual —el workflow no reimplementa la lógica de deploy,
+solo le da a esos scripts una llave SSH y los corre.
+
+- **Trigger**: `on: push: branches: [develop]` — un push a `feat/dev-desp` (o
+  cualquier otra rama) no dispara nada; el merge a `develop` sí.
+- **4 jobs en paralelo** (`strategy.matrix.role: [core, auth-gateway, extras,
+  frontend]`, `fail-fast: false`) — si un rol falla, los otros 3 igual terminan; no
+  se cancelan entre sí.
+- **`concurrency: group: deploy-ec2, cancel-in-progress: false`** — si llegan 2
+  pushes seguidos a `develop`, el segundo workflow espera a que termine el primero
+  en vez de cancelarlo a mitad de un `docker compose build` (dejaría una imagen a
+  medio armar).
+- **`timeout-minutes: 25`** por job — red de seguridad además del fix de
+  `DEPLOY_FAILED` de arriba.
+- **Secret requerido**: `EC2_SSH_KEY` (contenido completo de `Bananagram.pem`) — ya
+  cargado en Settings → Secrets and variables → Actions del repo. El workflow lo
+  escribe a un archivo temporal en el runner (`~/.ssh/bananagram.pem`, `chmod 600`)
+  y se lo pasa a `ec2-deploy.sh` vía `EC2_KEY_PATH` (los scripts ya soportaban ese
+  override, no hizo falta tocarlos para esto).
+- **No hay checkout de git en las instancias EC2** — el workflow hace lo mismo que
+  siempre: `rsync` del working tree (acá, el checkout del runner de GitHub Actions)
+  hacia cada EC2 vía `ec2-sync.sh`. Las 4 instancias siguen sin tener su propio clon
+  de git, solo la copia sincronizada.
+- **Riesgo conocido de esta cuenta (AWS Academy Learner Lab)**: si la sesión del lab
+  expiró o las instancias están paradas cuando corre el workflow, el deploy va a
+  fallar (SSH timeout) — no es un bug del workflow, es el mismo riesgo ya documentado
+  más abajo en "Pendiente". Si pasa, hay que reactivar la sesión del lab / levantar
+  las instancias a mano y volver a correr el workflow (Actions → el run fallido →
+  "Re-run all jobs").
+- **No se filtra por rol según qué carpetas cambiaron** — cada push a `develop`
+  reconstruye las 4 instancias completas, aunque el cambio haya sido solo en una
+  (ej. solo `apps/frontend/*`). Simplicidad deliberada por ahora; si se vuelve lento
+  o caro, la mejora natural es agregar `paths-filter` por rol y saltear los jobs sin
+  cambios relevantes.
+
 ### Cómo hacer un cambio y redesplegarlo en un microservicio
 
-El flujo normal para editar código y que quede reflejado en el EC2 correspondiente:
+**Con CI ya configurado, el flujo normal es simplemente mergear/pushear a `develop`**
+— el workflow de arriba hace el resto solo. Lo de abajo (`ec2-deploy.sh` a mano)
+sigue sirviendo para: probar un cambio en una rama antes de mergear a `develop`,
+iterar rápido sin esperar a que termine el workflow completo, o cuando no hay
+conexión a internet estable para depender de GitHub Actions.
+
+El flujo manual para editar código y que quede reflejado en el EC2 correspondiente:
 
 ```bash
 # 1. Editar el código local como siempre (ej. algo en core-service).

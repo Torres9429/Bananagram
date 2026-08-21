@@ -41,10 +41,11 @@ for svc in $SERVICES; do
 done
 
 ./scripts/ec2-connect.sh "$ROLE" "cd $(ec2_repo_path_for "$ROLE") && rm -f build.log && nohup bash -c '
-set -e
-$BUILD_CMDS
-sudo docker compose -f $COMPOSE_FILE up -d
-echo DEPLOY_DONE
+(
+  set -e
+  $BUILD_CMDS
+  sudo docker compose -f $COMPOSE_FILE up -d
+) && echo DEPLOY_DONE || echo DEPLOY_FAILED
 ' > build.log 2>&1 < /dev/null & disown; sleep 1; echo LAUNCHED"
 
 echo "== 3/3: siguiendo build.log (Ctrl+C solo corta el seguimiento, el build sigue en el servidor) =="
@@ -52,7 +53,26 @@ echo "== 3/3: siguiendo build.log (Ctrl+C solo corta el seguimiento, el build si
 TAIL_PID=$!
 trap 'kill $TAIL_PID 2>/dev/null || true' EXIT
 
-while ! ./scripts/ec2-connect.sh "$ROLE" "grep -q DEPLOY_DONE build.log" 2>/dev/null; do
+# Bug real corregido en vivo (2026-08-21): antes solo esperaba a que
+# apareciera DEPLOY_DONE — si el build fallaba a mitad de camino (ej. el
+# EOF de BuildKit que ya pasó en esta sesión), el script remoto moría sin
+# escribir nada y este loop se quedaba esperando para siempre, sin avisar
+# ni fallar. Ahora el script remoto SIEMPRE escribe uno de los dos
+# sentinels (ver arriba), así que este loop corta apenas aparece
+# cualquiera de los dos — y si fue DEPLOY_FAILED, este script también
+# falla (exit 1) en vez de reportar éxito falso. Necesario para que CI
+# (GitHub Actions) no se quede colgado ni marque un deploy roto como
+# exitoso.
+while true; do
+  if ./scripts/ec2-connect.sh "$ROLE" "grep -q DEPLOY_DONE build.log" 2>/dev/null; then
+    break
+  fi
+  if ./scripts/ec2-connect.sh "$ROLE" "grep -q DEPLOY_FAILED build.log" 2>/dev/null; then
+    kill $TAIL_PID 2>/dev/null || true
+    trap - EXIT
+    echo "== FALLÓ el deploy de $ROLE — ver el log de arriba =="
+    exit 1
+  fi
   sleep 5
 done
 kill $TAIL_PID 2>/dev/null || true
