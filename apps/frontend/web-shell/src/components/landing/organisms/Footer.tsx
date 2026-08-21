@@ -5,7 +5,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Link from '@mui/material/Link';
 import Image from 'next/image';
-import { ZONE_URLS } from '@repo/ui/config';
 
 const PRODUCT_LINKS = [
   { label: 'Funciones', href: '#funciones' },
@@ -15,7 +14,7 @@ const PRODUCT_LINKS = [
 ];
 
 const ACCOUNT_LINKS = [
-  { label: 'Iniciar sesión', href: `${ZONE_URLS.authFront}/login` },
+  { label: 'Iniciar sesión', href: '/login' },
   { label: 'Solicitar demo', href: '#contacto' },
 ];
 

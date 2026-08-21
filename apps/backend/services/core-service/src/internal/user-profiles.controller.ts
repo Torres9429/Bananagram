@@ -4,7 +4,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { InternalAuthGuard } from '@repo/backend-commons';
 import { prisma } from '../prisma/client';
-import { CloudinaryService, type UploadableFile } from '../cloudinary/cloudinary.service';
+import { S3Service, type UploadableFile } from '../storage/s3.service';
 import { UpsertUserProfileDto } from './dto/upsert-user-profile.dto';
 
 // Tráfico servicio-a-servicio (auth-service → core-service tras un
@@ -18,7 +18,7 @@ import { UpsertUserProfileDto } from './dto/upsert-user-profile.dto';
 @UseGuards(InternalAuthGuard)
 @Controller('internal/user-profiles')
 export class UserProfilesController {
-  constructor(private readonly cloudinary: CloudinaryService) {}
+  constructor(private readonly storage: S3Service) {}
 
   // Usado por auth-service al canjear un LinkCode (Alexa Skill, solo lee
   // .name) y por ProfileController's GET me/profile (StaffProfileSection,
@@ -104,7 +104,7 @@ export class UserProfilesController {
     });
   }
 
-  // Sube la imagen a Cloudinary y devuelve la URL — a propósito NO toca
+  // Sube la imagen a S3 y devuelve la URL — a propósito NO toca
   // UserProfile.avatarUrl acá (no exige que el perfil ya exista, evita el
   // caso raro de "subiste una foto pero el perfil todavía no tiene nombre/
   // categorías"). El caller (ProfileController.uploadAvatar) le pasa esa URL
@@ -115,7 +115,7 @@ export class UserProfilesController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5_000_000 } }))
   async uploadAvatar(@UploadedFile() file: UploadableFile) {
     if (!file) throw new BadRequestException('Falta el archivo de imagen');
-    const result = await this.cloudinary.uploadFile(file, 'bananagram/avatars');
+    const result = await this.storage.uploadFile(file, 'bananagram/avatars');
     return { avatarUrl: result.secure_url };
   }
 }

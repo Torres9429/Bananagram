@@ -6,10 +6,20 @@ import { CampaignsService } from './campaigns.service';
 // BFF de solo lectura sobre core-service (Fase 6 del plan) — sin
 // PermissionGuard propio: core-service ya aplica permiso + pertenencia real
 // sobre el mismo Bearer reenviado, duplicarlo aquí no agrega nada.
+//
+// Montado en 'skill-campaigns', NO 'campaigns' (2026-08-21): el gateway ya
+// tiene /api/campaigns reservado para core-service (el modelo crudo que usan
+// brands-front/analytics-front) — con el mismo prefijo, este controller
+// quedaba inalcanzable a través del gateway (todo tráfico a /api/campaigns
+// se iba a core-service, nunca llegaba aquí). Verificado en vivo: el Lambda
+// desplegado recibía el objeto crudo de core-service (sin totalPosts/score/
+// topPost) en vez de este BFF compuesto, y ?name= no filtraba igual —
+// "undefined" en el nombre/publicaciones de la campaña al seleccionarla por
+// voz. Ver gateway/src/main.ts para el proxy correspondiente.
 @ApiTags('campaigns')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('campaigns')
+@Controller('skill-campaigns')
 export class CampaignsController {
   constructor(private readonly campaigns: CampaignsService) {}
 

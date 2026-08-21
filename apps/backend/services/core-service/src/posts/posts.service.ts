@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CampaignStatus } from '../../node_modules/.prisma-client';
-import { CloudinaryService, UploadableFile } from '../cloudinary/cloudinary.service';
+import { S3Service, UploadableFile, UploadResult } from '../storage/s3.service';
 import { NotificationsClient } from '../notifications/notifications-client.service';
 import { PostSchedulerService } from '../scheduler/post-scheduler.service';
 import { prisma } from '../prisma/client';
@@ -37,7 +37,7 @@ const CLIENT_VISIBLE_STATUSES: PostStatus[] = [
 @Injectable()
 export class PostsService {
   constructor(
-    private readonly cloudinary: CloudinaryService,
+    private readonly storage: S3Service,
     private readonly notifications: NotificationsClient,
     private readonly postScheduler: PostSchedulerService,
   ) {}
@@ -617,7 +617,7 @@ export class PostsService {
     };
   }
 
-  // Borrador recién creado que se queda sin imagen porque Cloudinary falló
+  // Borrador recién creado que se queda sin imagen porque la subida a S3 falló
   // (ver posts-front/app/posts/new): en vez de dejar el post huérfano, el
   // front lo borra llamando esto justo después del fallo — mismo criterio de
   // "solo se puede tocar en borrador/rechazado" que updatePost/attachMedia.
@@ -650,7 +650,7 @@ export class PostsService {
   // Quita una imagen/video ya adjuntado — el join PostMedia y el propio
   // Media no tienen deletedAt (no son "tabla principal", ver schema.prisma:
   // Media solo vive colgado de un Post), así que se borran físicamente aquí
-  // y se limpia el archivo real en Cloudinary — mismo public_id que se
+  // y se limpia el archivo real en S3 — mismo public_id que se
   // guardó como fileName al subirlo (ver attachMediaToPost).
   async removeMediaFromPost(postId: string, mediaId: string, user: CurrentUser): Promise<any> {
     const post = await prisma.post.findFirst({
@@ -686,7 +686,7 @@ export class PostsService {
     ]);
 
     if (postMedia.media.fileName) {
-      await this.cloudinary.deleteFile(postMedia.media.fileName);
+      await this.storage.deleteFile(postMedia.media.fileName);
     }
 
     return prisma.post.findUniqueOrThrow({
@@ -733,19 +733,11 @@ export class PostsService {
       throw new ForbiddenException('No tienes permiso para adjuntar recursos a esta publicación');
     }
 
-    type CloudinaryUpload = {
-      public_id?: string;
-      secure_url?: string;
-      url?: string;
-      width?: number;
-      height?: number;
-      duration?: number;
-    };
     // Inicializado en [] (no solo declarado): si el throw de más abajo (fallo
     // de subida) dispara antes de la asignación real, el catch de este mismo
     // método también hace uploadedFiles.map(...) — sin este default sería
     // undefined.map() ahí, un crash nuevo en vez de propagar el error real.
-    let uploadedFiles: CloudinaryUpload[] = [];
+    let uploadedFiles: UploadResult[] = [];
 
     try {
       // Subidas en paralelo (2026-08-19, antes secuenciales con un for...await)
@@ -753,20 +745,20 @@ export class PostsService {
       // sumaba varios segundos por archivo y el request completo terminaba
       // tardando lo suficiente como para toparse con timeouts (reportado en
       // vivo). allSettled (no Promise.all directo) para poder seguir
-      // limpiando en Cloudinary los archivos que sí terminaron de subir
+      // limpiando en S3 los archivos que sí terminaron de subir
       // aunque otro haya fallado — Promise.all descarta los resultados
       // exitosos apenas uno rechaza, perdiendo esa info para el catch de abajo.
-      const results = await Promise.allSettled(files.map((file) => this.cloudinary.uploadFile(file)));
+      const results = await Promise.allSettled(files.map((file) => this.storage.uploadFile(file)));
       const firstFailure = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
       if (firstFailure) {
         await Promise.all(
           results
-            .filter((r): r is PromiseFulfilledResult<CloudinaryUpload> => r.status === 'fulfilled')
-            .map((r) => r.value.public_id && this.cloudinary.deleteFile(r.value.public_id)),
+            .filter((r): r is PromiseFulfilledResult<UploadResult> => r.status === 'fulfilled')
+            .map((r) => r.value.public_id && this.storage.deleteFile(r.value.public_id)),
         );
         throw firstFailure.reason;
       }
-      uploadedFiles = (results as PromiseFulfilledResult<CloudinaryUpload>[]).map((r) => r.value);
+      uploadedFiles = (results as PromiseFulfilledResult<UploadResult>[]).map((r) => r.value);
 
       // Bug real (encontrado en vivo con datos reales, ver contentTypeBreakdown
       // de analytics-front): index + 1 se calculaba solo contra el lote que se
@@ -788,7 +780,7 @@ export class PostsService {
                     fileName: uploadedFile.public_id || files[index].originalname,
                     originalName: files[index].originalname,
                     mimeType: files[index].mimetype,
-                    url: uploadedFile.secure_url || uploadedFile.url || '',
+                    url: uploadedFile.secure_url,
                     size: files[index].size,
                     width: uploadedFile.width,
                     height: uploadedFile.height,
@@ -806,7 +798,7 @@ export class PostsService {
         return updatedPost;
       });
     } catch (error) {
-      await Promise.all(uploadedFiles.map((uploadedFile) => uploadedFile.public_id && this.cloudinary.deleteFile(uploadedFile.public_id)));
+      await Promise.all(uploadedFiles.map((uploadedFile) => uploadedFile.public_id && this.storage.deleteFile(uploadedFile.public_id)));
       throw error;
     }
   }

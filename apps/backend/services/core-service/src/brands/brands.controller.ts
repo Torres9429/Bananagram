@@ -10,7 +10,7 @@ import { CurrentUser } from '@repo/backend-commons';
 import { BrandsService } from './brands.service';
 import { SocialAccountsService } from '../social-accounts/social-accounts.service';
 import { AccountMetricsCronService } from '../cron/account-metrics-cron.service';
-import { CloudinaryService, type UploadableFile } from '../cloudinary/cloudinary.service';
+import { S3Service, type UploadableFile } from '../storage/s3.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
 import { CreateConnectUrlDto } from './dto/create-connect-url.dto';
@@ -24,7 +24,7 @@ export class BrandsController {
     private readonly brands: BrandsService,
     private readonly socialAccounts: SocialAccountsService,
     private readonly accountMetricsCron: AccountMetricsCronService,
-    private readonly cloudinary: CloudinaryService,
+    private readonly storage: S3Service,
   ) {}
 
   @Get()
@@ -58,7 +58,7 @@ export class BrandsController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5_000_000 } }))
   async uploadLogoForNewBrand(@UploadedFile() file: UploadableFile) {
     if (!file) throw new BadRequestException('Falta el archivo de imagen');
-    const result = await this.cloudinary.uploadFile(file, 'bananagram/brands');
+    const result = await this.storage.uploadFile(file, 'bananagram/brands');
     return { logoUrl: result.secure_url };
   }
 
@@ -76,7 +76,7 @@ export class BrandsController {
     return this.brands.removeBrand(id);
   }
 
-  // Sube el logo a Cloudinary y devuelve la URL — a propósito NO toca
+  // Sube el logo a S3 y devuelve la URL — a propósito NO toca
   // Brand.logoUrl acá (mismo criterio que internal/user-profiles/:id/avatar
   // en auth-service/core-service: una sola operación de guardado). El
   // frontend incluye la URL devuelta en el siguiente PATCH :id junto con el
@@ -88,7 +88,7 @@ export class BrandsController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5_000_000 } }))
   async uploadLogo(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: UploadableFile) {
     if (!file) throw new BadRequestException('Falta el archivo de imagen');
-    const result = await this.cloudinary.uploadFile(file, 'bananagram/brands');
+    const result = await this.storage.uploadFile(file, 'bananagram/brands');
     return { logoUrl: result.secure_url };
   }
 

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Build context MUST be the repo root (not this directory), e.g.:
 #   docker build -f apps/backend/services/alexa-service/Dockerfile -t alexa-service .
 #
@@ -13,7 +14,8 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json .npmrc ./
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=bananagram-pnpm-store,target=/pnpm-store \
+    pnpm install --frozen-lockfile --store-dir=/pnpm-store
 
 # ---- build: generate Prisma Client against the shared schema, then compile.
 # Via turbo (not plain `pnpm --filter`) so @repo/backend-commons builds
@@ -21,7 +23,8 @@ RUN pnpm install --frozen-lockfile
 # the workspace dependency graph, plain pnpm --filter doesn't. ----
 FROM deps AS builder
 RUN pnpm db:generate
-RUN pnpm exec turbo run build --filter=@repo/alexa-service
+RUN --mount=type=cache,id=bananagram-turbo-cache,target=/app/.turbo/cache \
+    pnpm exec turbo run build --filter=@repo/alexa-service
 
 # ---- runtime: copy the whole built workspace (symlinked node_modules included) ----
 FROM node:20-alpine AS runtime

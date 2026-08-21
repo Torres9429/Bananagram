@@ -5,7 +5,6 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { ZONE_URLS } from '@repo/ui/config';
 import { BrandTabs } from '../../../../components/BrandTabs';
 import { MOCK_PROFILES, MOCK_CAMPAIGNS } from '../../../../lib/mock-data';
 
@@ -45,7 +44,7 @@ export default function BrandMetricsPage() {
         </Grid>
         <Typography variant="body2" color="text.secondary" mt={3}>
           Para el detalle de engagement por publicación y comparativos entre marcas, ve a{' '}
-          <Box component="a" href={`${ZONE_URLS.analyticsFront}/metrics`} sx={{ color: 'primary.contrastTextMuted', fontWeight: 600 }}>
+          <Box component="a" href="/metrics" sx={{ color: 'primary.contrastTextMuted', fontWeight: 600 }}>
             Métricas globales
           </Box>.
         </Typography>

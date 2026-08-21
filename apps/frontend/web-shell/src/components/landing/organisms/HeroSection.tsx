@@ -13,7 +13,6 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import { useTheme } from '@mui/material/styles';
 import { motion, useMotionValue, useReducedMotion, animate } from 'framer-motion';
-import { ZONE_URLS } from '@repo/ui/config';
 import { HeroAction } from '../molecules/HeroAction';
 import { ScrollReveal } from '../molecules/ScrollReveal';
 import { Marquee } from '../molecules/Marquee';
@@ -95,7 +94,7 @@ export function HeroSection() {
                 </Typography>
 
                 <HeroAction
-                  onPrimaryClick={() => window.location.assign(`${ZONE_URLS.authFront}/register`)}
+                  onPrimaryClick={() => window.location.assign('/register')}
                   onSecondaryClick={() => {
                     const target = document.getElementById('contacto');
                     target?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });

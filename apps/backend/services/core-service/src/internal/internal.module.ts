@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { S3Module } from '../storage/s3.module';
 import { UserProfilesController } from './user-profiles.controller';
 
-@Module({ imports: [CloudinaryModule], controllers: [UserProfilesController] })
+@Module({ imports: [S3Module], controllers: [UserProfilesController] })
 export class InternalModule {}

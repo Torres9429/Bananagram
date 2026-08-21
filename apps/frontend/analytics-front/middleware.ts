@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // arma la respuesta (Next exige middleware.ts en la raíz de cada app, no se
 // puede compartir el archivo en sí).
 import { resolveSessionAction } from '@repo/ui/session-middleware';
-import { ZONE_URLS } from '@repo/ui/config';
 
 // Bloqueo de sesión real (login ya conectado a auth-service, ver
 // LoginForm.tsx/ADR-0004): sin cookie o con JWT expirado (y sin poder
@@ -38,7 +37,21 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  return NextResponse.redirect(new URL('/login', ZONE_URLS.authFront));
+  // Relativo al origen de la propia request (nunca ZONE_URLS.authFront
+  // directo) — bug real encontrado en vivo (2026-08-21): cuando web-shell
+  // renueva el access token en su propio middleware (rama "refresh"), esa
+  // cookie nueva solo queda en la respuesta que vuelve al navegador — el
+  // rewrite server-to-server hacia esta zona sigue llevando la cookie
+  // VIEJA de la request original, esta zona la evalúa como inválida y cae
+  // en este redirect. Mismo hallazgo que web-shell/middleware.ts, aplicado
+  // acá porque SÍ se demostró alcanzable en producción.
+  return NextResponse.redirect(new URL('/login', request.url));
 }
 
-export const config = { matcher: ['/((?!api|_next|favicon.ico|public).*)'] };
+// Bug real encontrado en vivo (mismo hallazgo en web-shell/middleware.ts):
+// "public" en este patrón excluye la RUTA literal /public/*, que no existe
+// — Next.js sirve los archivos de public/ en la RAÍZ (ej. public/Logo.png
+// -> /Logo.png). Sin una exclusión por extensión de archivo, next/image
+// pidiéndose a sí mismo la imagen fuente sin sesión activa se topaba con
+// este middleware y recibía un redirect a /login en vez del PNG.
+export const config = { matcher: ['/((?!api|_next|favicon.ico|public|.*\\.[a-zA-Z0-9]+$).*)'] };

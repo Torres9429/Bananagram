@@ -12,7 +12,7 @@ import { ForwardToDesignerDto } from './dto/forward-to-designer.dto';
 import { PostsService } from './posts.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { UploadableFile } from '../cloudinary/cloudinary.service';
+import { UploadableFile } from '../storage/s3.service';
 import { PostStatus } from '../types/post-status.enum';
 
 type Claims = { sub: string; roles: string[] };
