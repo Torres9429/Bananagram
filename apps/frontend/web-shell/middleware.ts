@@ -50,4 +50,14 @@ export async function middleware(request: NextRequest) {
   return NextResponse.redirect(new URL('/login', request.url));
 }
 
-export const config = { matcher: ['/((?!api|_next|favicon.ico|public).*)'] };
+// Excluye /login (y el resto de rutas públicas de auth-front, ver
+// next.config.ts rewrites) del propio matcher — si no, un usuario sin
+// sesión que llega a /login se topa con ESTE middleware otra vez sobre esa
+// misma respuesta reescrita, que decide "no autenticado, redirigir a
+// /login", que vuelve a pasar por acá... bucle infinito (ERR_TOO_MANY_REDIRECTS).
+// Bug real encontrado en vivo: no se notaba antes de relativizar el
+// redirect (ver arriba) porque ZONE_URLS.authFront apuntaba a otro origen —
+// esa página nunca volvía a pasar por el middleware de web-shell.
+export const config = {
+  matcher: ['/((?!api|_next|favicon.ico|public|login|register|forgot-password|reset-password).*)'],
+};
