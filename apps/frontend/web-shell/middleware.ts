@@ -19,6 +19,16 @@ const COOKIE_NAME = 'bananagram_token';
 const REFRESH_COOKIE_NAME = 'bananagram_refresh_token';
 
 export async function middleware(request: NextRequest) {
+  // La raíz ("/") no se protege acá — app/page.tsx ya decide por su cuenta:
+  // muestra el landing si no hay sesión, o redirige a getPostAuthDestination()
+  // si sí la hay. Bug real encontrado en vivo (2026-08-21): el matcher de
+  // abajo no excluye "/" (solo /login, /register, etc.), así que un usuario
+  // sin cookie que entraba a la raíz nunca llegaba a ver el landing — este
+  // middleware lo redirigía a /login antes de que page.tsx corriera.
+  if (request.nextUrl.pathname === '/') {
+    return NextResponse.next();
+  }
+
   const action = await resolveSessionAction(
     request.cookies.get(COOKIE_NAME)?.value,
     request.cookies.get(REFRESH_COOKIE_NAME)?.value,

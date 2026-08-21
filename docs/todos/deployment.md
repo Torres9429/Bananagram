@@ -151,6 +151,18 @@ etc.) pero no para IAM. Sin credenciales estáticas en ningún `.env`: el SDK de
 (`@aws-sdk/client-s3` en `core-service`, y el `aws` CLI usado para administración)
 toma las credenciales del rol de instancia automáticamente vía metadata.
 
+**Auditoría completa 2026-08-21** (por consola, ya que `iam:GetPolicy` sigue
+bloqueado por API/CLI): `LabRole` tiene **7 políticas adjuntas** — 4 administradas por
+AWS (`AmazonEC2ContainerRegistryReadOnly`, `AmazonEKSClusterPolicy`,
+`AmazonEKSWorkerNodePolicy`, `AmazonSSMManagedInstanceCore`) y 3 administradas por el
+cliente, provistas por AWS Academy (nombre con prefijo
+`c223916a5652762l...-VocLabPolicy...`) — estas últimas son las que bloquean
+`iam:CreateRole`/`iam:GetPolicy` (ver arriba) y también, confirmado en vivo,
+`ec2:DescribeInstances` con las credenciales temporales del rol asumido — un script
+que intentó listar instancias por SDK recibió un `explicit deny` de una de ellas, por
+eso ciertas tareas de inventario/automatización tuvieron que hacerse por consola en
+vez de CLI/SDK.
+
 ## S3
 
 Bucket `bananagram-media-520580368175` (`us-east-1`), creado a mano en la consola.
@@ -538,27 +550,54 @@ levanta cada instancia — no hay un mecanismo automático de secretos todavía 
   `docker compose up -d` por sí solo deja todo con el código más reciente — hay que
   confirmar que las imágenes realmente se reconstruyeron completas antes de asumir
   que el fix desplegado es el que está corriendo.
-- 🔲 **Sin push todavía** — el trabajo de esta sesión (fix de cache Turbo/Prisma, fix
-  de middleware, documentación) ya está commiteado en `feat/dev-desp` en commits
-  separados, sin coautoría. Falta: probar el flujo completo en el navegador
-  (login + al menos una acción real) antes de hacer push y mergear a `develop`.
+- ✅ **`feat/dev-desp` ya se mergeó a `develop`** (PR #36) y `develop` sigue
+  recibiendo commits directos desde entonces (CI/CD, timeout, restart policies —
+  ver abajo). El repo local está parado sobre `develop`, no sobre `feat/dev-desp`.
+- ✅ **CI/CD real y verificado**: push a `develop` (y solo esa rama) redespliega las
+  4 instancias en paralelo sin intervención manual — ver sección dedicada "CI/CD —
+  GitHub Actions" más arriba para el detalle del workflow. 3 bugs reales de
+  infraestructura encontrados y corregidos hasta que un run pasó limpio: timeout de
+  job muy corto (25→45 min), y el bug de fondo — `ec2-deploy.sh` nunca podía
+  detectar su propio `DEPLOY_DONE` corriendo desde CI porque una sesión SSH no
+  interactiva aterriza en `$HOME`, no en el repo (bug que existía desde siempre,
+  enmascarado porque siempre se probó a mano escribiendo la ruta completa).
+- ✅ **`restart: unless-stopped` en los 13 servicios de producción** (los 4
+  `docker-compose.*.yml`, no el `docker-compose.yml` raíz de desarrollo local) —
+  corrige que los contenedores no sobrevivían un reinicio de instancia (pasó 2 veces
+  en esta sesión por el límite de tiempo del Learner Lab, ver "Riesgos conocidos" en
+  la auditoría de abajo). Antes había que entrar a mano a las 4 y correr
+  `docker compose up -d` cada vez.
+- ✅ **Auditoría completa de AWS (2026-08-21)**: se revisó de punta a punta lo que
+  existe en la cuenta (las 4 EC2, VPC/subred/tabla de rutas, los 5 security groups,
+  `LabRole`/IAM, Elastic IPs) contra la consola real y se armó un mapa de flujo
+  end-to-end (navegador → `web-shell` → zonas Multi-Zones → `api-gateway` →
+  servicios → Postgres/Redis, más el flujo de CI/CD por SSH). El detalle de red/IAM
+  nuevo que salió de esa auditoría (las 7 políticas reales de `LabRole`) ya está
+  integrado en la sección "IAM" de arriba.
+- ✅ **Bug real encontrado y corregido (2026-08-21)**: entrar a la raíz (`/`) sin
+  sesión mostraba el login directo en vez del landing — `app/page.tsx` ya tenía la
+  lógica correcta (landing si no hay token, redirect a `getPostAuthDestination()` si
+  sí), pero el matcher de `middleware.ts` no excluye `/` del resto de rutas
+  protegidas, así que ese middleware interceptaba la raíz primero y redirigía a
+  `/login` antes de que `page.tsx` llegara a correr. Fix: `middleware.ts` deja pasar
+  `/` sin tocarla (`request.nextUrl.pathname === '/'` → `NextResponse.next()`), la
+  decisión landing-vs-redirect queda 100% en `page.tsx`, que ya la tenía bien.
 
 ## Pendiente
 
-1. Prueba real en navegador: entrar a `http://52.200.97.70`, login con una de las
-   cuentas de prueba de arriba, y al menos un flujo completo (crear marca,
-   publicación, etc.) — para confirmar que las 4 instancias realmente arman el
-   sistema completo, no solo que cada una responde por separado.
-2. Una vez confirmado en el navegador: push de `feat/dev-desp` y merge a `develop`.
-3. TLS/dominio — hoy todo es HTTP plano sobre IPs públicas crudas. Sin Nginx ni
+1. ✅ ~~Prueba real en navegador~~ y ~~push/merge a `develop`~~ — hechos; `develop`
+   ya tiene todo este trabajo (CI/CD, restart policies) y el repo local está parado
+   ahí. Falta solo hacer commit + push del fix de landing de hoy (2026-08-21,
+   `middleware.ts`), que quedó sin subir.
+2. TLS/dominio — hoy todo es HTTP plano sobre IPs públicas crudas. Sin Nginx ni
    certificados todavía en ninguna de las 4 instancias.
-4. Secretos hoy se escriben a mano por SSH — no hay Secrets Manager ni nada
+3. Secretos hoy se escriben a mano por SSH — no hay Secrets Manager ni nada
    automatizado. Aceptable para este alcance (proyecto escolar, cuenta de lab
    temporal), documentado acá para no repetir el trabajo de memoria si hay que
    rehacer una instancia.
-5. Granularidad de los security groups internos (VPC CIDR completo en vez de
+4. Granularidad de los security groups internos (VPC CIDR completo en vez de
    SG-a-SG) — ver nota en la sección de security groups arriba.
-6. La sesión del AWS Academy Learner Lab tiene un límite de tiempo (se vio un
+5. La sesión del AWS Academy Learner Lab tiene un límite de tiempo (se vio un
    contador de "tiempo restante" en el panel del lab) — cuando termine o se reinicie,
    las credenciales de `~/.aws/credentials` dejan de servir y **puede que las 4
    instancias EC2 también se detengan/pierdan** según cómo esté configurado el lab.
@@ -578,3 +617,8 @@ levanta cada instancia — no hay un mecanismo automático de secretos todavía 
    que alcanzó con `docker compose up -d` en las 4, sin rebuild. No confirmado si
    esto es el comportamiento garantizado del lab o si tuvimos suerte esta vez — seguir
    tratando cualquier interrupción de sesión como un riesgo real de pérdida.
+   **Mitigado en parte (2026-08-21)**: con `restart: unless-stopped` (ver "Estado a
+   esta fecha" arriba) un *reinicio* de instancia ya no requiere el `up -d` manual —
+   los contenedores se levantan solos. Si la instancia se *detiene* del todo (no solo
+   reinicia), sigue haciendo falta reactivar la sesión del lab a mano; eso no lo
+   arregla ninguna política de Docker.
