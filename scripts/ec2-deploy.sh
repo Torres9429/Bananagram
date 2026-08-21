@@ -24,6 +24,7 @@ ec2_require_valid_role "$ROLE"
 
 COMPOSE_FILE="$(ec2_compose_file_for "$ROLE")"
 SERVICES="$(ec2_services_for "$ROLE")"
+REPO_PATH="$(ec2_repo_path_for "$ROLE")"
 
 echo "== 1/3: sincronizando código -> $ROLE =="
 ./scripts/ec2-sync.sh "$ROLE"
@@ -40,7 +41,7 @@ for svc in $SERVICES; do
   BUILD_CMDS="$BUILD_CMDS sudo DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f $COMPOSE_FILE build $svc &&"
 done
 
-./scripts/ec2-connect.sh "$ROLE" "cd $(ec2_repo_path_for "$ROLE") && rm -f build.log && nohup bash -c '
+./scripts/ec2-connect.sh "$ROLE" "cd $REPO_PATH && rm -f build.log && nohup bash -c '
 (
   set -e
   $BUILD_CMDS
@@ -49,25 +50,28 @@ done
 ' > build.log 2>&1 < /dev/null & disown; sleep 1; echo LAUNCHED"
 
 echo "== 3/3: siguiendo build.log (Ctrl+C solo corta el seguimiento, el build sigue en el servidor) =="
-./scripts/ec2-connect.sh "$ROLE" "tail -f -n +1 build.log" &
+# Bug real corregido en vivo (2026-08-21, primera corrida real de CI): las 3
+# llamadas de acá abajo (tail, el loop de grep, y el "docker compose ps"
+# final) le pasaban a ec2-connect.sh un comando con rutas relativas
+# (build.log, $COMPOSE_FILE) SIN hacer `cd` primero — una sesión SSH no
+# interactiva nueva (`ssh host "cmd"`) arranca en $HOME del usuario remoto
+# (ej. /home/ubuntu), no en $REPO_PATH, así que "build.log" ahí nunca
+# existía. El loop de abajo nunca podía ver DEPLOY_DONE ni DEPLOY_FAILED —
+# se quedaba reintentando para siempre hasta el timeout del job, aunque el
+# deploy real ya hubiera terminado bien en el servidor (confirmado por SSH
+# directo). No se notó en uso manual de esta sesión porque siempre usé la
+# ruta completa (~/Bananagram/build.log) a mano en vez de llamar a este
+# script tal cual — recién se manifestó al correr esto de punta a punta sin
+# intervención, que es exactamente lo que hace CI.
+./scripts/ec2-connect.sh "$ROLE" "cd $REPO_PATH && tail -f -n +1 build.log" &
 TAIL_PID=$!
 trap 'kill $TAIL_PID 2>/dev/null || true' EXIT
 
-# Bug real corregido en vivo (2026-08-21): antes solo esperaba a que
-# apareciera DEPLOY_DONE — si el build fallaba a mitad de camino (ej. el
-# EOF de BuildKit que ya pasó en esta sesión), el script remoto moría sin
-# escribir nada y este loop se quedaba esperando para siempre, sin avisar
-# ni fallar. Ahora el script remoto SIEMPRE escribe uno de los dos
-# sentinels (ver arriba), así que este loop corta apenas aparece
-# cualquiera de los dos — y si fue DEPLOY_FAILED, este script también
-# falla (exit 1) en vez de reportar éxito falso. Necesario para que CI
-# (GitHub Actions) no se quede colgado ni marque un deploy roto como
-# exitoso.
 while true; do
-  if ./scripts/ec2-connect.sh "$ROLE" "grep -q DEPLOY_DONE build.log" 2>/dev/null; then
+  if ./scripts/ec2-connect.sh "$ROLE" "cd $REPO_PATH && grep -q DEPLOY_DONE build.log" 2>/dev/null; then
     break
   fi
-  if ./scripts/ec2-connect.sh "$ROLE" "grep -q DEPLOY_FAILED build.log" 2>/dev/null; then
+  if ./scripts/ec2-connect.sh "$ROLE" "cd $REPO_PATH && grep -q DEPLOY_FAILED build.log" 2>/dev/null; then
     kill $TAIL_PID 2>/dev/null || true
     trap - EXIT
     echo "== FALLÓ el deploy de $ROLE — ver el log de arriba =="
@@ -79,4 +83,4 @@ kill $TAIL_PID 2>/dev/null || true
 trap - EXIT
 
 echo "== listo — estado final de $ROLE =="
-./scripts/ec2-connect.sh "$ROLE" "sudo docker compose -f $COMPOSE_FILE ps"
+./scripts/ec2-connect.sh "$ROLE" "cd $REPO_PATH && sudo docker compose -f $COMPOSE_FILE ps"
