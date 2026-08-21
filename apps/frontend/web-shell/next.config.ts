@@ -34,6 +34,12 @@ const nextConfig: NextConfig = {
         { source: '/brands/:path*',    destination: `${ZONES.BRANDS}/brands/:path*` },
         { source: '/my-campaigns',     destination: `${ZONES.BRANDS}/my-campaigns` },
         { source: '/team',             destination: `${ZONES.BRANDS}/team` },
+        // Faltaba (gap real encontrado en vivo, 2026-08-21): el Sidebar de
+        // analytics-front/posts-front ya navegaba a /my-team con
+        // navegación dura (ver Sidebar.tsx de cada zona), pero sin este
+        // rewrite esa ruta no la resuelve nadie fuera de brands-front
+        // mismo (404 al llegar por el proxy de web-shell).
+        { source: '/my-team',          destination: `${ZONES.BRANDS}/my-team` },
         // /profile no tenía rewrite — solo era alcanzable entrando directo a
         // brands-front:3013 (gap ya documentado en sesiones anteriores, se
         // cierra de paso al agregar /profile/alexa).

@@ -28,7 +28,6 @@ import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
 import { EmptyState, FormDialog, LabeledField, LabeledSelect, PrimaryButton, ConfirmDialog, ScoreGauge, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser, useListCategoriesQuery } from '@repo/ui/state';
 import { getInitials, formatDateRange } from '@repo/ui/utils';
-import { ZONE_URLS } from '@repo/ui/config';
 import { CreateCampaignDialog } from '../CreateCampaignDialog';
 import { CreateBrandDialog } from '../CreateBrandDialog';
 import { useUpdateBrandMutation, useCreateConnectUrlMutation, useUploadLogoMutation } from '../../store/api/brands.api';
@@ -366,7 +365,7 @@ export function ClientSection() {
             </Button>
           )}
           {can('publicaciones', 'ver') && (
-            <Button size="small" variant="outlined" startIcon={<RateReviewOutlinedIcon />} onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/approvals`; }}
+            <Button size="small" variant="outlined" startIcon={<RateReviewOutlinedIcon />} onClick={() => { window.location.href = '/posts/approvals'; }}
               sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}>
               Ver aprobaciones
             </Button>

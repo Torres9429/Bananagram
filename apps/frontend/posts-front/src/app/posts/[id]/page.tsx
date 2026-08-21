@@ -22,7 +22,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { StatusChip, PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
 import { selectUser, useListSocialNetworksQuery } from '@repo/ui/state';
-import { ZONE_URLS } from '@repo/ui/config';
 import type { PostSocialAccountStatus } from '@repo/ui/types';
 import {
   useGetPostQuery,
@@ -382,7 +381,7 @@ export default function PostDetailPage() {
                   component="span"
                   variant="body2"
                   sx={{ color: '#1565C0', cursor: 'pointer', textDecoration: 'underline', fontWeight: 500 }}
-                  onClick={() => { window.location.href = `${ZONE_URLS.brandsFront}/brands/${post.brandId}/campaigns/${post.campaignId}`; }}
+                  onClick={() => { window.location.href = `/brands/${post.brandId}/campaigns/${post.campaignId}`; }}
                 >
                   {post.campaign.name}
                 </Typography>
@@ -605,7 +604,7 @@ export default function PostDetailPage() {
                 <Button
                   variant="outlined"
                   sx={{ borderColor: '#E8E8E8', color: '#6B6B6B' }}
-                  onClick={() => { window.location.href = `${ZONE_URLS.brandsFront}/brands/${post.brandId}/campaigns/${post.campaignId}`; }}
+                  onClick={() => { window.location.href = `/brands/${post.brandId}/campaigns/${post.campaignId}`; }}
                 >
                   Ver campaña →
                 </Button>

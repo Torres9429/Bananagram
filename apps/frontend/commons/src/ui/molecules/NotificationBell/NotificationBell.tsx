@@ -10,7 +10,6 @@ import Divider from '@mui/material/Divider';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { useNotifications } from '../../../hooks/useNotifications';
 import { useMarkNotificationReadMutation } from '../../../api/notifications.api';
-import { ZONE_URLS } from '../../../config/zone-urls';
 import type { Notification } from '../../../types/notification.types';
 
 // type es un string libre en el backend (Notification.type) — solo se
@@ -47,10 +46,8 @@ function getMessage(n: Notification): string {
 }
 
 // Cada tipo lleva a quien lo recibe al lugar donde puede actuar — nunca solo
-// se queda en "marcar como leída". brandsFront porque NotificationBell vive
-// en TopBar, compartido por las 6 zonas — el destino real siempre es
-// brands-front (mismo patrón cross-zona que ya usa ClientSection.tsx con
-// ZONE_URLS.postsFront).
+// se queda en "marcar como leída". Rutas RELATIVAS a propósito (nunca
+// ZONE_URLS.X directo) — ver comentario en getPostAuthDestination.ts.
 function getTargetUrl(n: Notification): string | null {
   const p = n.payload as Record<string, unknown>;
   const campaignId = typeof p.campaignId === 'string' ? p.campaignId : undefined;
@@ -59,16 +56,16 @@ function getTargetUrl(n: Notification): string | null {
 
   switch (n.type) {
     case 'campaign_pending_cm_approval':
-      return `${ZONE_URLS.brandsFront}/my-campaigns`;
+      return '/my-campaigns';
     case 'campaign_accepted':
     case 'campaign_rejected':
-      return brandId && campaignId ? `${ZONE_URLS.brandsFront}/brands/${brandId}/campaigns/${campaignId}` : null;
+      return brandId && campaignId ? `/brands/${brandId}/campaigns/${campaignId}` : null;
     case 'post_submitted_for_review':
     case 'post_rejected_by_cm':
     case 'post_pending_client_approval':
     case 'post_rejected_by_client':
     case 'post_forwarded_to_designer':
-      return postId ? `${ZONE_URLS.postsFront}/posts/${postId}` : null;
+      return postId ? `/posts/${postId}` : null;
     default:
       return null;
   }

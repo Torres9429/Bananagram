@@ -15,31 +15,31 @@ import MicOutlinedIcon from '@mui/icons-material/MicOutlined';
 import { SidebarNav, usePermissions } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { AppRole, AppModule, AppAction } from '@repo/ui/types';
-import { ZONE_URLS } from '@repo/ui/config';
 import { useSelector } from 'react-redux';
 import type { NavItemWithPermission } from '../interfaces/interface';
 
-const { webShell: WEB_SHELL_URL, brandsFront: BRANDS_FRONT_URL, analyticsFront: ANALYTICS_FRONT_URL, adminFront: ADMIN_FRONT_URL } = ZONE_URLS;
-
+// Hrefs RELATIVOS a propósito (nunca ZONE_URLS.X directo) — ver comentario
+// en getPostAuthDestination.ts. Todos menos 'posts' viven en OTRA zona —
+// ver CROSS_ZONE_HREFS más abajo, que fuerza navegación dura para esos.
 const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
-  { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: <DashboardIcon /> },
   // Mis Campañas / Mi perfil van primero (justo después de Dashboard): mismo
   // destino que "Mi perfil" de abajo NO existe más abajo — se quitó ese
   // duplicado (apuntaba al mismo /profile). "Mis Campañas" (campanas:ver) y
   // "Mi perfil" (marcas:crear/editar) son mutuamente excluyentes por diseño
   // (landings distintos) — la exclusividad se resuelve por el permiso real
   // de marcas más abajo (hasProfileAccess), no por nombre de rol.
-  { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
   // Sin requirePermission a propósito (antes: marcas:crear/editar, sacaba a
   // CM/Diseñador de este arreglo en permissionVisible ANTES de que
   // roleAdjusted pudiera re-incluirlos — bug real, "Mi perfil" seguía sin
   // aparecer pese a que roleAdjusted ya decía `return true`) — la
   // visibilidad real la decide roleAdjusted más abajo, no este campo.
-  { key: 'my-brand', label: 'Mi perfil', href: `${BRANDS_FRONT_URL}/profile`, activeMatch: `${BRANDS_FRONT_URL}/profile`, exactMatch: true, icon: <AccountCircleOutlinedIcon /> },
+  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, icon: <AccountCircleOutlinedIcon /> },
   // Alexa Skill no tiene módulo propio en el catálogo de permisos — el gate
   // real es de rol (Cliente/Diseñador), igual que en brands-front/Sidebar.tsx
   // y en /profile/alexa/page.tsx. No se inventa un permiso nuevo.
-  { key: 'alexa', label: 'Alexa Skill', href: `${BRANDS_FRONT_URL}/profile/alexa`, icon: <MicOutlinedIcon /> },
+  { key: 'alexa', label: 'Alexa Skill', href: '/profile/alexa', icon: <MicOutlinedIcon /> },
   // Antes sin AppAction.VIEW: un rol nuevo de solo lectura (solo
   // publicaciones:ver, sin crear/aprobar) nunca veía este ítem pese a poder
   // listar publicaciones de verdad — mismo hallazgo que el resto del punto 8
@@ -48,14 +48,17 @@ const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
   // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
   // browsing multi-perfil que se conserva por compatibilidad (ver
   // brands-front/src/app/brands). No quitar hasta que /brands se retire.
-  { key: 'brands', label: 'Marcas', href: `${BRANDS_FRONT_URL}/brands`, icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
-  { key: 'calendar', label: 'Calendario', href: `${BRANDS_FRONT_URL}/profile/calendar`, icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
-  { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
+  { key: 'brands', label: 'Marcas', href: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
+  { key: 'calendar', label: 'Calendario', href: '/profile/calendar', icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  { key: 'metrics', label: 'Métricas', href: '/metrics', icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
   // Faltaba en esta zona (solo estaba en brands-front) — el CM lo perdía al
   // navegar a Posts, mismo criterio/permiso que el original.
-  { key: 'my-team', label: 'Diseñadores', href: `${BRANDS_FRONT_URL}/my-team`, icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.ASSIGN }] },
-  { key: 'admin', label: 'Admin', href: `${ADMIN_FRONT_URL}/users`, icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
+  { key: 'my-team', label: 'Diseñadores', href: '/my-team', icon: <GroupIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.ASSIGN }] },
+  { key: 'admin', label: 'Admin', href: '/users', icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
 ];
+
+// Rutas que viven en OTRA zona (fuera de posts-front) — ver handleNavigate.
+const CROSS_ZONE_HREFS = new Set(['/dashboard', '/my-campaigns', '/profile', '/profile/alexa', '/brands', '/profile/calendar', '/metrics', '/my-team', '/users']);
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -100,8 +103,11 @@ export function Sidebar() {
       ? roleAdjusted.filter((item) => item.key === 'dashboard' || item.key === 'admin')
       : roleAdjusted.filter((item) => item.key !== 'dashboard');
 
+  // Bug real encontrado en vivo — ver comentario equivalente en
+  // brands-front/Sidebar.tsx: la navegación cross-zona debe ser dura
+  // (window.location.href), nunca router.push/<Link>.
   function handleNavigate(href: string) {
-    if (href.startsWith('http')) {
+    if (CROSS_ZONE_HREFS.has(href)) {
       window.location.href = href;
       return;
     }

@@ -23,7 +23,6 @@ import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import { usePermissions, PrimaryButton, StatusChip } from '@repo/ui/ui';
 import { selectUser } from '@repo/ui/state';
 import { getInitials, formatDateRange } from '@repo/ui/utils';
-import { ZONE_URLS } from '@repo/ui/config';
 import { useGetCampaignMetricsQuery, useRefreshCampaignMetricsMutation } from '../../../../../store/api/metrics.api';
 import {
   useGetCampaignQuery,
@@ -140,7 +139,7 @@ export default function CampaignDetailPage() {
           <Button
             variant="outlined"
             startIcon={<ArticleOutlinedIcon />}
-            onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts?campaign=${campaign.id}`; }}
+            onClick={() => { window.location.href = `/posts?campaign=${campaign.id}`; }}
             sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
           >
             Ver todas las publicaciones
@@ -157,7 +156,7 @@ export default function CampaignDetailPage() {
             <Button
               variant="outlined"
               startIcon={<RateReviewOutlinedIcon />}
-              onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/approvals`; }}
+              onClick={() => { window.location.href = `/posts/approvals`; }}
               sx={{ borderColor: 'divider', color: 'secondary.main', '&:hover': { borderColor: 'primary.main' } }}
             >
               Ver aprobaciones
@@ -166,7 +165,7 @@ export default function CampaignDetailPage() {
           {can('publicaciones', 'crear') && (
             <PrimaryButton
               startIcon={<AddCircleOutlineIcon />}
-              onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/new`; }}
+              onClick={() => { window.location.href = `/posts/new`; }}
             >
               Crear publicación
             </PrimaryButton>
@@ -233,7 +232,7 @@ export default function CampaignDetailPage() {
                   justifyContent="space-between"
                   alignItems="center"
                   gap={1.5}
-                  onClick={() => { window.location.href = `${ZONE_URLS.postsFront}/posts/${post.id}`; }}
+                  onClick={() => { window.location.href = `/posts/${post.id}`; }}
                   sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, cursor: 'pointer', '&:hover': { borderColor: 'primary.main' } }}
                 >
                   <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

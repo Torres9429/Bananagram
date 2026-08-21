@@ -1,5 +1,5 @@
 import { fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
-import { API_BASE_URL, ZONE_URLS } from '../config/zone-urls';
+import { API_BASE_URL } from '../config/zone-urls';
 import {
   getCookieToken,
   setCookieToken,
@@ -44,7 +44,10 @@ function clearSessionAndRedirectToLogin(): void {
   deleteCookieToken();
   deleteRefreshCookieToken();
   if (typeof window !== 'undefined') {
-    window.location.href = `${ZONE_URLS.authFront}/login`;
+    // Relativo a propósito — ver comentario en getPostAuthDestination.ts
+    // (mismo hallazgo: ZONE_URLS.authFront no es alcanzable desde el
+    // navegador fuera de localhost).
+    window.location.href = '/login';
   }
 }
 

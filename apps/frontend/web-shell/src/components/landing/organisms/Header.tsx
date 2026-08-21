@@ -8,7 +8,6 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
 import { useReducedMotion } from 'framer-motion';
-import { ZONE_URLS } from '@repo/ui/config';
 import { LandingButton } from '../atoms/LandingButton';
 
 const HEADER_OFFSET = 88;
@@ -76,7 +75,7 @@ export function Header() {
 
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Button
-              onClick={() => window.location.assign(`${ZONE_URLS.authFront}/login`)}
+              onClick={() => window.location.assign('/login')}
               sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: 'text.primary', fontWeight: 600 }}
             >
               Iniciar sesión

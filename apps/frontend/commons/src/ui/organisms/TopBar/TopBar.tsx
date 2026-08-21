@@ -10,7 +10,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { NotificationBell } from '../../molecules/NotificationBell/NotificationBell';
 import { logout } from '../../../state/auth.slice';
 import { deleteCookieToken, deleteRefreshCookieToken } from '../../../session/cookieSession';
-import { ZONE_URLS } from '../../../config/zone-urls';
 import { useLogoutMutation } from '../../../api/auth.api';
 
 interface TopBarProps {
@@ -40,7 +39,8 @@ export function TopBar({ title = 'Gestor de Redes', color }: TopBarProps) {
     deleteCookieToken();
     deleteRefreshCookieToken();
     dispatch(logout());
-    window.location.href = `${ZONE_URLS.authFront}/login`;
+    // Relativo a propósito — ver comentario en getPostAuthDestination.ts.
+    window.location.href = '/login';
   }
 
   return (

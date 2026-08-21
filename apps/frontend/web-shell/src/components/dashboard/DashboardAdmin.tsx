@@ -14,7 +14,6 @@ import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import Skeleton from '@mui/material/Skeleton';
 import { WidgetCard, PrimaryButton, EmptyState, usePermissions } from '@repo/ui/ui';
-import { ZONE_URLS } from '@repo/ui/config';
 import {
   useListUsersQuery,
   useListRolesQuery,
@@ -26,7 +25,8 @@ import {
 import { formatDate, formatRoleName } from '@repo/ui/utils';
 
 function nav(path: string) {
-  window.location.href = `${ZONE_URLS.adminFront}${path}`;
+  // Relativo a propósito — ver comentario en getPostAuthDestination.ts.
+  window.location.href = path;
 }
 
 export function DashboardAdmin() {
