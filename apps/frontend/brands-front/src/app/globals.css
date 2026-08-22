@@ -4,8 +4,81 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @theme {
-  --color-brand-primary: #FDC726;
+  --color-brand-primary: #E0A800;
   --color-brand-primary-dark: #D4AC40;
   --color-brand-primary-light: #FFF8E1;
   --color-brand-text-on-yellow: #7A5C00;
+}
+
+/* react-big-calendar no es MUI — se tematiza aparte con la misma paleta. */
+@layer components {
+  .rbc-toolbar button {
+    color: #7a5c00;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    text-transform: none;
+    font-weight: 600;
+    box-shadow: none;
+  }
+  .rbc-toolbar button:hover {
+    background-color: #fff8e1;
+    border-color: #d4ac40;
+    color: #7a5c00;
+  }
+  .rbc-toolbar button:active,
+  .rbc-toolbar button.rbc-active {
+    background-color: #e0a800;
+    border-color: #e0a800;
+    color: #7a5c00;
+    box-shadow: none;
+  }
+  .rbc-toolbar button:active:hover,
+  .rbc-toolbar button.rbc-active:hover {
+    background-color: #d4ac40;
+    border-color: #d4ac40;
+  }
+  .rbc-toolbar-label {
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+  .rbc-today {
+    background-color: #fff8e1;
+  }
+  .rbc-off-range-bg {
+    background-color: #f7f7f7;
+  }
+  .rbc-header {
+    border-color: #e8e8e8;
+    font-weight: 600;
+    color: #6b6b6b;
+    padding: 8px 4px;
+  }
+  .rbc-month-view,
+  .rbc-time-view,
+  .rbc-agenda-view {
+    border-color: #e8e8e8;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .rbc-day-bg + .rbc-day-bg,
+  .rbc-month-row + .rbc-month-row,
+  .rbc-header + .rbc-header {
+    border-color: #e8e8e8;
+  }
+  .rbc-event {
+    background-color: #e0a800;
+    color: #7a5c00;
+    border-radius: 6px;
+    border: none;
+    font-weight: 600;
+  }
+  .rbc-event.rbc-selected,
+  .rbc-event:focus {
+    background-color: #d4ac40;
+    outline: none;
+  }
+  .rbc-show-more {
+    color: #7a5c00;
+    font-weight: 600;
+  }
 }

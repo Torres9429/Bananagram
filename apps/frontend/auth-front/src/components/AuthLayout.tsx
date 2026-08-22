@@ -1,10 +1,7 @@
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import { BrandPanel } from './BrandPanel';
-
-interface AuthLayoutProps {
-  children: React.ReactNode;
-}
+import type { AuthLayoutProps } from '../interfaces/interface';
 
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (

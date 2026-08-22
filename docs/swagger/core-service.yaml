@@ -1,0 +1,1629 @@
+openapi: 3.0.0
+paths:
+  /health:
+    get:
+      operationId: HealthController_health
+      parameters: []
+      responses:
+        '200':
+          description: ''
+  /api/catalogs/categories:
+    get:
+      operationId: CategoriesController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    post:
+      operationId: CategoriesController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/categories/{id}:
+    get:
+      operationId: CategoriesController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    patch:
+      operationId: CategoriesController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCategoryDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    delete:
+      operationId: CategoriesController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/specialties:
+    get:
+      operationId: SpecialtiesController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    post:
+      operationId: SpecialtiesController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpecialtyDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/specialties/{id}:
+    get:
+      operationId: SpecialtiesController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    patch:
+      operationId: SpecialtiesController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSpecialtyDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    delete:
+      operationId: SpecialtiesController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/social-networks:
+    get:
+      operationId: SocialNetworksController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    post:
+      operationId: SocialNetworksController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSocialNetworkDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/catalogs/social-networks/{id}:
+    get:
+      operationId: SocialNetworksController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    patch:
+      operationId: SocialNetworksController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSocialNetworkDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+    delete:
+      operationId: SocialNetworksController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - catalogs
+      security:
+        - bearer: []
+  /api/internal/user-profiles/{userId}:
+    get:
+      operationId: UserProfilesController_getByUserId
+      parameters:
+        - name: userId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - internal
+  /api/internal/user-profiles:
+    post:
+      operationId: UserProfilesController_upsert
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertUserProfileDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - internal
+  /api/brands:
+    get:
+      operationId: BrandsController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+    post:
+      operationId: BrandsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBrandDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}:
+    get:
+      operationId: BrandsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+    patch:
+      operationId: BrandsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBrandDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+    delete:
+      operationId: BrandsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/connect-url:
+    post:
+      operationId: BrandsController_createConnectUrl
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectUrlDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/reprovision-ayrshare:
+    post:
+      operationId: BrandsController_reprovisionAyrshare
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectUrlDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/metrics-history:
+    get:
+      operationId: BrandsController_getMetricsHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/metrics-history/refresh:
+    post:
+      operationId: BrandsController_refreshMetricsHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{id}/account-metrics-summary:
+    get:
+      operationId: BrandsController_getAccountMetricsSummary
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - brands
+      security:
+        - bearer: []
+  /api/brands/{brandId}/social-accounts:
+    get:
+      operationId: SocialAccountsController_findAll
+      parameters:
+        - name: brandId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - social-accounts
+      security:
+        - bearer: []
+  /api/brands/{brandId}/social-accounts/sync:
+    post:
+      operationId: SocialAccountsController_sync
+      parameters:
+        - name: brandId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - social-accounts
+      security:
+        - bearer: []
+  /api/brands/{brandId}/social-accounts/{id}/disconnect:
+    post:
+      operationId: SocialAccountsController_disconnect
+      parameters:
+        - name: brandId
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - social-accounts
+      security:
+        - bearer: []
+  /api/brands/{id}/score:
+    get:
+      operationId: ScoreController_getScore
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - score
+      security:
+        - bearer: []
+  /api/brands/{id}/score-history:
+    get:
+      operationId: ScoreController_getScoreHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - score
+      security:
+        - bearer: []
+  /api/campaigns:
+    get:
+      operationId: CampaignsController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+    post:
+      operationId: CampaignsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCampaignDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/eligible-community-managers:
+    get:
+      operationId: CampaignsController_findEligibleCommunityManagers
+      parameters:
+        - name: categoryIds
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/eligible-designers:
+    get:
+      operationId: CampaignsController_findEligibleDesigners
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/metrics-summary:
+    get:
+      operationId: CampaignsController_findAllWithMetrics
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}:
+    get:
+      operationId: CampaignsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+    patch:
+      operationId: CampaignsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCampaignDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+    delete:
+      operationId: CampaignsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/metrics:
+    get:
+      operationId: CampaignsController_getMetrics
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/metrics-history:
+    get:
+      operationId: CampaignsController_getMetricsHistory
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/posts/{postId}/metrics:
+    get:
+      operationId: CampaignsController_getPostMetrics
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: postId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/metrics/refresh:
+    post:
+      operationId: CampaignsController_refreshMetrics
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/accept:
+    post:
+      operationId: CampaignsController_accept
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/reject:
+    post:
+      operationId: CampaignsController_reject
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectCampaignDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/designers:
+    post:
+      operationId: CampaignsController_assignDesigner
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignDesignerDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/campaigns/{id}/designers/{userId}:
+    delete:
+      operationId: CampaignsController_unassignDesigner
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: userId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - campaigns
+      security:
+        - bearer: []
+  /api/cm-team:
+    get:
+      operationId: CmTeamController_listMine
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - cm-team
+      security:
+        - bearer: []
+    post:
+      operationId: CmTeamController_add
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeamMemberDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - cm-team
+      security:
+        - bearer: []
+  /api/cm-team/{designerUserId}:
+    delete:
+      operationId: CmTeamController_remove
+      parameters:
+        - name: designerUserId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - cm-team
+      security:
+        - bearer: []
+  /api/posts:
+    get:
+      operationId: PostsController_list
+      parameters:
+        - name: campaignId
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: brandId
+          required: true
+          in: query
+          schema:
+            type: string
+        - name: status
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+    post:
+      operationId: PostsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}:
+    get:
+      operationId: PostsController_get
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+    patch:
+      operationId: PostsController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePostDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+    delete:
+      operationId: PostsController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/submit-for-review:
+    post:
+      operationId: PostsController_submitForReview
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/approve:
+    post:
+      operationId: PostsController_approve
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/reject:
+    post:
+      operationId: PostsController_reject
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectPostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/client-reject:
+    post:
+      operationId: PostsController_clientReject
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectPostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/forward-to-designer:
+    post:
+      operationId: PostsController_forwardToDesigner
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForwardToDesignerDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/schedule:
+    post:
+      operationId: PostsController_schedule
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulePostDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/cancel:
+    post:
+      operationId: PostsController_cancel
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/media:
+    post:
+      operationId: PostsController_uploadMedia
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/posts/{id}/media/{mediaId}:
+    delete:
+      operationId: PostsController_removeMedia
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: mediaId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - posts
+      security:
+        - bearer: []
+  /api/reports:
+    get:
+      operationId: ReportsController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - reports
+      security:
+        - bearer: []
+    post:
+      operationId: ReportsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - reports
+      security:
+        - bearer: []
+  /api/reports/{id}:
+    get:
+      operationId: ReportsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - reports
+      security:
+        - bearer: []
+info:
+  title: core-service
+  description: Marcas, campañas, publicaciones, analítica e ideas de contenido
+  version: '1.0'
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    CreateCategoryDto:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+    UpdateCategoryDto:
+      type: object
+      properties:
+        name:
+          type: string
+    CreateSpecialtyDto:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+    UpdateSpecialtyDto:
+      type: object
+      properties:
+        name:
+          type: string
+    CreateSocialNetworkDto:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        baseEngagementRate:
+          type: number
+      required:
+        - name
+        - code
+        - baseEngagementRate
+    UpdateSocialNetworkDto:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        baseEngagementRate:
+          type: number
+    UpsertUserProfileDto:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+        roleNames:
+          type: array
+          items:
+            type: string
+            enum:
+              - cliente
+              - cm
+              - disenador
+        categoryIds:
+          type: array
+          items:
+            type: string
+        specialtyIds:
+          type: array
+          items:
+            type: string
+      required:
+        - userId
+        - name
+        - roleNames
+    CreateBrandDto:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        profileType:
+          type: string
+          enum:
+            - brand
+            - profile
+        categoryId:
+          type: string
+        logoUrl:
+          type: string
+        primaryColor:
+          type: string
+        allowedSocial:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+        - slug
+        - allowedSocial
+    UpdateBrandDto:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        profileType:
+          type: string
+          enum:
+            - brand
+            - profile
+        categoryId:
+          type: string
+        logoUrl:
+          type: string
+        primaryColor:
+          type: string
+    CreateConnectUrlDto:
+      type: object
+      properties:
+        allowedSocial:
+          type: array
+          items:
+            type: string
+    CreateCampaignDto:
+      type: object
+      properties:
+        brandId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        objective:
+          type: string
+        cmId:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        categoryIds:
+          type: array
+          items:
+            type: string
+      required:
+        - brandId
+        - name
+        - cmId
+    UpdateCampaignDto:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        objective:
+          type: string
+        cmId:
+          type: string
+        status:
+          type: string
+          enum:
+            - active
+            - paused
+            - finished
+        startDate:
+          type: string
+        endDate:
+          type: string
+    RejectCampaignDto:
+      type: object
+      properties:
+        reason:
+          type: string
+    AssignDesignerDto:
+      type: object
+      properties:
+        userId:
+          type: string
+      required:
+        - userId
+    AddTeamMemberDto:
+      type: object
+      properties:
+        designerUserId:
+          type: string
+      required:
+        - designerUserId
+    CreatePostDto:
+      type: object
+      properties:
+        brandId:
+          type: string
+        campaignId:
+          type: string
+        socialNetworkIds:
+          type: array
+          items:
+            type: string
+        content:
+          type: string
+        instructions:
+          type: string
+          nullable: true
+        scheduledAt:
+          type: string
+          nullable: true
+      required:
+        - brandId
+        - campaignId
+        - socialNetworkIds
+        - content
+    RejectPostDto:
+      type: object
+      properties:
+        comment:
+          type: string
+      required:
+        - comment
+    ForwardToDesignerDto:
+      type: object
+      properties:
+        comment:
+          type: string
+    UpdatePostDto:
+      type: object
+      properties:
+        content:
+          type: string
+        instructions:
+          type: string
+          nullable: true
+    SchedulePostDto:
+      type: object
+      properties:
+        scheduledAt:
+          type: string
+          nullable: true
+    CreateReportDto:
+      type: object
+      properties:
+        brandId:
+          type: string
+        format:
+          type: string
+          enum:
+            - csv
+            - pdf
+      required:
+        - brandId
+        - format

@@ -1,0 +1,50 @@
+name: Deploy a EC2 (develop)
+
+# Solo push a develop dispara el despliegue — nunca otra rama ni PRs, para
+# que las 4 instancias EC2 (recursos reales, cuenta de AWS Academy Lab) no
+# se redesplieguen por accidente desde una rama de trabajo.
+on:
+  push:
+    branches:
+      - develop
+
+# Evita que dos pushes seguidos a develop corran el deploy en paralelo y se
+# pisen entre sí sobre las mismas 4 instancias — el segundo espera a que
+# termine el primero (no lo cancela, a diferencia del default de
+# cancel-in-progress, porque cancelar a mitad de un `docker compose build`
+# puede dejar una imagen a medio armar).
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.role }}
+    runs-on: ubuntu-latest
+    # Bug real encontrado en vivo (2026-08-21, primer run real): con 25 los 4
+    # jobs se cancelaron por timeout — las imágenes ya se habían terminado de
+    # construir Y los contenedores ya estaban arriba (confirmado por SSH
+    # directo, con datos/timestamps que lo probaban), el script remoto
+    # simplemente no llegó a escribir DEPLOY_DONE antes del corte. `frontend`
+    # en particular (6 apps secuenciales) puede tardar más de 25min en un
+    # build en frío desde un runner de GitHub, sin la cache tibia que sí
+    # tenía en las corridas manuales anteriores de esta sesión.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [core, auth-gateway, extras, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar llave SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/bananagram.pem
+          chmod 600 ~/.ssh/bananagram.pem
+
+      - name: Desplegar ${{ matrix.role }}
+        env:
+          EC2_KEY_PATH: /home/runner/.ssh/bananagram.pem
+        run: ./scripts/ec2-deploy.sh ${{ matrix.role }}

@@ -1,0 +1,212 @@
+// Schema propio de auth-service — copiado de la sección "auth-service" de
+// docs/base/modelo2.txt (fuente de verdad del modelo de datos). Dueño de:
+// identidad, RBAC, Notification. Base de datos propia (DATABASE_URL_AUTH),
+// separada de core-service — ya no comparten un único Postgres/schema.
+
+// output personalizado: auth-service y core-service declaran la misma
+// versión de @prisma/client, y pnpm resuelve versiones idénticas al MISMO
+// folder físico en su store — sin esto, el prisma generate de un servicio
+// pisa el Client generado del otro (verificado). Vive dentro de
+// node_modules (no en src/) para que Docker lo empaquete tal cual con
+// `COPY node_modules` sin que tsc tenga que copiar código ya compilado.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_AUTH")
+}
+
+// Los privilegios viven en role_permissions (BD), nunca hardcodeados en
+// código (ver CLAUDE.md). module.slug + action.slug + allowed.
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  users       UserRole[]
+  permissions RolePermission[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("roles")
+}
+
+// Multirol: tabla puente pura (sin columnas propias) entre User y Role. Los
+// privilegios efectivos de un usuario son la UNIÓN de los permisos de todos
+// sus roles (ver AuthRepository.getPermissions) — reemplaza el viejo
+// User.roleId escalar (un usuario solo podía tener un rol a la vez).
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Module {
+  id          String           @id @default(uuid())
+  slug        String           @unique
+  name        String
+  permissions RolePermission[]
+
+  @@map("modules")
+}
+
+model Action {
+  id          String           @id @default(uuid())
+  slug        String           @unique
+  name        String
+  permissions RolePermission[]
+
+  @@map("actions")
+}
+
+model RolePermission {
+  id       String  @id @default(uuid())
+  roleId   String
+  role     Role    @relation(fields: [roleId], references: [id])
+  moduleId String
+  module   Module  @relation(fields: [moduleId], references: [id])
+  actionId String
+  action   Action  @relation(fields: [actionId], references: [id])
+  allowed  Boolean @default(true)
+
+  @@unique([roleId, moduleId, actionId])
+  @@map("role_permissions")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  // Todos los tokens nacidos de la misma sesión (login inicial + cada
+  // rotación de refresh) comparten familyId. Reusar un token ya consumido
+  // (usedAt) o revocado revoca TODA la familia — así un refresh robado y
+  // reutilizado mata también la sesión legítima que ya rotó, en vez de
+  // solo rechazar el intento del atacante.
+  familyId  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// Respaldo en Postgres de la denylist de access tokens revocados por logout
+// (ver TokenDenylistService). El hot path de cada request autenticado
+// consulta Redis (O(1)); esta tabla es el fallback si Redis está caído, y
+// registro por si hace falta auditar revocaciones después.
+model RevokedAccessToken {
+  jti       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("revoked_access_tokens")
+}
+
+// Bandeja de notificaciones (todos los roles). El evento que dispara una
+// notificación nace en core-service (post rechazado, campaña asignada,
+// reporte listo), pero la tabla vive aquí porque el dato es userId-céntrico.
+// core-service llama a un endpoint interno de auth-service (a construir) al
+// ocurrir el evento — llamada irreducible, el evento no puede "reubicarse":
+// nace donde nace.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("notifications")
+}
+
+// Opcional — implementar según tiempos. Por ahora todos nacen como active.
+enum UserStatus {
+  pending
+  active
+  suspended
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  status       UserStatus @default(active)
+
+  roles               UserRole[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  notifications       Notification[]
+  accountLinkCodes    AccountLinkCode[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+// Account-linking de la Alexa Skill: código corto de un solo uso, generado
+// desde el frontend logueado y canjeado una vez por el Lambda (nunca OAuth2
+// — contrato ya usado por el equipo externo de la skill). Mismo patrón que
+// PasswordResetToken (token/expiresAt/usedAt), salvo que `code` es corto
+// (6-8 caracteres alfanuméricos) en vez de un UUID — pensado para copiar/
+// pegar o dictar por voz, no para verse en una URL.
+model AccountLinkCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  code      String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("account_link_codes")
+}
+
+// Inmutable — instancia LOCAL de auditoría de auth-service. performedBy se
+// puebla directo desde el userId del JWT (dato que ya se tiene en cada
+// request), sin ninguna llamada cruzada. auth-service y core-service tienen
+// cada uno su propia copia de este modelo.
+model AuditLog {
+  id          BigInt  @id @default(autoincrement())
+  tableName   String
+  // Nullable (2026-08-19): AuditInterceptor (commons/) ya declaraba
+  // recordId: string | null a propósito — no toda acción mutante tiene un
+  // recordId natural (ej. POST /auth/login no crea/modifica ninguna fila
+  // identificable) — pero el schema lo exigía non-null, así que CADA login
+  // fallaba en silencio al escribir audit_log (atrapado y solo logueado como
+  // WARN, nunca rompía el login en sí, pero el audit trail quedaba vacío).
+  recordId    String?
+  action      String
+  before      Json?
+  after       Json?
+  performedBy String // desde JWT userId — sin llamada cruzada
+  requestId   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("audit_log")
+}

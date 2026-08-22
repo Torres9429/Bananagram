@@ -1,17 +1,15 @@
-import type { MockUser } from './mock-users';
-
-function encodeMockJwt(payload: object): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = btoa(JSON.stringify(payload));
-  return `${header}.${body}.mock-signature`;
-}
+import type { MockUser } from '../types/auth.types';
+import { encodeMockJwt } from '../state/auth.slice';
 
 export function buildTokenFromUser(user: MockUser): string {
   return encodeMockJwt({
-    sub: user.email,
+    sub: user.id,
     email: user.email,
-    role: user.role,
-    brandIds: user.brandIds,
+    name: user.name,
+    roles: [user.role],
+    status: user.status,
+    avatarUrl: user.avatarUrl ?? null,
+    ownedBrandIds: user.ownedBrandIds ?? [],
     permissions: user.permissions,
   });
 }

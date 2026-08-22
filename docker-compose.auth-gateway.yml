@@ -1,0 +1,58 @@
+# Instancia "auth-gateway" (arquitectura multi-EC2, ver docs/todos/deployment.md).
+# auth-service + api-gateway en el mismo host — el gateway verifica JWTs contra
+# el JWKS de auth-service constantemente, mejor sin salto de red entre ambos.
+# Este es el único de los 3 EC2 de backend con un puerto expuesto al público
+# (4000): el navegador llama al gateway directo (NEXT_PUBLIC_API_URL), no hay
+# proxy delante todavía — por eso TRUST_PROXY=false en el .env del gateway.
+#
+# Uso: docker compose -f docker-compose.auth-gateway.yml up -d --build
+
+services:
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/backend/services/auth-service/Dockerfile
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # (frecuente con las sesiones del Learner Lab) deja los contenedores
+    # "Exited" para siempre hasta que alguien corre `up -d` a mano.
+    restart: unless-stopped
+    env_file: ./apps/backend/services/auth-service/.env
+    environment:
+      # Postgres vive en el EC2 "core" — IP privada real.
+      DATABASE_URL_AUTH: postgresql://postgres:postgres@172.31.12.54:5432/gestor_redes_auth
+      REDIS_URL: redis://172.31.12.54:6379
+      JWT_PRIVATE_KEY_PATH: ./keys/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: ./keys/jwt_public.pem
+      CORE_SERVICE_URL: http://172.31.12.54:3002
+    volumes:
+      # Bug real: JWT_PRIVATE_KEY_PATH/JWT_PUBLIC_KEY_PATH son rutas relativas
+      # (./keys/jwt_*.pem) que Node resuelve contra el WORKDIR final del
+      # contenedor (WORKDIR /app/apps/backend/services/auth-service en el
+      # Dockerfile, no /repo) — montar en /repo/keys nunca coincidía, el
+      # proceso crasheaba con ENOENT al arrancar (TokenSignerService.onModuleInit).
+      - ./keys:/app/apps/backend/services/auth-service/keys:ro
+    # Publicado (no 127.0.0.1) porque core-service (EC2 "core") y
+    # alexa/ai-service (EC2 "extras") necesitan alcanzarlo — protegido por
+    # security group (solo VPC CIDR).
+    ports: ["3001:3001"]
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/backend/gateway/Dockerfile
+    restart: unless-stopped
+    env_file: ./apps/backend/gateway/.env
+    environment:
+      # auth-service: mismo host, por nombre de servicio de Compose.
+      AUTH_SERVICE_URL: http://auth-service:3001
+      AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
+      # core-service (EC2 "core") y alexa/ai-service (EC2 "extras"): IP
+      # privada real, otro host.
+      CORE_SERVICE_URL: http://172.31.12.54:3002
+      ALEXA_SERVICE_URL: http://172.31.4.136:3004
+      AI_SERVICE_URL: http://172.31.4.136:3005
+      REDIS_URL: redis://172.31.12.54:6379
+    # Público — el navegador del usuario llama directo a este puerto.
+    ports: ["4000:4000"]
+    depends_on: [auth-service]

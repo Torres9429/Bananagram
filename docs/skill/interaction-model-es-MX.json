@@ -1,0 +1,581 @@
+{
+    "interactionModel": {
+        "languageModel": {
+            "invocationName": "flash ideas",
+            "intents": [
+                {
+                    "name": "AMAZON.CancelIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.HelpIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.StopIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.NavigateHomeIntent",
+                    "samples": []
+                },
+                {
+                    "name": "LogoutIntent",
+                    "slots": [],
+                    "samples": [
+                        "cerrar sesion",
+                        "desvincula mi cuenta",
+                        "salir de mi cuenta",
+                        "cambiar de usuario",
+                        "desconectar mi cuenta",
+                        "cierra sesion",
+                        "salir"
+                    ]
+                },
+                {
+                    "name": "LinkAccountIntent",
+                    "slots": [
+                        {
+                            "name": "linkCode",
+                            "type": "AMAZON.FOUR_DIGIT_NUMBER"
+                        }
+                    ],
+                    "samples": [
+                        "vincula mi cuenta",
+                        "vincula mi cuenta con el codigo {linkCode}",
+                        "mi codigo es {linkCode}",
+                        "conecta mi cuenta",
+                        "el codigo es {linkCode}",
+                        "codigo {linkCode}",
+                        "entra con {linkCode}",
+                        "entra con el codigo {linkCode}",
+                        "inicia sesion",
+                        "inicia sesion con {linkCode}"
+                    ]
+                },
+                {
+                    "name": "GetActiveCampaignsIntent",
+                    "slots": [],
+                    "samples": [
+                        "que campañas hay disponibles",
+                        "cuales son mis campañas",
+                        "muestrame las campañas activas",
+                        "lista mis campañas",
+                        "que campañas tengo",
+                        "dime mis campañas",
+                        "mis campañas"
+                    ]
+                },
+                {
+                    "name": "SelectCampaignIntent",
+                    "slots": [
+                        {
+                            "name": "campaignName",
+                            "type": "AMAZON.SearchQuery"
+                        }
+                    ],
+                    "samples": [
+                        "vamos con {campaignName}",
+                        "abre campaña {campaignName}",
+                        "abrir campaña {campaignName}",
+                        "quiero revisar {campaignName}",
+                        "selecciona {campaignName}",
+                        "entra a {campaignName}",
+                        "entra a la campaña {campaignName}",
+                        "abre {campaignName}"
+                    ]
+                },
+                {
+                    "name": "GetCampaignMetricsIntent",
+                    "slots": [],
+                    "samples": [
+                        "cual es el engagement",
+                        "cuanto alcance tiene esta campaña",
+                        "como esta funcionando la campaña",
+                        "dame las metricas",
+                        "como va esta campaña",
+                        "dime las metricas",
+                        "metricas"
+                    ]
+                },
+                {
+                    "name": "GetTopContentIntent",
+                    "slots": [
+                        {
+                            "name": "networkName",
+                            "type": "LISTA_REDES"
+                        },
+                        {
+                            "name": "dateRange",
+                            "type": "LISTA_PERIODOS"
+                        }
+                    ],
+                    "samples": [
+                        "el mejor post de {networkName} esta {dateRange}",
+                        "cual tuvo mas likes",
+                        "cual fue el mejor post en {networkName}",
+                        "que publicacion funciono mejor",
+                        "cual fue la mejor publicacion",
+                        "mejor publicacion"
+                    ]
+                },
+                {
+                    "name": "GenerateContentIdeasIntent",
+                    "slots": [
+                        {
+                            "name": "networkName",
+                            "type": "LISTA_REDES"
+                        },
+                        {
+                            "name": "quantity",
+                            "type": "AMAZON.NUMBER"
+                        }
+                    ],
+                    "samples": [
+                        "dame {quantity} ideas para {networkName}",
+                        "que puedo publicar en {networkName}",
+                        "sugiere tres ideas",
+                        "genera contenido para esta campaña",
+                        "que puedo publicar",
+                        "dame ideas de contenido",
+                        "dame ideas",
+                        "genera ideas",
+                        "generar ideas",
+                        "dime ideas"
+                    ]
+                },
+                {
+                    "name": "SaveIdeaIntent",
+                    "slots": [
+                        {
+                            "name": "ideaNumber",
+                            "type": "CustomAnswer"
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "samples": [
+                                "guardala como {ideaTitle}",
+                                "guarda como {ideaTitle}",
+                                "con el titulo {ideaTitle}",
+                                "ponle de nombre {ideaTitle}",
+                                "llama a la idea {ideaTitle}"
+                            ]
+                        }
+                    ],
+                    "samples": [
+                        "{ideaNumber}",
+                        "guarda {ideaNumber}",
+                        "almacena {ideaNumber}",
+                        "guarda la numero {ideaNumber}",
+                        "quiero guardar la idea {ideaNumber}",
+                        "guarda la opcion {ideaNumber}"
+                    ]
+                },
+                {
+                    "name": "SaveCustomIdeaIntent",
+                    "slots": [
+                        {
+                            "name": "ideaText",
+                            "type": "AMAZON.SearchQuery"
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "samples": [
+                                "guardala como {ideaTitle}",
+                                "guarda como {ideaTitle}",
+                                "ponle {ideaTitle}",
+                                "el titulo es {ideaTitle}",
+                                "se llama {ideaTitle}"
+                            ]
+                        }
+                    ],
+                    "samples": [
+                        "tengo una idea",
+                        "guarda esta idea",
+                        "anota una idea",
+                        "quiero registrar una nota",
+                        "quiero guardar algo",
+                        "guarda {ideaText}"
+                    ]
+                },
+                {
+                    "name": "GetSavedIdeasIntent",
+                    "slots": [],
+                    "samples": [
+                        "que ideas tengo guardadas",
+                        "leeme mis ideas",
+                        "muestrame mis notas",
+                        "cuales son mis ideas",
+                        "cuantas ideas llevo guardadas"
+                    ]
+                },
+                {
+                    "name": "DeleteIdeaIntent",
+                    "slots": [
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery"
+                        }
+                    ],
+                    "samples": [
+                        "elimina la idea {ideaTitle}",
+                        "elimina la {ideaTitle}",
+                        "elimina {ideaTitle}",
+                        "borra la idea {ideaTitle}",
+                        "borra {ideaTitle}"
+                    ]
+                },
+                {
+                    "name": "ChangeCampaignIntent",
+                    "slots": [
+                        {
+                            "name": "campaignName",
+                            "type": "AMAZON.SearchQuery"
+                        }
+                    ],
+                    "samples": [
+                        "cambiar campaña",
+                        "seleccionar otra campaña",
+                        "regresar a mis campañas",
+                        "cambia a {campaignName}",
+                        "quiero ver otra campaña",
+                        "pasemos a {campaignName}"
+                    ]
+                },
+                {
+                    "name": "GetIdeaRecommendationsIntent",
+                    "slots": [],
+                    "samples": [
+                        "dame recomendaciones",
+                        "como mejoro esta campaña",
+                        "que deberia cambiar",
+                        "que me recomiendas",
+                        "dame consejos para esta campaña",
+                        "como mejoro el engagement"
+                    ]
+                },
+                {
+                    "name": "GetCampaignSummaryIntent",
+                    "slots": [],
+                    "samples": [
+                        "dame un resumen",
+                        "resume la campaña",
+                        "que hemos visto hasta ahora",
+                        "como estamos",
+                        "dame el panorama general",
+                        "resumen rapido"
+                    ]
+                },
+                {
+                    "name": "AMAZON.YesIntent",
+                    "samples": [
+                        "sí",
+                        "si",
+                        "confirmar",
+                        "claro",
+                        "por supuesto",
+                        "hazlo",
+                        "de acuerdo",
+                        "confirmo"
+                    ]
+                },
+                {
+                    "name": "AMAZON.NoIntent",
+                    "samples": [
+                        "no",
+                        "cancelar",
+                        "no gracias",
+                        "mejor no",
+                        "negativo",
+                        "descarta"
+                    ]
+                },
+                {
+                    "name": "AMAZON.FallbackIntent",
+                    "samples": []
+                }
+            ],
+            "types": [
+                {
+                    "name": "LISTA_REDES",
+                    "values": [
+                        {
+                            "name": {
+                                "value": "x"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "linkedin"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "facebook"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "tiktok"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "instagram"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "LISTA_PERIODOS",
+                    "values": [
+                        {
+                            "name": {
+                                "value": "campaña"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "mes"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "semana"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CustomAnswer",
+                    "values": [
+                        {
+                            "name": {
+                                "value": "3",
+                                "synonyms": [
+                                    "el tres",
+                                    "tres",
+                                    "la tres",
+                                    "la tercera",
+                                    "tercera"
+                                ]
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "2",
+                                "synonyms": [
+                                    "la dos",
+                                    "el dos",
+                                    "la segunda",
+                                    "segunda",
+                                    "dos"
+                                ]
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "1",
+                                "synonyms": [
+                                    "primera",
+                                    "uno",
+                                    "la uno",
+                                    "la primera"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "dialog": {
+            "intents": [
+                {
+                    "name": "LinkAccountIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "linkCode",
+                            "type": "AMAZON.FOUR_DIGIT_NUMBER",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.LinkAccountIntent.linkCode"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "SaveIdeaIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "ideaNumber",
+                            "type": "CustomAnswer",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.35014411070.458707042689"
+                            }
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": true,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "confirmation": "Confirm.Slot.35014411070.172588795167",
+                                "elicitation": "Elicit.Slot.35014411070.172588795167"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "SelectCampaignIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "campaignName",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.1699521565153.97120113117"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "SaveCustomIdeaIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "ideaText",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.SaveCustomIdeaIntent.ideaText"
+                            }
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.SaveCustomIdeaIntent.ideaTitle"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "DeleteIdeaIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.DeleteIdeaIntent.ideaTitle"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "delegationStrategy": "ALWAYS"
+        },
+        "prompts": [
+            {
+                "id": "Elicit.Slot.LinkAccountIntent.linkCode",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Cuál es tu código de vinculación?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.35014411070.458707042689",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Qué número de idea quieres guardar?"
+                    }
+                ]
+            },
+            {
+                "id": "Confirm.Slot.35014411070.458707042689",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Estás seguro de que desea guardar {ideaTitle} ?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.35014411070.172588795167",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Qué título le pondrías a esta idea?"
+                    }
+                ]
+            },
+            {
+                "id": "Confirm.Slot.35014411070.172588795167",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Estás seguro de que deseas guardarla?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.1699521565153.97120113117",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Cuál campaña quieres revisar?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.SaveCustomIdeaIntent.ideaTitle",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Con qué título quieres guardar esta idea?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.SaveCustomIdeaIntent.ideaText",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "Claro, dime la idea."
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.DeleteIdeaIntent.ideaTitle",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "¿Qué idea quieres eliminar? Dime su título."
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -5,6 +5,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
+import { getInitials } from '@repo/ui/utils';
 import { getTeamAggregate } from '../../lib/mock-data';
 
 export default function TeamPage() {
@@ -26,16 +27,16 @@ export default function TeamPage() {
             sx={{ p: 2, bgcolor: '#fff', border: '1px solid #E8E8E8', borderRadius: 3 }}
           >
             <Avatar sx={{ bgcolor: member.avatarBg, color: member.avatarColor, fontWeight: 600 }}>
-              {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+              {getInitials(member.name)}
             </Avatar>
             <Box sx={{ flex: 1 }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
                 <Typography variant="body2" fontWeight={600}>{member.name}</Typography>
-                <Chip size="small" label={member.role} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} />
+                <Chip size="small" label={member.role} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
               </Stack>
               <Stack direction="row" gap={0.75} flexWrap="wrap">
                 {member.campaigns.map((c) => (
-                  <Chip key={c.id} size="small" variant="outlined" label={`${c.name} · ${c.brandName}`} sx={{ fontSize: 11 }} />
+                  <Chip key={c.id} size="small" variant="outlined" label={`${c.name} · ${c.profileName}`} sx={{ fontSize: 11 }} />
                 ))}
               </Stack>
             </Box>

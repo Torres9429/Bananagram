@@ -1,0 +1,12 @@
+{
+  "name": "seed",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file-if-exists=../../apps/backend/services/auth-service/.env --env-file-if-exists=../../apps/backend/services/core-service/.env src/index.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0",
+    "argon2": "^0.41.1"
+  }
+}

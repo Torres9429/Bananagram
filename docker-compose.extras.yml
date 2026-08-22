@@ -1,0 +1,42 @@
+# Instancia "extras" (arquitectura multi-EC2, ver docs/todos/deployment.md).
+# alexa-service + ai-service — los 2 BFF más livianos, camino no crítico,
+# comparten host sin problema.
+#
+# Uso: docker compose -f docker-compose.extras.yml up -d --build
+
+services:
+  alexa-service:
+    build:
+      context: .
+      dockerfile: apps/backend/services/alexa-service/Dockerfile
+    # Bug real encontrado en vivo (2026-08-21) — ver comentario completo en
+    # docker-compose.core.yml: sin esto, un reinicio de la instancia EC2
+    # deja los contenedores "Exited" para siempre hasta un `up -d` a mano.
+    restart: unless-stopped
+    env_file: ./apps/backend/services/alexa-service/.env
+    environment:
+      # Prisma Client propio de alexa-service (dueño de ContentIdea) apunta
+      # directo a la base física de core-service — IP privada real del EC2 "core".
+      DATABASE_URL_CORE: postgresql://postgres:postgres@172.31.12.54:5432/gestor_redes_core
+      REDIS_URL: redis://172.31.12.54:6379
+      AUTH_JWKS_URL: http://172.31.1.153:3001/.well-known/jwks.json
+      AUTH_SERVICE_URL: http://172.31.1.153:3001
+      CORE_SERVICE_URL: http://172.31.12.54:3002
+      # ai-service: mismo host, por nombre de servicio de Compose.
+      AI_SERVICE_URL: http://ai-service:3005
+    # Publicado porque api-gateway (EC2 "auth-gateway") necesita alcanzarlo —
+    # protegido por security group (solo VPC CIDR).
+    ports: ["3004:3004"]
+    depends_on: [ai-service]
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: apps/backend/services/ai-service/Dockerfile
+    restart: unless-stopped
+    env_file: ./apps/backend/services/ai-service/.env
+    environment:
+      REDIS_URL: redis://172.31.12.54:6379
+      AUTH_JWKS_URL: http://172.31.1.153:3001/.well-known/jwks.json
+      CORE_SERVICE_URL: http://172.31.12.54:3002
+    ports: ["3005:3005"]

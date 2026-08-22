@@ -1,1 +1,646 @@
-# Swagger auth-service — generado automáticamente por NestJS Swagger
+openapi: 3.0.0
+paths:
+  /health:
+    get:
+      operationId: HealthController_health
+      parameters: []
+      responses:
+        '200':
+          description: ''
+  /api/auth/register:
+    post:
+      operationId: AuthController_register
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+  /api/auth/login:
+    post:
+      operationId: AuthController_login
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+  /api/auth/refresh:
+    post:
+      operationId: AuthController_refresh
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+  /api/auth/logout:
+    post:
+      operationId: AuthController_logout
+      parameters: []
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+      security:
+        - bearer: []
+  /api/auth/me:
+    get:
+      operationId: AuthController_me
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - auth
+      security:
+        - bearer: []
+  /api/auth/password-reset/request:
+    post:
+      operationId: AuthController_requestPasswordReset
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequestDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - auth
+  /api/auth/password-reset/confirm:
+    post:
+      operationId: AuthController_confirmPasswordReset
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirmDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+  /api/auth/link-code:
+    post:
+      operationId: AuthController_createLinkCode
+      parameters: []
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+      security:
+        - bearer: []
+  /api/auth/link-code/redeem:
+    post:
+      operationId: AuthController_redeemLinkCode
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemLinkCodeDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - auth
+  /api/me/permissions:
+    get:
+      operationId: PermissionsController_getPermissions
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - permissions
+      security:
+        - bearer: []
+  /api/admin/users:
+    get:
+      operationId: UsersController_findAll
+      parameters:
+        - name: roleName
+          required: true
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+    post:
+      operationId: UsersController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/users/{id}:
+    get:
+      operationId: UsersController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+    patch:
+      operationId: UsersController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+    delete:
+      operationId: UsersController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/users/{id}/roles:
+    post:
+      operationId: UsersController_assignRole
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRoleDto'
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/users/{id}/roles/{roleId}:
+    delete:
+      operationId: UsersController_unassignRole
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: roleId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/roles:
+    get:
+      operationId: RolesController_findAll
+      parameters: []
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+    post:
+      operationId: RolesController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/roles/{id}:
+    get:
+      operationId: RolesController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/modules:
+    get:
+      operationId: RolesController_listModules
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/actions:
+    get:
+      operationId: RolesController_listActions
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/admin/roles/{id}/permissions:
+    patch:
+      operationId: RolesController_updatePermission
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRolePermissionDto'
+      responses:
+        '200':
+          description: ''
+      tags:
+        - admin
+      security:
+        - bearer: []
+  /api/me/profile:
+    patch:
+      operationId: ProfileController_completeProfile
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteProfileDto'
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+      tags:
+        - profile
+      security:
+        - bearer: []
+  /api/me/notifications:
+    get:
+      operationId: NotificationsController_listMine
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - notifications
+      security:
+        - bearer: []
+  /api/me/notifications/{id}/read:
+    patch:
+      operationId: NotificationsController_markRead
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ''
+      tags:
+        - notifications
+      security:
+        - bearer: []
+  /api/me/notifications/stream:
+    get:
+      operationId: NotificationsController_streamNotifications
+      parameters: []
+      responses:
+        '200':
+          description: ''
+      tags:
+        - notifications
+      security:
+        - bearer: []
+  /api/internal/notifications:
+    post:
+      operationId: InternalNotificationsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNotificationDto'
+      responses:
+        '201':
+          description: ''
+      tags:
+        - internal
+info:
+  title: auth-service
+  description: Autenticación, usuarios, roles y privilegios
+  version: '1.0'
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    RegisterDto:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        name:
+          type: string
+          minLength: 1
+        avatarUrl:
+          type: string
+        roleName:
+          type: string
+          enum:
+            - cliente
+            - cm
+            - disenador
+        categoryIds:
+          type: array
+          items:
+            type: string
+        specialtyIds:
+          type: array
+          items:
+            type: string
+      required:
+        - email
+        - password
+        - name
+        - roleName
+    LoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+      required:
+        - email
+        - password
+    RefreshDto:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required:
+        - refreshToken
+    PasswordResetRequestDto:
+      type: object
+      properties:
+        email:
+          type: string
+      required:
+        - email
+    PasswordResetConfirmDto:
+      type: object
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 6
+      required:
+        - token
+        - newPassword
+    RedeemLinkCodeDto:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+        - code
+    CreateUserDto:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        roleName:
+          type: string
+      required:
+        - email
+        - password
+        - roleName
+    UpdateUserDto:
+      type: object
+      properties:
+        email:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - active
+            - suspended
+    AssignRoleDto:
+      type: object
+      properties:
+        roleId:
+          type: string
+      required:
+        - roleId
+    CreateRoleDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+      required:
+        - name
+    UpdateRolePermissionDto:
+      type: object
+      properties:
+        moduleSlug:
+          type: string
+        actionSlug:
+          type: string
+        allowed:
+          type: boolean
+      required:
+        - moduleSlug
+        - actionSlug
+        - allowed
+    CompleteProfileDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        avatarUrl:
+          type: string
+        categoryIds:
+          type: array
+          items:
+            type: string
+        specialtyIds:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+    CreateNotificationDto:
+      type: object
+      properties:
+        userId:
+          type: string
+        type:
+          type: string
+          minLength: 1
+        payload:
+          type: object
+      required:
+        - userId
+        - type

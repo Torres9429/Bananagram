@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
-import { LabeledField } from './LabeledField';
+import { LabeledField } from '@repo/ui/ui';
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
@@ -56,7 +56,7 @@ export function ForgotPasswordForm() {
           py: 1.25,
           color: '#fff',
           fontWeight: 700,
-          background: '#FDC726',
+          background: '#E0A800',
           '&:hover': { background: '#D4AC40' },
         }}
       >

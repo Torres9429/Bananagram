@@ -1,6 +1,8 @@
 'use client';
 
+import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSelector } from 'react-redux';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
@@ -9,169 +11,321 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
-import { ProtectedAction, usePermissions } from '@repo/ui';
-import { MOCK_POSTS } from '../../../lib/mock-data';
+import Skeleton from '@mui/material/Skeleton';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import { PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { NETWORK_DISPLAY_COLORS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
+import {
+  useListPostsQuery,
+  useSubmitForReviewMutation,
+  useApprovePostMutation,
+  useRejectPostMutation,
+  type RealPostListItem,
+} from '../../../store/api/posts.api';
+import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
 import { NetworkAvatar } from '../../../components/NetworkAvatar';
-import { CampaignDot } from '../../../components/CampaignDot';
+import { PostsTabs } from '../../../components/PostsTabs';
+import { RejectPostDialog } from '../../../components/RejectPostDialog';
 
+function NetworkAvatarForPost({ post, size }: { post: RealPostListItem; size?: number }) {
+  const code = post.socialNetworks[0]?.socialNetwork.code;
+  const colors = code ? NETWORK_DISPLAY_COLORS[code] : undefined;
+  return <NetworkAvatar network={code ? NETWORK_SHORT_LABELS[code] : '—'} networkBg={colors?.bg ?? '#EEEEEE'} networkColor={colors?.color ?? '#666666'} size={size} />;
+}
+
+function postTitle(content: string): string {
+  return content.length > 100 ? `${content.slice(0, 100)}...` : content;
+}
+
+// Fase O — 5 secciones por audiencia (antes 3, sin distinguir para quién era
+// cada una): CM revisa en_revision/rechazado_cliente, Cliente ve aprobado
+// (informativo, la acción real vive en el detalle), Diseñador/CM corrigen
+// rechazado/borrador. listPosts ya scopea server-side qué puede ver cada
+// quien — las secciones solo deciden qué ACCIONES mostrar, no qué datos.
 export default function PostsApprovalPage() {
   const router = useRouter();
-  const { can, canAny } = usePermissions();
-  const draftPosts = MOCK_POSTS.filter((p) => p.status === 'borrador');
-  const reviewPosts = MOCK_POSTS.filter((p) => p.status === 'en_revision');
-  const rejectedPosts = MOCK_POSTS.filter((p) => p.status === 'rechazado');
+  const user = useSelector(selectUser);
+  const { showSuccess, showError } = useToast();
+  const { can } = usePermissions();
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
 
-  const showDraftsSection = can('post', 'create');
-  // El CM también debe ver esta sección (en espera del cliente), aunque no tenga
-  // approve/reject — solo se le ocultan los botones de acción vía ProtectedAction.
-  const showReviewSection = canAny('post', ['create', 'approve', 'reject']);
-  const showRejectedSection = can('post', 'create');
+  const roles = user?.roles ?? [];
+  const isCm = roles.includes('community_manager');
+  const isDesigner = roles.includes('disenador');
+  const isClient = roles.includes('cliente');
+  // Antes: canReviewPublicaciones = canAny('publicaciones',['aprobar','rechazar'])
+  // decidía si mostrar la sección "Para revisar" (cola en_revision, etapa del
+  // CM) — pero Cliente también tiene aprobar/rechazar reales, solo que para
+  // SU etapa (aprobado→programar). Con el flag compartido, un Cliente veía
+  // la cola de revisión del CM (auditoría final, bug de granularidad real).
+  // "Para revisar" es específicamente la etapa del CM (en_revision→aprobado
+  // en la máquina de estados), así que se gatea por isCm, no por el permiso
+  // compartido. Aprobar/Rechazar dentro de esa sección se sigue gateando por
+  // can('publicaciones','aprobar'/'rechazar') a nivel de botón (ya estaba
+  // bien). El resto de esta pantalla (a quién le toca ver qué cola, reenviar
+  // a revisión) sigue siendo lógica de negocio por rol, sin tocar.
+  const canReviewPublicaciones = isCm;
+
+  const { data: campaigns = [] } = useListCampaignsQuery();
+  const { data: draftPosts = [], isFetching: loadingDrafts } = useListPostsQuery({ status: 'borrador' });
+  const { data: reviewPosts = [], isFetching: loadingReview } = useListPostsQuery({ status: 'en_revision' });
+  const { data: clientRejectedPosts = [], isFetching: loadingClientRejected } = useListPostsQuery({ status: 'rechazado_cliente' });
+  const { data: pendingClientPosts = [], isFetching: loadingPendingClient } = useListPostsQuery({ status: 'aprobado' });
+  const { data: rejectedPosts = [], isFetching: loadingRejected } = useListPostsQuery({ status: 'rechazado' });
+
+  const [submitForReview] = useSubmitForReviewMutation();
+  const [approvePost] = useApprovePostMutation();
+  const [rejectPost] = useRejectPostMutation();
+
+  const campaignById = new Map(campaigns.map((c) => [c.id, c]));
+
+  async function handleSubmitForReview(id: string) {
+    try {
+      await submitForReview(id).unwrap();
+      showSuccess('Publicación enviada a revisión.');
+    } catch {
+      showError('No se pudo enviar a revisión.');
+    }
+  }
+
+  async function handleApprove(id: string) {
+    try {
+      await approvePost(id).unwrap();
+      showSuccess('Publicación aprobada — pasó al Cliente.');
+    } catch {
+      showError('No se pudo aprobar la publicación.');
+    }
+  }
+
+  async function handleConfirmReject(reason: string) {
+    const id = rejectTargetId;
+    if (!id) return;
+    try {
+      await rejectPost({ id, comment: reason }).unwrap();
+      showSuccess('Publicación rechazada — regresó al Diseñador.');
+    } catch {
+      showError('No se pudo rechazar la publicación.');
+    } finally {
+      setRejectTargetId(null);
+    }
+  }
+
+  function PostCard({
+    post,
+    statusChip,
+    actions,
+  }: {
+    post: RealPostListItem;
+    statusChip?: ReactNode;
+    actions: ReactNode;
+  }) {
+    return (
+      <Card
+        key={post.id}
+        elevation={0}
+        onClick={() => router.push(`/posts/${post.id}`)}
+        sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2, cursor: 'pointer', '&:hover': { borderColor: '#E0A800' } }}
+      >
+        <CardContent>
+          <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
+            <Stack direction="row" gap={1} alignItems="center">
+              <NetworkAvatarForPost post={post} size={32} />
+              <Typography fontWeight={600}>{postTitle(post.content).slice(0, 40)}</Typography>
+              <Typography variant="caption" color="text.secondary">{campaignById.get(post.campaignId)?.name ?? 'Sin campaña'}</Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              {new Date(post.createdAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+            </Typography>
+          </Stack>
+          <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 1.5, p: 1.5, mb: 1.5 }}>
+            <Typography variant="body2">{postTitle(post.content)}</Typography>
+          </Box>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+            {statusChip ?? <span />}
+            <Stack direction="row" gap={1}>{actions}</Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Antes cada una de las 5 secciones comparaba solo posts.length===0 — como
+  // el default de useListPostsQuery es [], el mensaje "Sin publicaciones..."
+  // aparecía primero y luego "parpadeaba" a los datos reales una vez
+  // resueltas las queries. Un bloque de skeletons por sección evita eso.
+  function PostListSkeleton() {
+    return (
+      <Stack gap={2} mb={3}>
+        {[0, 1].map((i) => (
+          <Skeleton key={i} variant="rounded" height={92} sx={{ borderRadius: 3 }} />
+        ))}
+      </Stack>
+    );
+  }
+
+  const viewButton = (id: string) => (
+    <Button
+      size="small"
+      startIcon={<VisibilityOutlinedIcon fontSize="small" />}
+      onClick={(e) => { e.stopPropagation(); router.push(`/posts/${id}`); }}
+      sx={{ color: 'secondary.main' }}
+    >
+      Ver detalle
+    </Button>
+  );
 
   return (
-    <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
+    <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh' }}>
+      <PostsTabs />
+      <Box sx={{ p: 3 }}>
       <Stack direction="row" gap={1.5} mb={3} flexWrap="wrap">
-        <Chip label={`${draftPosts.length} para revisar`} sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 600 }} />
-        <Chip
-          label={`${reviewPosts.length} listos para cliente`}
-          sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }}
-        />
-        <Chip label={`${rejectedPosts.length} rechazados`} sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
+        {canReviewPublicaciones && <Chip label={`${reviewPosts.length} para revisar`} sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />}
+        {isCm && <Chip label={`${clientRejectedPosts.length} rechazadas por el cliente`} sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />}
+        <Chip label={`${pendingClientPosts.length} esperando al cliente`} sx={{ bgcolor: '#FFF3E0', color: '#E65100', fontWeight: 600 }} />
+        <Chip label={`${rejectedPosts.length} rechazadas por el CM`} sx={{ bgcolor: '#FFEBEE', color: '#C62828', fontWeight: 600 }} />
+        <Chip label={`${draftPosts.length} borradores`} sx={{ bgcolor: '#F5F5F5', color: '#616161', fontWeight: 600 }} />
       </Stack>
 
-      {showDraftsSection && (
+      {canReviewPublicaciones && (
         <>
-          <Typography variant="subtitle1" mb={2}>
-            Borradores por enviar a revisión
-          </Typography>
+          <Typography variant="subtitle1" mb={2}>Para revisar</Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Revisa el trabajo de tus diseñadores antes de enviarlo al cliente.
+            Revisa el trabajo de tus Diseñadores antes de enviarlo al Cliente.
           </Alert>
-          {draftPosts.map((post) => (
-            <Card key={post.id} elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2 }}>
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
-                  <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar network={post.network} networkBg={post.networkBg} networkColor={post.networkColor} size={32} />
-                    <Typography fontWeight={600}>{post.title}</Typography>
-                    {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary">
-                    {post.createdAt}
-                  </Typography>
-                </Stack>
-                <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 1.5, p: 1.5, mb: 1.5 }}>
-                  <Typography variant="body2">
-                    {post.content.length > 100 ? `${post.content.slice(0, 100)}...` : post.content}
-                  </Typography>
-                </Box>
-                <Stack direction="row" gap={1} justifyContent="flex-end">
-                  <Button size="small" variant="contained" sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
-                    Enviar a revisión →
-                  </Button>
-                </Stack>
-              </CardContent>
-            </Card>
-          ))}
-        </>
-      )}
-
-      {showReviewSection && (
-        <>
-          <Typography variant="subtitle1" mt={4} mb={2}>
-            Esperando aprobación del cliente
-          </Typography>
-          <Alert severity="success" sx={{ mb: 2 }}>
-            Estas publicaciones ya pasaron tu revisión y esperan aprobación del cliente.
-          </Alert>
-          {reviewPosts.map((post) => (
-            <Card key={post.id} elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2 }}>
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
-                  <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar network={post.network} networkBg={post.networkBg} networkColor={post.networkColor} size={32} />
-                    <Typography fontWeight={600}>{post.title}</Typography>
-                    {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary">
-                    {post.createdAt}
-                  </Typography>
-                </Stack>
-                <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 1.5, p: 1.5, mb: 1.5 }}>
-                  <Typography variant="body2">
-                    {post.content.length > 100 ? `${post.content.slice(0, 100)}...` : post.content}
-                  </Typography>
-                </Box>
-                <Stack direction="row" gap={1} justifyContent="space-between" alignItems="center" flexWrap="wrap">
-                  <Chip size="small" label="En espera del cliente" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />
-                  <Stack direction="row" gap={1}>
-                    <ProtectedAction module="post" action="reject">
-                      <Button size="small" variant="outlined" sx={{ color: '#C62828', borderColor: '#C62828' }}>
+          {loadingReview ? (
+            <PostListSkeleton />
+          ) : reviewPosts.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones para revisar.</Typography>
+          ) : (
+            reviewPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                actions={
+                  <>
+                    {viewButton(post.id)}
+                    {can('publicaciones', 'rechazar') && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => { e.stopPropagation(); setRejectTargetId(post.id); }}
+                        sx={{ color: '#C62828', borderColor: '#C62828' }}
+                      >
                         Rechazar
                       </Button>
-                    </ProtectedAction>
-                    <ProtectedAction module="post" action="approve">
-                      <Button size="small" variant="contained" sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}>
+                    )}
+                    {can('publicaciones', 'aprobar') && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={(e) => { e.stopPropagation(); handleApprove(post.id); }}
+                        sx={{ bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' } }}
+                      >
                         Aprobar
                       </Button>
-                    </ProtectedAction>
-                  </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
-          ))}
+                    )}
+                  </>
+                }
+              />
+            ))
+          )}
         </>
       )}
 
-      {showRejectedSection && (
+      {isCm && (
         <>
-          <Typography variant="subtitle1" mt={4} mb={2}>
-            Rechazados — requieren corrección
-          </Typography>
-          <Alert severity="error" sx={{ mb: 2 }}>
-            El cliente rechazó estas publicaciones con comentarios. Corrígelas y reenvíalas.
+          <Typography variant="subtitle1" mt={4} mb={2}>Rechazadas por el Cliente</Typography>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            El Cliente pidió correcciones — entra al detalle para editarla tú o regresarla al Diseñador.
           </Alert>
-          {rejectedPosts.map((post) => (
-            <Card key={post.id} elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, mb: 2 }}>
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
-                  <Stack direction="row" gap={1} alignItems="center">
-                    <NetworkAvatar network={post.network} networkBg={post.networkBg} networkColor={post.networkColor} size={32} />
-                    <Typography fontWeight={600}>{post.title}</Typography>
-                    {post.campaign && <CampaignDot color={post.campaign.color} name={post.campaign.name} />}
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary">
-                    {post.createdAt}
-                  </Typography>
-                </Stack>
-                <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 1.5, p: 1.5, mb: 1.5 }}>
-                  <Typography variant="body2">
-                    {post.content.length > 100 ? `${post.content.slice(0, 100)}...` : post.content}
-                  </Typography>
-                </Box>
-                {post.rejectionReason && (
-                  <Box sx={{ bgcolor: '#FFEBEE', border: '1px solid #FFCDD2', borderRadius: 1.5, p: 1.5, mb: 1.5 }}>
-                    <Typography variant="caption" sx={{ color: '#C62828' }}>
-                      {post.rejectionReason}
-                    </Typography>
-                  </Box>
-                )}
-                <Stack direction="row" justifyContent="flex-end">
-                  <ProtectedAction module="post" action="create">
-                    <Button
-                      size="small"
-                      variant="contained"
-                      sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-                      onClick={() => router.push('/posts/new')}
-                    >
-                      Editar y reenviar →
-                    </Button>
-                  </ProtectedAction>
-                </Stack>
-              </CardContent>
-            </Card>
-          ))}
+          {loadingClientRejected ? (
+            <PostListSkeleton />
+          ) : clientRejectedPosts.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones rechazadas por el Cliente.</Typography>
+          ) : (
+            clientRejectedPosts.map((post) => (
+              <PostCard key={post.id} post={post} actions={viewButton(post.id)} />
+            ))
+          )}
         </>
       )}
+
+      <Typography variant="subtitle1" mt={4} mb={2}>Esperando al Cliente</Typography>
+      <Alert severity="success" sx={{ mb: 2 }}>
+        Ya pasaron la revisión del CM y esperan aprobación del Cliente (programar o rechazar, desde el detalle).
+      </Alert>
+      {loadingPendingClient ? (
+        <PostListSkeleton />
+      ) : pendingClientPosts.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones esperando al Cliente.</Typography>
+      ) : (
+        pendingClientPosts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            statusChip={<Chip size="small" label="En espera del cliente" sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }} />}
+            actions={viewButton(post.id)}
+          />
+        ))
+      )}
+
+      {(isDesigner || isCm) && (
+        <>
+          <Typography variant="subtitle1" mt={4} mb={2}>Rechazadas por el CM — corrígelas</Typography>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            El CM pidió correcciones. Edítalas y reenvíalas a revisión.
+          </Alert>
+          {loadingRejected ? (
+            <PostListSkeleton />
+          ) : rejectedPosts.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" mb={3}>Sin publicaciones rechazadas.</Typography>
+          ) : (
+            rejectedPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                actions={
+                  <>
+                    {viewButton(post.id)}
+                    <PrimaryButton size="small" onClick={(e) => { e.stopPropagation(); handleSubmitForReview(post.id); }}>
+                      Reenviar a revisión →
+                    </PrimaryButton>
+                  </>
+                }
+              />
+            ))
+          )}
+        </>
+      )}
+
+      {(isDesigner || isCm || isClient) && (
+        <>
+          <Typography variant="subtitle1" mt={4} mb={2}>Borradores</Typography>
+          {loadingDrafts ? (
+            <PostListSkeleton />
+          ) : draftPosts.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" mb={3}>Sin borradores pendientes.</Typography>
+          ) : (
+            draftPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                actions={
+                  <>
+                    {viewButton(post.id)}
+                    <PrimaryButton size="small" onClick={(e) => { e.stopPropagation(); handleSubmitForReview(post.id); }}>
+                      Enviar a revisión →
+                    </PrimaryButton>
+                  </>
+                }
+              />
+            ))
+          )}
+        </>
+      )}
+      </Box>
+      <RejectPostDialog open={!!rejectTargetId} onClose={() => setRejectTargetId(null)} onConfirm={handleConfirmReject} />
     </Box>
   );
 }

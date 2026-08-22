@@ -1,72 +1,114 @@
 import { AppModule } from '../types/modules.enum';
 import { AppAction } from '../types/actions.enum';
 import { AppRole } from '../types/roles.enum';
-
-export interface MockUser {
-  email: string;
-  password: string;
-  role: AppRole;
-  name: string;
-  brandIds: string[];
-  permissions: Record<string, string[]>;
-}
+import type { MockUser } from '../types/auth.types';
 
 export const MOCK_USERS: MockUser[] = [
   {
+    id: 'user-admin-001',
     email: 'admin@bananagram.mx',
     password: 'admin123',
     role: AppRole.ADMINISTRADOR,
     name: 'Laura Méndez',
-    brandIds: ['brand-001', 'brand-002'],
+    status: 'active',
+    // Admin administra el catálogo global vía permisos, no es dueño de marcas
+    // (Brand.ownerId siempre es un Cliente) — ver docs/frontend-db-alignment.md §1.2.
     permissions: {
-      // Admin administra el catálogo de campañas, NO tiene campañas propias asignadas
-      [AppModule.USERS]:     [AppAction.MANAGE],
-      [AppModule.BRANDS]:    [AppAction.MANAGE],
-      [AppModule.CATALOGS]:  [AppAction.MANAGE],
-      [AppModule.POST]:      [AppAction.CREATE, AppAction.SCHEDULE, AppAction.APPROVE, AppAction.REJECT, AppAction.PUBLISH],
-      [AppModule.CAMPAIGNS]: [AppAction.MANAGE],
+      [AppModule.USERS]:     [AppAction.VIEW],
+      [AppModule.BRANDS]:    [AppAction.VIEW],
+      [AppModule.CATALOGS]:  [AppAction.VIEW],
+      [AppModule.POST]:      [AppAction.CREATE, AppAction.EDIT, AppAction.APPROVE, AppAction.REJECT, AppAction.EDIT],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
       [AppModule.METRICS]:   [AppAction.VIEW],
       [AppModule.SCORE]:     [AppAction.VIEW],
       [AppModule.REPORTS]:   [AppAction.EXPORT],
     },
   },
   {
+    id: 'user-cm-001',
     email: 'cm@bananagram.mx',
     password: 'cm123456',
     role: AppRole.COMMUNITY_MANAGER,
     name: 'Ana García',
-    brandIds: ['brand-001'],
+    status: 'active',
+    // Sin ownedBrandIds: un CM no es dueño de marca. Su marca se deriva en
+    // tiempo real de sus campañas asignadas (Campaign.cmId), nunca es un
+    // campo de sesión — ver docs/frontend-db-alignment.md §1.2/§9.1.
     permissions: {
-      // CM ve SUS campañas asignadas, no administra el catálogo global
-      [AppModule.POST]:      [AppAction.CREATE, AppAction.SCHEDULE, AppAction.PUBLISH],
-      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
+      [AppModule.POST]:      [AppAction.CREATE, AppAction.EDIT, AppAction.EDIT],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
       [AppModule.METRICS]:   [AppAction.VIEW],
       [AppModule.SCORE]:     [AppAction.VIEW],
     },
   },
   {
+    id: 'user-disenador-001',
     email: 'disenador@bananagram.mx',
     password: 'diseno123',
     role: AppRole.DISENADOR,
     name: 'Carlos Ruiz',
-    brandIds: ['brand-001'],
+    status: 'active',
+    // Sin ownedBrandIds — mismo caso que CM: se deriva de CampaignDesigner.
     permissions: {
-      // Diseñador también participa en campañas asignadas
       [AppModule.POST]:      [AppAction.CREATE],
-      [AppModule.CAMPAIGNS]: [AppAction.VIEW_OWN],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
     },
   },
   {
+    id: 'user-cliente-001',
     email: 'cliente@bananagram.mx',
     password: 'cliente123',
     role: AppRole.CLIENTE,
     name: 'Roberto Fernández',
-    brandIds: ['brand-001', 'brand-002'],
+    status: 'active',
+    ownedBrandIds: ['brand-001', 'brand-002'],
     permissions: {
-      [AppModule.POST]:    [AppAction.APPROVE, AppAction.REJECT],
-      [AppModule.METRICS]: [AppAction.VIEW],
-      [AppModule.SCORE]:   [AppAction.VIEW],
-      [AppModule.REPORTS]: [AppAction.EXPORT],
+      // Permite iniciar el onboarding: crear/elegir campaña + CM (ver MD 6.2).
+      // No es 'view-own' (eso es para CM/Diseñador viendo campañas ya asignadas).
+      [AppModule.POST]:      [AppAction.APPROVE, AppAction.REJECT],
+      [AppModule.CAMPAIGNS]: [AppAction.CREATE],
+      [AppModule.METRICS]:   [AppAction.VIEW],
+      [AppModule.SCORE]:     [AppAction.VIEW],
+      [AppModule.REPORTS]:   [AppAction.EXPORT],
+    },
+  },
+  {
+    // Segundo Cliente, profileType 'personal' (§Parte C del rediseño de
+    // dominio) — valida que el modelo de Perfil único funciona igual de bien
+    // para un creador de contenido individual que para una marca comercial.
+    // Mismos permisos que el Cliente existente — ningún permiso nuevo.
+    id: 'user-cliente-002',
+    email: 'alex@bananagram.mx',
+    password: 'alex12345',
+    role: AppRole.CLIENTE,
+    name: 'Alex Rivera',
+    status: 'active',
+    ownedBrandIds: ['brand-004'],
+    permissions: {
+      [AppModule.POST]:      [AppAction.APPROVE, AppAction.REJECT],
+      [AppModule.CAMPAIGNS]: [AppAction.CREATE],
+      [AppModule.METRICS]:   [AppAction.VIEW],
+      [AppModule.SCORE]:     [AppAction.VIEW],
+      [AppModule.REPORTS]:   [AppAction.EXPORT],
+    },
+  },
+  {
+    // Dado de alta por el Admin (CreateUserDialog), sin activar todavía —
+    // 'pending' + sin categoryIds/specialtyIds simula exactamente al CM/
+    // Diseñador real que el backend crea con solo email+password+rol (ver
+    // CreateUserDto, auth-service) y que debe completar su perfil después
+    // (PATCH /me/profile) — usado por ActivateForm para demostrar ese paso.
+    id: 'user-cm-002',
+    email: 'diego.fernandez@bananagram.mx',
+    password: '',
+    role: AppRole.COMMUNITY_MANAGER,
+    name: 'Diego Fernández',
+    status: 'pending',
+    permissions: {
+      [AppModule.POST]:      [AppAction.CREATE, AppAction.EDIT, AppAction.EDIT],
+      [AppModule.CAMPAIGNS]: [AppAction.VIEW],
+      [AppModule.METRICS]:   [AppAction.VIEW],
+      [AppModule.SCORE]:     [AppAction.VIEW],
     },
   },
 ];

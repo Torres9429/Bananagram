@@ -1,0 +1,52 @@
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { PermissionGuard } from '@repo/backend-commons';
+import { RequirePermission } from '@repo/backend-commons';
+import { AdminRolesService } from './admin-roles.service';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRolePermissionDto } from './dto/update-role-permission.dto';
+
+@ApiTags('admin')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@Controller('admin')
+export class RolesController {
+  constructor(private readonly roles: AdminRolesService) {}
+
+  @Get('roles')
+  @RequirePermission('privilegios', 'ver')
+  findAll() {
+    return this.roles.listRoles();
+  }
+
+  @Post('roles')
+  @RequirePermission('privilegios', 'crear')
+  create(@Body() dto: CreateRoleDto) {
+    return this.roles.createRole(dto);
+  }
+
+  @Get('roles/:id')
+  @RequirePermission('privilegios', 'ver')
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.roles.getRole(id);
+  }
+
+  @Get('modules')
+  @RequirePermission('privilegios', 'ver')
+  listModules() {
+    return this.roles.listModules();
+  }
+
+  @Get('actions')
+  @RequirePermission('privilegios', 'ver')
+  listActions() {
+    return this.roles.listActions();
+  }
+
+  @Patch('roles/:id/permissions')
+  @RequirePermission('privilegios', 'editar')
+  updatePermission(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateRolePermissionDto) {
+    return this.roles.updateRolePermission(id, dto.moduleSlug, dto.actionSlug, dto.allowed);
+  }
+}

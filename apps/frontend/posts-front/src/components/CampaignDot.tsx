@@ -1,10 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-
-interface CampaignDotProps {
-  color: string;
-  name: string;
-}
+import type { CampaignDotProps } from '../interfaces/interface';
 
 export function CampaignDot({ color, name }: CampaignDotProps) {
   return (

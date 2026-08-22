@@ -1,18 +1,12 @@
 'use client';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import { MOCK_TOKENS, type MockRole } from '../../../mocks/mock-tokens';
 import { setCredentials, selectUser } from '../../../state/auth.slice';
-
-const ROLES: { key: MockRole; label: string; color: string }[] = [
-  { key: 'admin', label: 'Administrador', color: '#7B1FA2' },
-  { key: 'cm', label: 'CM', color: '#1565C0' },
-  { key: 'disenador', label: 'Diseñador', color: '#2E7D32' },
-  { key: 'cliente', label: 'Cliente', color: '#E65100' },
-];
 
 // El JWT mock guarda el rol con el nombre "de negocio" (administrador,
 // community_manager, ...), no con la key de MOCK_TOKENS — este mapeo
@@ -25,13 +19,25 @@ const ROLE_KEY_BY_JWT_ROLE: Record<string, MockRole> = {
 };
 
 export function RoleSwitcher() {
+  const theme = useTheme();
   const dispatch = useDispatch();
   const user = useSelector(selectUser);
-  const activeRole = user ? ROLE_KEY_BY_JWT_ROLE[user.role] : undefined;
+  const activeRole = user?.roles?.map((r) => ROLE_KEY_BY_JWT_ROLE[r]).find(Boolean);
+
+  // Estos colores se interpolan en CSS plano (border/bgcolor por rol), así
+  // que se leen del theme directamente en vez de usar rutas de paleta en sx.
+  // #7B1FA2 (admin) no tiene equivalente en el theme — se deja como hex.
+  const ROLES: { key: MockRole; label: string; color: string }[] = [
+    { key: 'admin', label: 'Administrador', color: '#7B1FA2' },
+    { key: 'cm', label: 'CM', color: theme.palette.info.main },
+    { key: 'disenador', label: 'Diseñador', color: theme.palette.success.main },
+    { key: 'cliente', label: 'Cliente', color: theme.palette.warning.main },
+  ];
 
   function switchRole(role: MockRole) {
+    // RoleSwitcher desactivado — si se reactiva, debe usar setCookieToken.
+    // import { setCookieToken } from '../../session/cookieSession';
     dispatch(setCredentials({ accessToken: MOCK_TOKENS[role] }));
-    localStorage.setItem('mock_access_token', MOCK_TOKENS[role]);
   }
 
   return (
@@ -41,8 +47,9 @@ export function RoleSwitcher() {
         bottom: 16,
         right: 16,
         zIndex: 1300,
-        bgcolor: '#fff',
-        border: '1px solid #E8E8E8',
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
         borderRadius: 3,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
         p: 1.5,

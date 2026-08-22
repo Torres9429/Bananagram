@@ -1,42 +1,28 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { ScoreGauge } from '@repo/ui';
+import { ScoreGauge } from '@repo/ui/ui';
 import { BrandTabs } from '../../../../components/BrandTabs';
-import { MOCK_BRANDS } from '../../../../lib/mock-data';
+import { MOCK_PROFILES } from '../../../../lib/mock-data';
 
 const COMPONENTS = [
-  { key: 'consistency', label: 'Consistencia', weight: 30, color: '#FDC726' },
+  { key: 'consistency', label: 'Consistencia', weight: 30, color: '#E0A800' },
   { key: 'engagement', label: 'Engagement', weight: 40, color: '#42A5F5' },
   { key: 'frequency', label: 'Frecuencia', weight: 30, color: '#66BB6A' },
 ] as const;
 
 export default function BrandScorePage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const brand = MOCK_BRANDS.find((b) => b.id === params.id) ?? MOCK_BRANDS[0];
+  const brand = MOCK_PROFILES.find((b) => b.id === params.id) ?? MOCK_PROFILES[0];
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100%' }}>
-      <Box sx={{ px: 3, pt: 2 }}>
-        <Tooltip title="Volver">
-          <IconButton
-            onClick={() => router.back()}
-            sx={{ color: '#7A5C00', bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFF8E1' } }}
-          >
-            <ArrowBackIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
       <BrandTabs brandId={brand.id} />
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" fontWeight={700} mb={1}>Score Digital — {brand.name}</Typography>

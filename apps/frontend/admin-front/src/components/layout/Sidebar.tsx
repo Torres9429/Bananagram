@@ -2,55 +2,100 @@
 
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useSelector } from 'react-redux';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ArticleIcon from '@mui/icons-material/Article';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import GroupIcon from '@mui/icons-material/Group';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import { SidebarNav, type SidebarNavItem, usePermissions, selectUser, getMockSessionEmail } from '@repo/ui';
+import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import { SidebarNav, usePermissions } from '@repo/ui/ui';
+import { selectUser } from '@repo/ui/state';
+import { AppRole, AppModule, AppAction } from '@repo/ui/types';
+import { useSelector } from 'react-redux';
+import type { NavItemWithPermission } from '../../interfaces/interface';
 
-const WEB_SHELL_URL = 'http://localhost:3000';
-const POSTS_FRONT_URL = 'http://localhost:3014';
-const BRANDS_FRONT_URL = 'http://localhost:3013';
-const ANALYTICS_FRONT_URL = 'http://localhost:3011';
-
-interface NavItemWithPermission extends SidebarNavItem {
-  requirePermission?: { module: string; action: string };
-}
-
+// Hrefs RELATIVOS a propósito (nunca ZONE_URLS.X directo) — ver comentario
+// en getPostAuthDestination.ts. Todos menos 'admin' viven en OTRA zona —
+// ver CROSS_ZONE_HREFS más abajo, que fuerza navegación dura para esos.
 const NAV_ITEMS_WITH_PERMISSION: NavItemWithPermission[] = [
-  { key: 'dashboard', label: 'Dashboard', href: `${WEB_SHELL_URL}/dashboard`, icon: <DashboardIcon /> },
-  { key: 'posts', label: 'Posts', href: `${POSTS_FRONT_URL}/posts`, icon: <ArticleIcon />, requirePermission: { module: 'post', action: 'create' } },
-  { key: 'brands', label: 'Marcas', href: `${BRANDS_FRONT_URL}/brands`, icon: <StorefrontIcon />, requirePermission: { module: 'brands', action: 'manage' } },
-  { key: 'my-campaigns', label: 'Mis Campañas', href: `${BRANDS_FRONT_URL}/my-campaigns`, icon: <CampaignIcon />, requirePermission: { module: 'campaigns', action: 'view-own' } },
-  { key: 'metrics', label: 'Métricas', href: `${ANALYTICS_FRONT_URL}/metrics`, icon: <BarChartIcon />, requirePermission: { module: 'metrics', action: 'view' } },
-  { key: 'team', label: 'Team', href: `${BRANDS_FRONT_URL}/team`, icon: <GroupIcon />, requirePermission: { module: 'campaigns', action: 'view-own' } },
-  { key: 'admin', label: 'Admin', href: '/users', icon: <AdminPanelSettingsIcon />, requirePermission: { module: 'users', action: 'manage' } },
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: <DashboardIcon /> },
+  // Mis Campañas / Mi perfil van primero (justo después de Dashboard): mismo
+  // destino que "Mi perfil" de abajo NO existe más abajo — se quitó ese
+  // duplicado (apuntaba al mismo /profile). "Mis Campañas" (campanas:ver) y
+  // "Mi perfil" (marcas:crear/editar) son mutuamente excluyentes por diseño
+  // (landings distintos) — la exclusividad se resuelve por el permiso real
+  // de marcas más abajo (hasProfileAccess), no por nombre de rol.
+  { key: 'my-campaigns', label: 'Mis Campañas', href: '/my-campaigns', icon: <CampaignIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  // Sin requirePermission a propósito (antes: marcas:crear/editar, sacaba a
+  // CM/Diseñador de este arreglo en permissionVisible ANTES de que
+  // roleAdjusted pudiera re-incluirlos — bug real, "Mi perfil" seguía sin
+  // aparecer pese a que roleAdjusted ya decía `return true`) — la
+  // visibilidad real la decide roleAdjusted más abajo, no este campo.
+  { key: 'my-brand', label: 'Mi perfil', href: '/profile', activeMatch: '/profile', exactMatch: true, icon: <AccountCircleOutlinedIcon /> },
+  // Antes sin AppAction.VIEW: un rol nuevo de solo lectura (solo
+  // publicaciones:ver, sin crear/aprobar) nunca veía este ítem pese a poder
+  // listar publicaciones de verdad — mismo hallazgo que el resto del punto 8
+  // (auditoría final).
+  { key: 'posts', label: 'Posts', href: '/posts', icon: <ArticleIcon />, requirePermission: [{ module: AppModule.POST, action: AppAction.CREATE }, { module: AppModule.POST, action: AppAction.APPROVE }, { module: AppModule.POST, action: AppAction.VIEW }] },
+  // LEGACY (dominio v3): lista de "Marcas" para Admin sobre /brands, la ruta de
+  // browsing multi-perfil que se conserva por compatibilidad (ver
+  // brands-front/src/app/brands). No quitar hasta que /brands se retire.
+  { key: 'brands', label: 'Marcas', href: '/brands', icon: <StorefrontIcon />, requirePermission: [{ module: AppModule.BRANDS, action: AppAction.VIEW }] },
+  { key: 'calendar', label: 'Calendario', href: '/profile/calendar', icon: <CalendarMonthOutlinedIcon />, requirePermission: [{ module: AppModule.CAMPAIGNS, action: AppAction.CREATE }, { module: AppModule.CAMPAIGNS, action: AppAction.VIEW }] },
+  { key: 'metrics', label: 'Métricas', href: '/metrics', icon: <BarChartIcon />, requirePermission: [{ module: AppModule.METRICS, action: AppAction.VIEW }] },
+  { key: 'admin', label: 'Admin', href: '/users', icon: <AdminPanelSettingsIcon />, requirePermission: [{ module: AppModule.USERS, action: AppAction.VIEW }] },
 ];
+
+// Rutas que viven en OTRA zona (fuera de admin-front) — ver handleNavigate.
+const CROSS_ZONE_HREFS = new Set(['/dashboard', '/my-campaigns', '/profile', '/posts', '/brands', '/profile/calendar', '/metrics']);
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { can } = usePermissions();
   const user = useSelector(selectUser);
+  const isAdmin = user?.roles?.includes(AppRole.ADMINISTRADOR) ?? false;
 
-  const visibleItems = NAV_ITEMS_WITH_PERMISSION.filter(
-    (item) => !item.requirePermission || can(item.requirePermission.module, item.requirePermission.action),
+  const permissionVisible = NAV_ITEMS_WITH_PERMISSION.filter(
+    (item) => !item.requirePermission || item.requirePermission.some((p) => can(p.module, p.action)),
   );
+  // "Mis Campañas" y "Mi perfil" siguen siendo mutuamente excluyentes por
+  // diseño (landings distintos), pero ya NO se decide por nombre de rol
+  // (antes: isCliente) — se decide por el permiso real que separa ambas
+  // identidades: quien puede crear/editar marcas "es dueño de marca", sin
+  // importar su rol.
+  const hasProfileAccess = can('marcas', 'crear') || can('marcas', 'editar');
+  // "Mi perfil" ya no es exclusiva de hasProfileAccess (antes: solo
+  // Cliente/Admin la veían) — /profile también renderiza contenido real
+  // para CM/Diseñador (StaffProfileSection), y sin este ítem no tenían
+  // ningún camino de navegación para completar su perfil (hallazgo real,
+  // ver brands-front/Sidebar.tsx para el detalle completo).
+  const roleAdjusted = permissionVisible.filter((item) => {
+    if (item.key === 'my-campaigns') return !hasProfileAccess;
+    if (item.key === 'my-brand') return true;
+    return true;
+  });
+  // Ajuste de UX (no de permisos): Admin no debe operar como usuario de negocio
+  // (Marcas/Posts/Métricas/Mis Campañas/Team/Mi perfil), solo Dashboard y Admin
+  // (que ya contiene Usuarios/Roles/Catálogos/Auditoría vía AdminTabs).
+  // Mientras la sesión no hidrata (!user), `can()` siempre da false y esta
+  // lista quedaría casi vacía por un instante — se manda [] explícito en vez
+  // de esa lista "casi vacía pero incorrecta", para no mostrar/ocultar ítems
+  // equivocados ni un salto de layout cuando los reales aparecen.
+  const visibleItems = !user
+    ? []
+    : isAdmin
+      ? roleAdjusted.filter((item) => item.key === 'dashboard' || item.key === 'admin')
+      : roleAdjusted.filter((item) => item.key !== 'dashboard');
 
+  // Bug real encontrado en vivo — ver comentario equivalente en
+  // brands-front/Sidebar.tsx: la navegación cross-zona debe ser dura
+  // (window.location.href), nunca router.push/<Link>.
   function handleNavigate(href: string) {
-    // Admin vive en admin-front; el resto de secciones son otros microfronts
-    // (sin Multi-Zones real todavía), así que cruzamos con navegación absoluta.
-    if (href.startsWith('http')) {
-      const url = new URL(href);
-      const sessionEmail = user?.email ?? getMockSessionEmail();
-      if (sessionEmail) {
-        url.searchParams.set('mock_user', sessionEmail);
-      }
-      window.location.href = url.toString();
+    if (CROSS_ZONE_HREFS.has(href)) {
+      window.location.href = href;
       return;
     }
     router.push(href);
@@ -66,16 +111,10 @@ export function Sidebar() {
       activeHref={activeHref}
       onNavigate={handleNavigate}
       header={
-        <Image
-          src="/LogoName.png"
-          alt="Bananagram"
-          width={1146}
-          height={308}
-          style={{ width: '100%', maxWidth: 150, height: 'auto' }}
-        />
+        <Image src="/LogoNameMonkey.png" alt="Bananagram" width={1146} height={308} style={{ width: '100%', maxWidth: 150, height: 'auto' }} />
       }
       collapsedHeader={
-        <Image src="/Logo.png" alt="Bananagram" width={308} height={308} style={{ width: '100%', maxWidth: 38, height: 'auto' }} />
+        <Image src="/LogoMonkey.png" alt="Bananagram" width={308} height={308} style={{ width: '100%', maxWidth: 38, height: 'auto' }} />
       }
     />
   );

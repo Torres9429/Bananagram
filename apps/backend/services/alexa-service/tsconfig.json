@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    // Mismo motivo que ai-service/tsconfig.json: primeros *.spec.ts de este
+    // paquete dentro de src/ — explícito para que el editor cargue bien los
+    // globals de Jest (describe/it/expect). No afecta tsc build ni jest.
+    "types": ["jest", "node"]
+  }
+}

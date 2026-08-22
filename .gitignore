@@ -1,8 +1,28 @@
 node_modules/
 dist/
+*.tsbuildinfo
 .env*
+!.env.example
 *.local
 .turbo/
 .next/
 coverage/
 *.log
+.dev-pids
+.dev-logs/
+
+# Llaves RSA (RS256/JWKS) — solo auth-service las necesita en runtime (vía
+# volumen, nunca COPY en el Dockerfile). Si alguien las compromete podría
+# firmar tokens falsos: nunca deben viajar en el repo. Se generan con
+# `pnpm generate-keys` (scripts/generate-keys.mjs, no sobrescribe si ya existen).
+keys/*
+!keys/.gitkeep
+*.pem
+
+/*.sql
+
+# Backups de BD (pg_dump) — contienen datos reales de usuarios/marcas/etc.,
+# nunca deben viajar en el repo.
+/backups/
+#agregar solo los .sql de esa carpeta
+/backups/*.sql

@@ -1,0 +1,23 @@
+{
+  "family": "alexa-service",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [{
+    "name": "alexa-service",
+    "image": "<ECR_REGISTRY>/alexa-service:latest",
+    "essential": true,
+    "secrets": [
+      { "name": "JWT_SECRET",   "valueFrom": "arn:aws:secretsmanager:us-east-1:<ACCOUNT>:secret:JWT_SECRET" }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/alexa-service",
+        "awslogs-region": "us-east-1",
+        "awslogs-stream-prefix": "ecs"
+      }
+    }
+  }]
+}

@@ -1,11 +1,86 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+// Toda la lógica de decisión (decodificar, expiración, intentar refresh)
+// vive en commons/src/session/resolve-session-action.ts — se comparte entre
+// las 5 zonas. Este archivo solo traduce cookies de Next <-> ese contrato y
+// arma la respuesta (Next exige middleware.ts en la raíz de cada app, no se
+// puede compartir el archivo en sí).
+import { resolveSessionAction } from '@repo/ui/session-middleware';
 
-// Diseño sin backend: el login real todavía no setea la cookie `access_token`
-// (ver comentario "Consumo de API (pendiente)" en LoginForm.tsx), así que este guard
-// se deja como passthrough para poder navegar libremente entre pantallas.
-// Restaurar la redirección por cookie cuando el login quede conectado al backend.
-export function middleware() {
-  return NextResponse.next();
+// Bloqueo de sesión real (login ya conectado a auth-service, ver
+// LoginForm.tsx/ADR-0004): sin cookie o con JWT expirado (y sin poder
+// renovarlo en silencio vía refresh token), redirige a auth-front en vez de
+// servir la página. Solo verifica presencia/expiración del payload
+// decodificado, no la firma — la firma la verifica cada microservicio real
+// vía JWKS en cada request (gateway + core-service + alexa-service), este
+// middleware es una UX de conveniencia, no el enforcement de seguridad real.
+// El bloqueo fino por permiso de módulo específico sigue viviendo a nivel de
+// página (patrón EmptyState).
+const COOKIE_NAME = 'bananagram_token';
+const REFRESH_COOKIE_NAME = 'bananagram_refresh_token';
+
+export async function middleware(request: NextRequest) {
+  // La raíz ("/") no se protege acá — app/page.tsx ya decide por su cuenta:
+  // muestra el landing si no hay sesión, o redirige a getPostAuthDestination()
+  // si sí la hay. Bug real encontrado en vivo (2026-08-21): el matcher de
+  // abajo no excluye "/" (solo /login, /register, etc.), así que un usuario
+  // sin cookie que entraba a la raíz nunca llegaba a ver el landing — este
+  // middleware lo redirigía a /login antes de que page.tsx corriera.
+  if (request.nextUrl.pathname === '/') {
+    return NextResponse.next();
+  }
+
+  const action = await resolveSessionAction(
+    request.cookies.get(COOKIE_NAME)?.value,
+    request.cookies.get(REFRESH_COOKIE_NAME)?.value,
+  );
+
+  if (action.type === 'allow') {
+    return NextResponse.next();
+  }
+
+  if (action.type === 'refresh') {
+    // Deja pasar la navegación Y renueva las cookies en la misma respuesta
+    // — el usuario nunca se entera de que el access token había vencido.
+    const response = NextResponse.next();
+    response.cookies.set(COOKIE_NAME, action.accessToken, { path: '/', sameSite: 'lax' });
+    response.cookies.set(REFRESH_COOKIE_NAME, action.refreshToken, { path: '/', sameSite: 'lax' });
+    return response;
+  }
+
+  // Relativo al origen de la propia request (nunca ZONE_URLS.authFront
+  // directo) — /login en el propio web-shell ya se reescribe server-side
+  // hacia auth-front (ver next.config.ts). Bug real encontrado en vivo:
+  // ZONE_URLS.authFront es un valor pensado para el proxy DEL SERVIDOR
+  // (Docker resuelve nombres de servicio entre contenedores, o incluso IPs
+  // privadas entre distintos EC2), pero este redirect lo recibe y lo sigue
+  // el NAVEGADOR del usuario — con esa URL nunca es alcanzable fuera de la
+  // red interna. Pasaba desapercibido en desarrollo local porque el default
+  // (localhost:3012) sí es igual de alcanzable para el navegador que para
+  // el servidor, al correr ambos en la misma máquina.
+  return NextResponse.redirect(new URL('/login', request.url));
 }
 
-export const config = { matcher: ['/((?!api|_next|favicon.ico|public).*)'] };
+// Excluye /login (y el resto de rutas públicas de auth-front, ver
+// next.config.ts rewrites) del propio matcher — si no, un usuario sin
+// sesión que llega a /login se topa con ESTE middleware otra vez sobre esa
+// misma respuesta reescrita, que decide "no autenticado, redirigir a
+// /login", que vuelve a pasar por acá... bucle infinito (ERR_TOO_MANY_REDIRECTS).
+// Bug real encontrado en vivo: no se notaba antes de relativizar el
+// redirect (ver arriba) porque ZONE_URLS.authFront apuntaba a otro origen —
+// esa página nunca volvía a pasar por el middleware de web-shell.
+//
+// El "public" de este patrón excluye la RUTA literal /public/*, que no
+// existe — Next.js sirve los archivos de la carpeta public/ en la RAÍZ
+// (public/LogoNameMonkey.png -> /LogoNameMonkey.png), así que ese término
+// nunca excluye nada real. Bug real encontrado en vivo: next/image, al
+// optimizar el logo, vuelve a pedirle a este mismo servidor
+// /LogoNameMonkey.png — sin sesión, ESTE middleware interceptaba esa
+// petición interna y la redirigía a /login (una respuesta HTML, no una
+// imagen), y next/image fallaba con 400 "The requested resource isn't a
+// valid image" en /login (logo roto en la propia pantalla de login).
+// Se agrega una exclusión genérica por extensión de archivo
+// (\.[a-zA-Z0-9]+$) — ninguna ruta de página real termina en punto+extensión
+// en este proyecto, así que es seguro excluir cualquier request que sí.
+export const config = {
+  matcher: ['/((?!api|_next|favicon.ico|public|login|register|forgot-password|reset-password|.*\\.[a-zA-Z0-9]+$).*)'],
+};

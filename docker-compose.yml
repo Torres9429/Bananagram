@@ -1,4 +1,11 @@
-version: "3.9"
+# Uso recomendado para desarrollo diario (liviano):
+#   docker compose up -d              # solo postgres + adminer
+#   pnpm dev                          # backend + fronts corriendo en el host (más rápido, hot reload)
+#
+# Uso para levantar el stack completo containerizado (más pesado, útil antes
+# de un deploy o para probar el build de producción de cada servicio):
+#   docker compose --profile full up -d --build
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -6,52 +13,253 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: gestor_redes
-    ports: ["5432:5432"]
-    volumes: [postgres_data:/var/lib/postgresql/data]
+    ports: ["5433:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
 
   adminer:
     image: adminer
     ports: ["8080:8080"]
 
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
   auth-service:
-    build: ./apps/backend/services/auth-service
-    env_file: .env
-    ports: ["3001:3001"]
-    depends_on: [postgres]
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/backend/services/auth-service/Dockerfile
+    env_file: ./apps/backend/services/auth-service/.env
+    environment:
+      # El .env de auth-service trae localhost:5433 (para pnpm dev en el
+      # host); dentro de la red de compose, postgres se resuelve por su
+      # nombre de servicio en el puerto interno 5432 — este override tiene
+      # prioridad sobre env_file para la misma variable.
+      DATABASE_URL_AUTH: postgresql://postgres:postgres@postgres:5432/gestor_redes_auth
+      REDIS_URL: redis://redis:6379
+      # El .env de auth-service trae la ruta relativa a su propio cwd para
+      # `pnpm dev` en el host (apps/backend/services/auth-service/../../../../keys/...)
+      # — dentro del contenedor el WORKDIR final es distinto y las llaves se
+      # montan aparte (ver volumes abajo), así que necesita su propio valor.
+      JWT_PRIVATE_KEY_PATH: ./keys/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: ./keys/jwt_public.pem
+      # El .env de auth-service trae localhost:3002 — sin este override,
+      # POST /auth/register y POST /me/profile llaman a
+      # http://localhost:3002 DENTRO del propio contenedor de auth-service
+      # (se resuelve a sí mismo, no a core-service) y fallan con
+      # ECONNREFUSED. Bug real, no solo hipotético — encontrado en esta
+      # auditoría, nunca antes documentado.
+      CORE_SERVICE_URL: http://core-service:3002
+      # Compartido con core-service (mismo valor en ambos) para
+      # InternalAuthGuard en las rutas /internal/*. Overridable desde el .env
+      # raíz (${INTERNAL_SERVICE_SECRET}) — sin esto, un valor real puesto en
+      # el .env de cada servicio quedaría igual pisado por este default, ya
+      # que `environment:` de compose tiene prioridad sobre `env_file:`.
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-dev-internal-secret-change-me}
+    volumes:
+      # Llave privada RS256 — solo auth-service la necesita, montada en
+      # runtime (nunca por COPY en el Dockerfile, para que no quede horneada
+      # en ninguna capa de la imagen). Generar antes con `pnpm generate-keys`.
+      # Bug real (encontrado en vivo desplegando en EC2, 2026-08-20):
+      # JWT_PRIVATE_KEY_PATH/JWT_PUBLIC_KEY_PATH son rutas relativas que Node
+      # resuelve contra el WORKDIR final del contenedor (WORKDIR
+      # /app/apps/backend/services/auth-service en el Dockerfile, no /repo) —
+      # montar en /repo/keys nunca coincidía y el proceso crasheaba con ENOENT
+      # al arrancar (TokenSignerService.onModuleInit). Nunca se detectó antes
+      # porque este servicio nunca se había llegado a *correr* de verdad bajo
+      # `--profile full`, solo a construir.
+      - ./keys:/app/apps/backend/services/auth-service/keys:ro
+    # Solo accesible desde el propio host (127.0.0.1), no desde fuera de la
+    # máquina — la comunicación real contenedor-a-contenedor (core-service,
+    # api-gateway) va por la red interna de Docker, no por este puerto
+    # publicado. Antes estaba publicado sin restricción (equivalente a
+    # 0.0.0.0), lo que dejaba /internal/* alcanzable desde cualquier lugar
+    # que pudiera llegar al host — el InternalAuthGuard ya lo protege, esto
+    # es una capa adicional de defensa en profundidad, no la única.
+    ports: ["127.0.0.1:3001:3001"]
+    depends_on: [postgres, redis]
 
-  brands-service:
-    build: ./apps/backend/services/brands-service
-    env_file: .env
-    ports: ["3002:3002"]
-    depends_on: [postgres]
+  core-service:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/backend/services/core-service/Dockerfile
+    env_file: ./apps/backend/services/core-service/.env
+    environment:
+      DATABASE_URL_CORE: postgresql://postgres:postgres@postgres:5432/gestor_redes_core
+      REDIS_URL: redis://redis:6379
+      AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
+      # El .env de core-service trae localhost:3001 — sin este override,
+      # NotificationsClient.notify() (best-effort) llama a
+      # http://localhost:3001 dentro del propio contenedor de core-service y
+      # nunca llega a auth-service; falla en silencio (solo loggea un
+      # warning, nunca rompe la request real), así que este gap no se veía
+      # como error — las notificaciones cross-servicio simplemente nunca
+      # llegaban.
+      AUTH_SERVICE_URL: http://auth-service:3001
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-dev-internal-secret-change-me}
+    ports: ["127.0.0.1:3002:3002"]
+    depends_on: [postgres, redis, auth-service]
 
-  content-service:
-    build: ./apps/backend/services/content-service
-    env_file: .env
-    ports: ["3003:3003"]
-    depends_on: [postgres]
+  alexa-service:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/backend/services/alexa-service/Dockerfile
+    env_file: ./apps/backend/services/alexa-service/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
+      # 3 gaps reales encontrados en esta auditoría, ninguno documentado
+      # antes: alexa-service tiene su PROPIO Prisma Client apuntando
+      # directo a la base de core-service (dueño de ContentIdea) — sin este
+      # override, Prisma intenta conectar a localhost:5433 desde DENTRO del
+      # contenedor y todos los endpoints de ideas/* fallan al arrancar la
+      # primera query.
+      DATABASE_URL_CORE: postgresql://postgres:postgres@postgres:5432/gestor_redes_core
+      # Sin este override, el proxy de campañas y el lookup de ideas
+      # (campaigns.service.ts/ideas.service.ts) llaman a
+      # http://localhost:3002 dentro de su propio contenedor.
+      CORE_SERVICE_URL: http://core-service:3002
 
-  analytics-service:
-    build: ./apps/backend/services/analytics-service
-    env_file: .env
+      # Sin este override, POST ideas/generate (generación de ideas por voz)
+      # llama a http://localhost:3005 dentro de su propio contenedor.
+      AI_SERVICE_URL: http://ai-service:3005
+    ports: ["3004:3004"]
+    depends_on: [core-service, auth-service, redis]
+
+  ai-service:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/backend/services/ai-service/Dockerfile
+    env_file: ./apps/backend/services/ai-service/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
+      CORE_SERVICE_URL: http://core-service:3002
     ports: ["3005:3005"]
-    depends_on: [postgres]
+    depends_on: [core-service, auth-service, redis]
 
   api-gateway:
-    build: ./apps/backend/gateway
-    env_file: .env
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/backend/gateway/Dockerfile
+    env_file: ./apps/backend/gateway/.env
+    environment:
+      # El .env del gateway trae localhost:3001/3002 (para pnpm dev en el
+      # host); dentro de la red de compose, cada servicio se resuelve por
+      # su nombre — mismo patrón que DATABASE_URL_AUTH/CORE.
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CORE_SERVICE_URL: http://core-service:3002
+      AI_SERVICE_URL: http://ai-service:3005
+      # Gap real ya conocido (ver CLAUDE.md): sin este override, /api/ideas/*
+      # no resuelve bajo --profile full — main.ts cae al fallback
+      # http://localhost:3004, que dentro del contenedor del gateway es él
+      # mismo, no alexa-service.
+      ALEXA_SERVICE_URL: http://alexa-service:3004
+      REDIS_URL: redis://redis:6379
+      AUTH_JWKS_URL: http://auth-service:3001/.well-known/jwks.json
     ports: ["4000:4000"]
     depends_on:
       - auth-service
-      - brands-service
-      - content-service
-      - analytics-service
+      - core-service
+      - alexa-service
+      - ai-service
+      - redis
+
+  # Gap real encontrado al probar --profile full en vivo: no existía ningún
+  # Dockerfile para web-shell (build fallaba con "failed to read dockerfile:
+  # open Dockerfile: no such file or directory"), y ninguna de las 5 zonas de
+  # Multi-Zones a las que web-shell delega por rewrites() (next.config.ts)
+  # tenía ni Dockerfile ni entrada en este compose — "full" nunca había
+  # arrancado el frontend completo, solo el shell (que ni siquiera podía
+  # buildear). Se agregan las 5 zonas + se corrige el build de web-shell.
+  admin-front:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/frontend/admin-front/Dockerfile
+      # NEXT_PUBLIC_API_URL gets inlined into the browser bundle at build
+      # time (see the Dockerfile's ARG/ENV) — must resolve from wherever the
+      # USER'S BROWSER can reach the gateway (public IP/domain), never a
+      # Docker-network hostname. Falls back to localhost:4000/api (the
+      # code-level default in zone-urls.ts) when unset, so local
+      # `--profile full` runs keep working unchanged.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3010:3010"]
+    depends_on: [api-gateway]
+
+  analytics-front:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/frontend/analytics-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3011:3011"]
+    depends_on: [api-gateway]
+
+  auth-front:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/frontend/auth-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3012:3012"]
+    depends_on: [api-gateway]
+
+  brands-front:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/frontend/brands-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3013:3013"]
+    depends_on: [api-gateway]
+
+  posts-front:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/frontend/posts-front/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3014:3014"]
+    depends_on: [api-gateway]
 
   web-shell:
-    build: ./apps/frontend/web-shell
-    env_file: .env
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/frontend/web-shell/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    environment:
+      # OJO — asimetría deliberada, no un descuido: estos NEXT_PUBLIC_* solo
+      # los lee next.config.ts (rewrites(), corre en el SERVIDOR de este
+      # contenedor) — por eso aquí SÍ deben ser hostnames de Docker. Pero
+      # NEXT_PUBLIC_API_URL (ZONE_URLS.API_BASE_URL) lo lee el NAVEGADOR del
+      # usuario (queda inlineado en el bundle de cliente en build time, ver
+      # zone-urls.ts) — ese SÍ debe seguir siendo localhost:4000, porque el
+      # navegador corre en el host, no dentro de la red de Docker. Por eso NO
+      # se define NEXT_PUBLIC_API_URL acá ni en ninguna zona: su fallback de
+      # código (http://localhost:4000/api) ya es el valor correcto para el
+      # navegador, y como estos Dockerfiles no pasan build args, ese fallback
+      # es justamente lo que queda horneado en cada bundle de cliente.
+      NEXT_PUBLIC_ADMIN_FRONT_URL: http://admin-front:3010
+      NEXT_PUBLIC_ANALYTICS_FRONT_URL: http://analytics-front:3011
+      NEXT_PUBLIC_AUTH_FRONT_URL: http://auth-front:3012
+      NEXT_PUBLIC_BRANDS_FRONT_URL: http://brands-front:3013
+      NEXT_PUBLIC_POSTS_FRONT_URL: http://posts-front:3014
     ports: ["3000:3000"]
-    depends_on: [api-gateway]
+    depends_on: [api-gateway, admin-front, analytics-front, auth-front, brands-front, posts-front]
 
 volumes:
   postgres_data:

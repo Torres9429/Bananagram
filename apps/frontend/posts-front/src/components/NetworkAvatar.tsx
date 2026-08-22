@@ -1,11 +1,5 @@
 import Avatar from '@mui/material/Avatar';
-
-interface NetworkAvatarProps {
-  network: string;
-  networkBg: string;
-  networkColor: string;
-  size?: number;
-}
+import type { NetworkAvatarProps } from '../interfaces/interface';
 
 export function NetworkAvatar({ network, networkBg, networkColor, size = 36 }: NetworkAvatarProps) {
   return (

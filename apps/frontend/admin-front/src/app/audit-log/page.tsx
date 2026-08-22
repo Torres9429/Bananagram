@@ -4,16 +4,21 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
-import { DataTable, type DataTableColumn } from '@repo/ui';
+import { DataTable, type DataTableColumn, EmptyState, usePermissions } from '@repo/ui/ui';
+import { formatDate } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
-import { MOCK_AUDIT_LOG, type MockAuditEntry } from '../../lib/mock-data';
+import { useGetAuditLogQuery, type AuditLogEntry } from '../../store/api/admin.api';
 
 export default function AuditLogPage() {
-  const columns: DataTableColumn<MockAuditEntry>[] = [
-    { key: 'date', header: 'Fecha', width: 140, render: (e) => <Typography variant="caption" color="text.secondary">{e.date}</Typography> },
-    { key: 'actor', header: 'Usuario', render: (e) => <Typography variant="body2" fontWeight={600}>{e.actor}</Typography> },
+  const { can } = usePermissions();
+  const canView = can('usuarios', 'ver');
+  const { data: entries = [], isLoading } = useGetAuditLogQuery(100, { skip: !canView });
+
+  const columns: DataTableColumn<AuditLogEntry>[] = [
+    { key: 'createdAt', header: 'Fecha', width: 160, render: (e) => <Typography variant="caption" color="text.secondary">{formatDate(e.createdAt)}</Typography> },
+    { key: 'performedBy', header: 'Usuario', render: (e) => <Typography variant="body2" fontWeight={600}>{e.performedBy}</Typography> },
     { key: 'action', header: 'Acción', render: (e) => <Typography variant="body2">{e.action}</Typography> },
-    { key: 'entity', header: 'Entidad', render: (e) => <Typography variant="body2" color="text.secondary">{e.entity}</Typography> },
+    { key: 'tableName', header: 'Entidad', render: (e) => <Typography variant="body2" color="text.secondary">{e.tableName}{e.recordId ? ` (${e.recordId})` : ''}</Typography> },
   ];
 
   return (
@@ -24,9 +29,15 @@ export default function AuditLogPage() {
           <Typography variant="h5" fontWeight={700}>Bitácora de auditoría</Typography>
         </Stack>
         <Alert severity="info" sx={{ mb: 2 }}>
-          Este registro es inmutable: ningún evento puede editarse ni borrarse, solo consultarse.
+          Este registro es inmutable: ningún evento puede editarse ni borrarse, solo consultarse. Muestra
+          la actividad de gestión de usuarios/roles/permisos (auth-service) — las mutaciones de
+          marcas/campañas/publicaciones se auditan por separado, en su propio servicio.
         </Alert>
-        <DataTable columns={columns} rows={MOCK_AUDIT_LOG} getRowKey={(e) => e.id} />
+        {!canView ? (
+          <EmptyState title="Sin permiso" description="No tienes permiso para ver la auditoría (usuarios:ver)." />
+        ) : (
+          <DataTable columns={columns} rows={entries} getRowKey={(e) => e.id} pagination initialPageSize={10} isLoading={isLoading} emptyMessage="No hay eventos registrados." />
+        )}
       </Box>
     </Box>
   );

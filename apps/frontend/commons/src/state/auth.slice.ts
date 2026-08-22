@@ -1,44 +1,22 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { AuthUser, AuthState, JwtPayload } from '../types/auth.types';
+import { decodeJwt, encodeMockJwt } from './jwt';
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: string;
-}
-
-export interface AuthState {
-  user: AuthUser | null;
-  accessToken: string | null;
-  permissions: Record<string, string[]>;
-  brandIds: string[];
-}
-
-interface JwtPayload {
-  sub: string;
-  email: string;
-  role: string;
-  brandIds?: string[];
-  permissions?: Record<string, string[]>;
-}
+export type { AuthUser, AuthState, JwtPayload };
+// Re-exportados para no romper a los consumidores existentes de
+// @repo/ui/state — la implementación real vive en ./jwt (ver ese archivo
+// para por qué está separado: lo importa también el Edge Middleware).
+export { decodeJwt, encodeMockJwt };
 
 type AuthRootState = { auth: AuthState };
 
-function decodeJwt(token: string): JwtPayload | null {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const json = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
-        .join(''),
-    );
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-const initialState: AuthState = { user: null, accessToken: null, permissions: {}, brandIds: [] };
+const initialState: AuthState = {
+  user: null,
+  accessToken: null,
+  permissions: {},
+  ownedBrandIds: [],
+  isAuthenticated: false,
+};
 
 const authSlice = createSlice({
   name: 'auth',
@@ -48,21 +26,31 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       const payload = decodeJwt(action.payload.accessToken);
       if (payload) {
-        state.user = { id: payload.sub, email: payload.email, role: payload.role };
+        state.user = {
+          id: payload.sub,
+          email: payload.email,
+          // El JWT real no trae name/status (viven en UserProfile, otro
+          // servicio) — cae a email/'active' en vez de dejarlos undefined.
+          name: payload.name ?? payload.email,
+          roles: payload.roles ?? [],
+          status: payload.status ?? 'active',
+          avatarUrl: payload.avatarUrl ?? null,
+        };
         state.permissions = payload.permissions ?? {};
-        state.brandIds = payload.brandIds ?? [];
+        // Solo tiene sentido para Cliente — ver AuthState.ownedBrandIds.
+        // brandIds es el nombre real del backend (siempre [] hoy, ver
+        // ADR-0004); ownedBrandIds es el nombre que usa el JWT mock.
+        state.ownedBrandIds = payload.brandIds ?? payload.ownedBrandIds ?? [];
+        state.isAuthenticated = true;
       }
-    },
-    setPermissions(state, action: PayloadAction<{ permissions: Record<string, string[]>; brandIds: string[] }>) {
-      state.permissions = action.payload.permissions;
-      state.brandIds = action.payload.brandIds;
     },
     logout(state) { Object.assign(state, initialState); },
   },
 });
 
-export const { setCredentials, setPermissions, logout } = authSlice.actions;
+export const { setCredentials, logout } = authSlice.actions;
 export const authReducer = authSlice.reducer;
 export const selectUser = (s: AuthRootState) => s.auth.user;
 export const selectPermissions = (s: AuthRootState) => s.auth.permissions;
-export const selectBrandIds = (s: AuthRootState) => s.auth.brandIds;
+export const selectOwnedBrandIds = (s: AuthRootState) => s.auth.ownedBrandIds;
+export const selectIsAuthenticated = (s: AuthRootState) => s.auth.isAuthenticated;

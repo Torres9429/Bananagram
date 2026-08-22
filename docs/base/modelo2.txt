@@ -1,0 +1,928 @@
+// ════════════════════════════════════════════════════════════════════════
+// ⚠ AVISO DE DESACTUALIZACIÓN (agregado 2026-08-17)
+// ════════════════════════════════════════════════════════════════════════
+//
+// Última sincronización real conocida de este archivo contra el schema
+// implementado: commit ee3a9df (2026-08-06). Desde entonces el schema real
+// avanzó 3 commits más, hasta 0221e42 (2026-08-14), y este archivo NO se
+// actualizó — quedó desactualizado respecto al modelo realmente implementado.
+//
+// La fuente viva hoy (2026-08-17) es:
+//   - `.claude/INVENTORY.md` §1.6 — sí está al día.
+//   - Los `schema.prisma` reales de cada servicio:
+//     `apps/backend/services/auth-service/prisma/schema.prisma`
+//     `apps/backend/services/core-service/prisma/schema.prisma`
+//     `apps/backend/services/alexa-service/prisma/schema.prisma` (solo
+//     ContentIdea, acceso directo a la BD de core-service, sin migrar desde
+//     ahí — ver comentario en ese archivo y `docs/base/service-boundaries.md`).
+//
+// Este archivo NO se reescribió por completo para no arriesgar
+// inconsistencias — se corrigieron puntualmente el enum PostStatus y
+// Media.uploadedBy (marcados inline donde aparecen abajo), y se agregó al
+// final la sección "## Cambios desde 2026-08-06 no reflejados arriba" con
+// el detalle completo de lo que falta: modelos enteros nuevos
+// (AccountLinkCode, SocialAccountMetricSnapshot, CmTeamMember,
+// ProviderRequestLog, MetricSyncRun) y campos nuevos en modelos existentes.
+// Consulta esa sección antes de asumir que lo que ves arriba es el modelo
+// completo vigente.
+//
+// ════════════════════════════════════════════════════════════════════════
+// modelo2.txt — modelo.txt separado por microservicio
+// ════════════════════════════════════════════════════════════════════════
+//
+// Punto de partida: docs/base/modelo.txt (schema Prisma único, 18+ modelos,
+// el modelo original/maestro completo — NO se toca, se mantiene intacto a
+// propósito como referencia). Este archivo es la propuesta de reparto por
+// microservicio, y por eso SÍ puede divergir de modelo.txt (p. ej. agrega
+// ContentIdea, que no existe en el maestro) — la idea es poder comparar
+// "original vs. propuesta" entre ambos archivos.
+//
+// La organización final del backend es de 3 microservicios:
+//   - auth-service   — login y todo lo derivado de autenticación
+//   - core-service   — "tiene todo": marcas, redes sociales, campañas,
+//                       publicaciones, medios, métricas, score, reportes
+//                       e ideas de contenido (Alexa Skill)
+//   - alexa-service  — SIN base de datos propia. Es un puro consumidor del
+//                       API de core-service y auth-service (BFF para la
+//                       Alexa Skill) — por eso NO tiene sección de schema
+//                       en este archivo, no es dueño de ninguna tabla. Ver
+//                       docs/base/service-boundaries.md para el detalle de
+//                       qué endpoints consume de cada uno.
+//
+// Solo auth-service y core-service tienen datasource propio (2 secciones
+// abajo). Donde antes brands/content/analytics-service se llamaban entre sí
+// por HTTP (p. ej. analytics leyendo posts de content, o content validando
+// una cuenta social de brands), esas llamadas cruzadas DESAPARECEN: ahora
+// es el mismo servicio y la misma base de datos, así que son joins/queries
+// normales de Prisma. Lo único que sigue cruzando de verdad es la identidad
+// (auth-service ↔ core-service) — ver leyenda de anotaciones abajo.
+//
+// Cada sección trae su propio bloque `datasource`/`generator` (con su
+// propia variable de entorno *_URL) como si ya fuera un archivo de schema
+// independiente — así, separar físicamente en
+// apps/backend/services/<servicio>/prisma/schema.prisma más adelante es
+// copiar y pegar la sección completa, no rediseñarla.
+//
+// ── Leyenda de anotaciones en campos cruzados ──────────────────────────
+//
+// 1) `// FK → auth-service.<Modelo>.id (sin constraint de BD; resolver vía
+//    HTTP GET /internal/..., circuit breaker)`
+//    → Es una FK "tonta": una columna con el id de un registro que vive en
+//      auth-service. No hay `@relation` de Prisma (no se puede: son bases
+//      de datos distintas). Para escribir, casi siempre basta el id que ya
+//      se tiene (del JWT o del payload del request) — no requiere llamada.
+//      Para leer/mostrar datos del otro lado (nombre, email, etc.), sí
+//      requiere una llamada HTTP síncrona a través del circuit breaker de
+//      apps/backend/commons/circuit-breaker/opossum.factory.ts (hoy
+//      implementado pero sin usar en ningún servicio).
+//
+// AuditLog se repite igual (mismo shape) en las 2 secciones: cada servicio
+// escribe su propia tabla local de auditoría, poblada directo desde el
+// `userId` del JWT — no requiere ninguna llamada cruzada para escribir.
+//
+// ════════════════════════════════════════════════════════════════════════
+
+
+// ══════════════════════════════════════════════════════════════════════
+// SERVICE: auth-service (puerto 3001)
+// Dueño de: identidad, RBAC, Notification
+// Actualizado 2026-08-05: multi-rol real (UserRole reemplaza User.roleId) +
+// RS256/JWKS + argon2 + denylist de access tokens en Redis (con
+// RevokedAccessToken como respaldo en Postgres). Ver ADR-0004 (supera a
+// ADR-0002, que documentaba HS256 sin Redis).
+// ══════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_AUTH")
+}
+
+// Los privilegios viven en role_permissions (BD), nunca hardcodeados en
+// código (ver CLAUDE.md). module.slug + action.slug + allowed.
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  users       UserRole[]
+  permissions RolePermission[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("roles")
+}
+
+// Multi-rol (2026-08-05): tabla puente que reemplaza el antiguo
+// User.roleId escalar — un usuario puede tener N roles a la vez (ej. un
+// usuario que opera como community_manager y disenador). Los permisos
+// efectivos de un usuario son la UNIÓN de los permisos de TODOS sus roles
+// (ver AuthRepository.getPermissions). No se puede dejar a un usuario con
+// 0 roles (AuthRepository.removeRoleFromUser lo bloquea).
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Module {
+  id          String           @id @default(uuid())
+  slug        String           @unique
+  name        String
+  permissions RolePermission[]
+
+  @@map("modules")
+}
+
+model Action {
+  id          String           @id @default(uuid())
+  slug        String           @unique
+  name        String
+  permissions RolePermission[]
+
+  @@map("actions")
+}
+
+model RolePermission {
+  id       String  @id @default(uuid())
+  roleId   String
+  role     Role    @relation(fields: [roleId], references: [id])
+  moduleId String
+  module   Module  @relation(fields: [moduleId], references: [id])
+  actionId String
+  action   Action  @relation(fields: [actionId], references: [id])
+  allowed  Boolean @default(true)
+
+  @@unique([roleId, moduleId, actionId])
+  @@map("role_permissions")
+}
+
+// familyId/revokedAt agregados 2026-07-27 (migración
+// auth-service/prisma/migrations/20260727143453_refresh_token_family):
+// todos los tokens nacidos de la misma sesión (login/register + cada
+// rotación de refresh) comparten familyId. AuthRepository.rotateRefreshToken
+// consume el token viejo y crea el reemplazo en una sola transacción; si
+// alguien reusa un token ya consumido/revocado/expirado, se revoca TODA la
+// familia (incluido el token que "ganó" la rotación) — detección de robo de
+// refresh token, no solo rechazo del intento inválido.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  familyId  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// Bandeja de notificaciones (todos los roles). El evento que dispara una
+// notificación nace en core-service (post rechazado, campaña asignada,
+// reporte listo), pero la tabla vive aquí porque el dato es userId-céntrico.
+// core-service llama a un endpoint interno de auth-service (a construir) al
+// ocurrir el evento — llamada irreducible, el evento no puede "reubicarse":
+// nace donde nace.
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("notifications")
+}
+
+
+
+// Opcional — implementar según tiempos. Por ahora todos nacen como active.
+enum UserStatus {
+  pending
+  active
+  suspended
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String
+  roles               UserRole[]
+  status              UserStatus @default(active)
+
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  notifications       Notification[]
+  profile             UserProfile?
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  @@map("users")
+}
+
+// Respaldo en Postgres de la denylist de access tokens revocados por
+// logout (2026-08-05) — el hot path de cada request autenticado consulta
+// Redis (O(1)); esta tabla es el fallback si Redis está caído, y registro
+// para auditar revocaciones. Ver TokenDenylistService.
+model RevokedAccessToken {
+  jti       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("revoked_access_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+// Inmutable — instancia LOCAL de auditoría de auth-service. performedBy se
+// puebla directo desde el userId del JWT (dato que ya se tiene en cada
+// request), sin ninguna llamada cruzada. auth-service y core-service tienen
+// cada uno su propia copia de este modelo — ver leyenda al inicio del archivo.
+model AuditLog {
+  id          BigInt  @id @default(autoincrement())
+  tableName   String
+  recordId    String
+  action      String
+  before      Json?
+  after       Json?
+  performedBy String // desde JWT userId — sin llamada cruzada
+  requestId   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("audit_log")
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// SERVICE: core-service (puerto 3002)
+// Dueño de: marcas, redes sociales, campañas y su equipo, publicaciones,
+// su máquina de estados y fan-out multi-red, medios, métricas simuladas,
+// score digital, reportes (PDF/CSV) e ideas de contenido (Alexa Skill).
+// ══════════════════════════════════════════════════════════════════════
+//
+// Esta sección fusiona lo que antes eran 3 secciones separadas
+// (brands-service, content-service, analytics-service). Todas las FKs que
+// antes cruzaban entre ellas (Post.brandId, Post.campaignId,
+// PostSocialAccount.socialAccountId, PostMetric.postSocialAccountId,
+// BrandScore.brandId, Report.brandId, ContentIdea.campaignId, el cron de
+// analytics leyendo SocialNetwork.baseEngagementRate, etc.) dejan de ser
+// "FK tonta + llamada HTTP" y pasan a ser `@relation` normales de Prisma:
+// ahora es el mismo proceso y la misma base de datos. Esto también resuelve
+// de raíz la violación que hoy existe en el código real
+// (score.service.ts / metrics-cron.service.ts leían Post/BrandProfile
+// cruzando límites de servicio) — bajo este modelo esa lectura es local y
+// legítima. Por la misma razón, los snapshots denormalizados que existían
+// solo para evitar HTTP entre servicios (brandName/campaignName en Post,
+// socialAccountHandle/socialNetworkCode en PostSocialAccount) también se
+// retiran aquí: ya no hay HTTP que evitar, un join normal basta.
+//
+// Lo único que sigue siendo una FK cruzada real es hacia auth-service
+// (identidad: ownerId, cmId, createdBy, changedBy, uploadedBy,
+// requestedBy, ContentIdea.createdBy → User). Category, Specialty y
+// SocialNetwork ya son catálogos locales de core-service.
+// NOTA 2026-08-17: `Media.uploadedBy` fue removido del schema real después
+// de 2026-08-06 — ya no es una de estas FKs cruzadas. Se deja mencionado
+// aquí sin editar más a fondo porque este párrafo es prosa de contexto, no
+// el schema en sí (la corrección real está en el modelo `Media` más abajo).
+//
+// Nota histórica: antes había que decidir si Campaign vivía en
+// brands-service o content-service (ver docs/architecture.md vs.
+// docs/database.md). Con la fusión en core-service la pregunta queda sin
+// objeto — ambos son el mismo servicio — se deja documentada en
+// docs/base/service-boundaries.md solo como antecedente.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_CORE")
+}
+
+
+// CORE
+// Nota (implementación real, 2026-08-01): sin `user User @relation(...)` — no
+// es posible, `User` vive en la BD de auth-service y Prisma no soporta
+// `@relation` cruzando datasources. `userId` es una FK "tonta" más, igual que
+// ownerId/cmId/createdBy en el resto de este archivo.
+model UserProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique // FK → auth-service.User.id (sin constraint de BD)
+
+  name          String
+  avatarUrl     String?
+
+  // Denormalizado desde auth-service.User.roles (multi-rol, 2026-08-05) al
+  // registrar/completar perfil (POST /internal/user-profiles) — valores de
+  // 'cliente'|'cm'|'disenador'. Sin esto, core-service no tiene forma de
+  // saber los roles de un usuario para validar que un cmId/designerId de
+  // Campaign corresponda a un CM/Diseñador real (ver
+  // CampaignsService.assertUserHasRole). Array (antes un solo String?)
+  // porque un usuario puede tener varios roles a la vez — @default([]) en
+  // vez de null, sigue siendo best-effort como el resto del perfil.
+  roleNames     String[] @default([])
+
+  categories    UserProfileCategory[]
+  specialties   UserProfileSpecialty[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@map("user_profiles")
+}
+
+model UserProfileCategory {
+  userProfileId String
+  categoryId    String
+
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
+  category      Category    @relation(fields: [categoryId], references: [id])
+
+  @@id([userProfileId, categoryId])
+  @@map("user_profile_categories")
+}
+
+model UserProfileSpecialty {
+  userProfileId String
+  specialtyId   String
+
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
+  specialty     Specialty   @relation(fields: [specialtyId], references: [id])
+
+  @@id([userProfileId, specialtyId])
+  @@map("user_profile_specialties")
+}
+
+// ── Catálogos ─────────────────────────────────────────────────────────
+
+// Áreas temáticas: clasifican a usuarios operativos (CM/Diseñador),
+// campañas y marcas. Es el eje del sistema de matching (orientativo, no
+// restrictivo — regla de negocio #8).
+//
+// Catálogo base de core-service — decisión ya cerrada (ver
+// docs/base/service-boundaries.md §4.6 y `feat/catalogos-base`, mergeada a
+// develop): Category, Specialty y SocialNetwork viven aquí, no en
+// auth-service. auth-service ya no es dueño de ningún catálogo, solo de
+// identidad/RBAC (Role/Module/Action/User).
+model Category {
+  id   String @id @default(uuid())
+  name String @unique
+
+  // Consumo 100% local (misma sección/BD que Brand y CampaignCategory,
+  // ver @relation en ambos modelos más abajo) — ya no es FK cruzada.
+  userProfileCategories UserProfileCategory[]
+  brands                Brand[]
+  campaignCategories    CampaignCategory[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("categories")
+}
+
+// Habilidades técnicas exclusivas de CM y Diseñador. NO aplica a marcas ni
+// campañas.
+model Specialty {
+  id   String @id @default(uuid())
+  name String @unique
+
+  userProfileSpecialties UserProfileSpecialty[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("specialties")
+}
+
+// Plataformas de publicación disponibles en el sistema. Gestionado solo
+// por Admin (un INSERT = nueva red, sin deploy) — ver auth-service para la
+// validación de permisos de quién puede administrar este catálogo.
+//
+// baseEngagementRate: leído por el cron de simulación de métricas. Antes
+// era una llamada HTTP de analytics-service hacia brands-service (una por
+// corrida de cron); ahora es una lectura local normal, mismo servicio.
+model SocialNetwork {
+  id                 String @id @default(uuid())
+  name               String
+  code               String @unique // 'instagram' | 'tiktok' | etc.
+  baseEngagementRate Float
+
+  socialAccounts SocialAccount[]
+  postSocialNetworks PostSocialNetwork[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("social_networks")
+}
+
+model Brand {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  profileType String?
+
+  logoUrl      String?
+  primaryColor String?
+
+  // dueño — siempre un Cliente
+  ownerId String // FK → auth-service.User.id (sin constraint de BD; resolver
+  // vía HTTP GET /internal/users/:id si la vista necesita nombre/email —
+  // para validar propiedad basta comparar contra el userId del JWT, sin llamada)
+
+  // industria/categoría de la marca (catálogo base, semilla por Admin).
+  // Relación local — Category vive en core-service, no hay cruce de servicio.
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  // Ayrshare: null hasta que el Cliente conecte sus redes en el onboarding
+  ayrshareProfileKey String? @unique
+
+  socialAccounts SocialAccount[]
+  campaigns      Campaign[]
+  posts          Post[]
+  media          Media[]
+  scores         BrandScore[]
+  reports        Report[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("brands")
+}
+
+model SocialAccount {
+  id              String        @id @default(uuid())
+  brandId         String
+  brand           Brand         @relation(fields: [brandId], references: [id])
+  socialNetworkId String
+  socialNetwork   SocialNetwork @relation(fields: [socialNetworkId], references: [id])
+  handle          String? // @username en esa red
+
+  followers Int     @default(0)
+  active    Boolean @default(true)
+
+  postSocialAccounts PostSocialAccount[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([brandId, socialNetworkId])
+  @@map("social_accounts")
+}
+
+model Campaign {
+  id          String         @id @default(uuid())
+  brandId     String
+  brand       Brand          @relation(fields: [brandId], references: [id])
+  name        String
+  description String?
+  objective   String?
+  status      CampaignStatus @default(active)
+  startDate   DateTime?
+  endDate     DateTime?
+
+  // El CM vive directo aquí — FK única garantiza "solo un CM por campaña"
+  // en BD. FK → auth-service.User.id (sin constraint). Actualización
+  // 2026-08-01: la lista de candidatos elegibles (CM/Diseñador) NO se
+  // resuelve con una llamada HTTP a auth-service en tiempo de lectura, como
+  // se planeaba aquí originalmente — se resuelve 100% local filtrando
+  // UserProfile.roleNames (array, denormalizado, ver modelo de UserProfile
+  // arriba) con `{ has: roleName }`, vía GET
+  // /campaigns/eligible-community-managers y /campaigns/eligible-designers.
+  // El único costo de esta decisión es que roleNames puede quedar
+  // desactualizado si los roles de un usuario cambian en auth-service
+  // después de su registro (nada lo re-sincroniza hoy).
+  cmId String
+
+  designers  CampaignDesigner[]
+  categories CampaignCategory[]
+  posts      Post[]
+  ideas      ContentIdea[]
+
+  createdBy String // FK → auth-service.User.id (Cliente que la creó; sin
+  // constraint, no requiere llamada para escribir — viene del JWT)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("campaigns")
+}
+
+model CampaignDesigner {
+  campaignId String
+  userId     String // FK → auth-service.User.id (sin constraint de BD)
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  @@id([campaignId, userId])
+  @@map("campaign_designers")
+}
+
+model CampaignCategory {
+  campaignId String
+  categoryId String // relación local — Category vive en core-service
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@id([campaignId, categoryId])
+  @@map("campaign_categories")
+}
+
+enum CampaignStatus {
+  active
+  paused
+  finished
+}
+
+// Estado único de la publicación: cubre tanto el flujo de aprobación
+// (borrador → en_revision → aprobado/rechazado) como el de publicación
+// multi-red (programado → publicando → publicado/parcial/error/cancelado).
+// post_status_history registra cada transición (actor, fecha, comentario).
+enum PostStatus {
+  borrador
+  en_revision
+  aprobado
+  rechazado
+  rechazado_cliente // agregado después de 2026-08-06 (11vo valor, no 10) —
+  // segundo tramo de aprobación del Cliente, ver schema real de core-service
+  // y sección "Cambios desde 2026-08-06" al final de este archivo.
+  programado
+  publicando
+  publicado
+  parcial
+  error
+  cancelado
+}
+
+enum PostSocialAccountStatus {
+  pendiente
+  publicando
+  publicado
+  error
+  cancelado
+}
+
+// Capa 1 — La intención del usuario (independiente de la red)
+model Post {
+  id         String    @id @default(uuid())
+  brandId    String
+  brand      Brand     @relation(fields: [brandId], references: [id])
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id])
+
+  content     String     @db.Text
+  instructions String?   @db.Text
+  status      PostStatus @default(borrador)
+  scheduledAt DateTime?
+  publishedAt DateTime?
+
+  createdBy String // FK → auth-service.User.id (CM o Diseñador; sin
+  // constraint, viene del JWT al escribir)
+
+  // null hasta que Ayrshare acepta el post
+  ayrsharePostId String? @unique
+
+  socialAccounts PostSocialAccount[]
+  socialNetworks PostSocialNetwork[]
+  statusHistory  PostStatusHistory[]
+  media          PostMedia[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("posts")
+}
+
+// Inmutable — historial de transiciones de estado del Post
+model PostStatusHistory {
+  id         BigInt      @id @default(autoincrement())
+  postId     String
+  post       Post        @relation(fields: [postId], references: [id])
+  fromStatus PostStatus?
+  toStatus   PostStatus
+  changedBy  String // FK → auth-service.User.id (sin constraint; JWT al escribir)
+  comment    String?     @db.Text // obligatorio si toStatus = rechazado o cancelado
+
+  createdAt DateTime @default(now())
+
+  @@map("post_status_history")
+}
+
+// Capa 2 — Publicación física por red social
+model PostSocialAccount {
+  id              String        @id @default(uuid())
+  postId          String
+  post            Post          @relation(fields: [postId], references: [id])
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  status       PostSocialAccountStatus @default(pendiente)
+  socialPostId String? // ID devuelto por la red (vía Ayrshare)
+  postUrl      String?
+  publishedAt  DateTime?
+  errorMessage String?
+
+  metrics PostMetric[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([postId, socialAccountId])
+  @@map("post_social_accounts")
+}
+
+model PostSocialNetwork {
+  postId          String
+  socialNetworkId String
+
+  post          Post          @relation(fields: [postId], references: [id])
+  socialNetwork SocialNetwork @relation(fields: [socialNetworkId], references: [id])
+
+  @@id([postId, socialNetworkId])
+  @@map("post_social_networks")
+}
+
+// ── Biblioteca de medios ────────────────────────────────────────────────
+model Media {
+  id      String @id @default(uuid())
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  // REMOVIDO del schema real de core-service después de 2026-08-06 (ya no
+  // existe la columna) — se deja esta línea comentada como nota histórica,
+  // no como campo vigente. Ver sección "Cambios desde 2026-08-06" al final.
+  // uploadedBy String // FK → auth-service.User.id (CM o Diseñador; sin constraint)
+
+  fileName     String
+  originalName String
+  mimeType     String
+  url          String
+  size         Int
+  width        Int?
+  height       Int?
+  duration     Int? // solo video
+
+  postMedia PostMedia[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("media")
+}
+
+model PostMedia {
+  postId  String
+  mediaId String
+  order   Int
+
+  post  Post  @relation(fields: [postId], references: [id])
+  media Media @relation(fields: [mediaId], references: [id])
+
+  @@id([postId, mediaId])
+  @@map("post_media")
+}
+
+// ── Ideas de contenido ──────────────────────────────────────────────────
+// Capturadas por la Alexa Skill (SaveIdeaIntent/SaveCustomIdeaIntent, vía
+// alexa-service, que no tiene BD propia y llama al endpoint de este
+// servicio) y, potencialmente, desde el panel web más adelante — mismo
+// modelo, sin distinción de canal de origen a nivel de dato (no hay razón
+// funcional para que una idea "sepa" si nació por voz o por texto, solo si
+// es sugerida por IA o dictada por el usuario — ver `source`). Dueño:
+// core-service, porque una idea de contenido es contenido, misma familia
+// que Post/Media.
+enum ContentIdeaSource {
+  sugerida // generada por GenerateContentIdeasIntent y guardada tal cual
+  propia   // dictada libremente por el usuario (SaveCustomIdeaIntent)
+}
+
+model ContentIdea {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  createdBy String // FK → auth-service.User.id (sin constraint de BD; viene
+  // del JWT al escribir, sin llamada — mismo patrón que Post.createdBy)
+
+  title  String? // null cuando source = propia y el usuario no dictó título
+  text   String  @db.Text
+  source ContentIdeaSource @default(sugerida)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("content_ideas")
+}
+
+// Endpoints que expone core-service para este modelo (implementado
+// 2026-07-27 en core-service/src/ideas/ — diverge de la forma de ruta que
+// este comentario documentaba antes, ver nota abajo):
+//   GET    /ideas?campaignId=:campaignId  (list, no anidado bajo /campaigns)
+//   GET    /ideas/:id
+//   POST   /ideas                          (campaignId va en el body, no en la URL)
+//   PATCH  /ideas/:id
+//   DELETE /ideas/:id
+// Guardados con JwtAuthGuard + PermissionGuard (`campanas:ver`/`crear` — Idea
+// no tiene módulo de permiso propio en el seed) + una verificación de
+// pertenencia a la campaña dentro de IdeasService (no hay guard genérico
+// para esto: BrandAccessGuard resuelve el :id de la ruta como brandId, y acá
+// :id es un ideaId/campaignId, no un brandId — reusarlo directo lo rompería).
+// NOTA: la versión anterior de este comentario prescribía rutas anidadas
+// (`/campaigns/:campaignId/ideas`, `DELETE /ideas/:id` resuelto por título
+// hablado) pensadas para alexa-service — ese consumo real desde
+// alexa-service (traducir los intents de voz a estas llamadas HTTP) todavía
+// no se construyó; cuando se haga, decidir si conviene agregar esas rutas
+// anidadas o si alexa-service llama a las planas de arriba.
+
+// Capa 3 — Snapshot de métricas por red (cron job).
+model PostMetric {
+  id                  String            @id @default(uuid())
+  postSocialAccountId String
+  postSocialAccount   PostSocialAccount @relation(fields: [postSocialAccountId], references: [id])
+
+  likes      Int?
+  comments   Int?
+  shares     Int?
+  views      Int?
+  reach      Int?
+  engagement Float? // tasa calculada: (likes+comments+shares) / reach
+
+  capturedAt DateTime @default(now())
+
+  @@map("post_metrics")
+}
+
+// Score = (Consistencia×0.30) + (Engagement×0.40) + (Frecuencia×0.30) — ver
+// CLAUDE.md sobre la discrepancia entre la fórmula documentada (3 factores)
+// y la implementada hoy en score.service.ts (4 factores, incluye
+// Cobertura×0.20) — confirmar con el usuario cuál es la vigente antes de
+// tocar el cálculo real.
+// `coverage` es informativa: NO entra al cálculo ponderado del score.
+model BrandScore {
+  id      String @id @default(uuid())
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  score          Float
+  consistency    Float
+  engagement     Float
+  frequency      Float
+  coverage       Float
+  classification String
+  snapshotDate   DateTime @default(now())
+
+  @@map("brand_scores")
+}
+
+enum ReportFormat {
+  csv
+  pdf
+}
+
+model Report {
+  id      String @id @default(uuid())
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  format      ReportFormat
+  fileUrl     String?
+  requestedBy String // FK → auth-service.User.id (sin constraint de BD)
+
+  createdAt DateTime @default(now())
+
+  @@map("reports")
+}
+
+// Inmutable — instancia LOCAL de auditoría de core-service (ver leyenda al
+// inicio del archivo y la sección auth-service para el detalle).
+model AuditLog {
+  id          BigInt  @id @default(autoincrement())
+  tableName   String
+  recordId    String
+  action      String
+  before      Json?
+  after       Json?
+  performedBy String // desde JWT userId — sin llamada cruzada
+  requestId   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("audit_log")
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// ## Cambios desde 2026-08-06 no reflejados arriba
+// ════════════════════════════════════════════════════════════════════════
+//
+// Agregado 2026-08-17. Todo lo listado aquí SÍ existe en los `schema.prisma`
+// reales de cada servicio (verificado contra el código, no copiado a
+// ciegas) pero NO está reflejado en el cuerpo de este archivo arriba, salvo
+// las 2 correcciones puntuales ya marcadas inline (enum PostStatus,
+// Media.uploadedBy). Ver también `.claude/INVENTORY.md` §1.6.
+//
+// ── Modelos enteros que faltan por completo ────────────────────────────
+//
+// auth-service:
+//   - `AccountLinkCode` — código de vinculación de cuenta para el
+//     account-linking de la Alexa Skill (id, userId → User, code @unique,
+//     expiresAt, usedAt, createdAt). Ver
+//     apps/backend/services/auth-service/prisma/schema.prisma.
+//
+// core-service:
+//   - `SocialAccountMetricSnapshot` — historial append-only de seguidores/
+//     métricas por SocialAccount conectada (followers, likes/comments/
+//     shares/views/reach nullable, source 'ayrshare'|'simulated',
+//     capturedAt). Poblado cada 6h por account-metrics-cron.service.ts.
+//   - `CmTeamMember` — equipo GENERAL de un CM (cmUserId, designerUserId),
+//     distinto de CampaignDesigner (que es por-campaña); sin soft-delete.
+//   - `ProviderRequestLog` — trazabilidad de cada llamada saliente a
+//     Ayrshare (provider, operation, entityType, entityId, requestId,
+//     httpStatus, succeeded, errorCode, durationMs) — no confundir con
+//     AuditLog, que audita mutaciones de dominio, no llamadas HTTP externas.
+//   - `MetricSyncRun` — registro de cada corrida del cron de sincronización
+//     de métricas (startedAt, finishedAt, itemsProcessed, itemsFailed,
+//     status).
+//
+// ── Campos nuevos en modelos existentes ────────────────────────────────
+//
+// core-service:
+//   - `Brand`: `refId String? @unique`, `profileKey String? @unique`,
+//     `timezone String?` (nullable, con fallback a default de aplicación,
+//     sin backfill forzado).
+//   - `SocialAccount`: `platformAccountId String?`, `disconnectedAt
+//     DateTime?`, `lastAuthenticatedAt DateTime?` (integración real con
+//     Ayrshare — id que asigna la red, cuándo se desconectó de verdad,
+//     última reautenticación).
+//   - `Campaign`: `cmStatus CmAssignmentStatus @default(pendiente)`,
+//     `cmRespondedAt DateTime?`, `cmRejectionReason String?` — flujo de
+//     aceptación del CM (Fase J), más el enum nuevo:
+//       enum CmAssignmentStatus { pendiente aceptada rechazada }
+//   - `PostSocialAccount`: `providerStatus String?`, `errorCode String?`,
+//     `retryCount Int @default(0)`, `lastSyncedAt DateTime?`, `submittedAt
+//     DateTime?`, `providerScheduledAt DateTime?` — pipeline real de
+//     publicación/sync contra Ayrshare.
+//   - `PostMetric`: `raw Json?`, `source String @default("simulated")`,
+//     `engagementBase String?` ('reach'|'views'|'impressions') — respuesta
+//     cruda del proveedor, origen del dato, y qué denominador se usó para
+//     `engagement` cuando `reach` no está disponible.
+//
+// ── Enum corregido inline arriba ───────────────────────────────────────
+//
+//   - `PostStatus` tiene 11 valores, no 10: se agregó `rechazado_cliente`
+//     (segundo tramo de aprobación del Cliente) después de 2026-08-06.
+//
+// ── Campo removido, marcado inline arriba ──────────────────────────────
+//
+//   - `Media.uploadedBy` ya no existe en el schema real de core-service —
+//     se comentó (no se borró la línea) en el modelo `Media` de este
+//     archivo, con nota histórica.
+//
+// ── Nota aparte, no listada como "diferencia" porque ya está documentada
+//    en docs/base/service-boundaries.md ────────────────────────────────
+//
+// `ContentIdea` (arriba, dentro de la sección core-service) sigue siendo
+// correcto tal cual está: `core-service` sigue siendo el dueño de la
+// migración de esa tabla. Lo que cambió (2026-08-14, no listado como
+// diferencia de campos porque no es un campo) es quién más tiene acceso:
+// `alexa-service` ahora también lee/escribe `ContentIdea` directo contra la
+// misma base física (`gestor_redes_core`) vía su propio
+// `prisma/schema.prisma` (solo ese modelo, sin `prisma migrate` desde ahí),
+// en vez de consumirlo por HTTP contra `core-service` como decía la versión
+// vieja de `docs/base/service-boundaries.md`. Detalle completo en ese
+// documento, secciones 1 y 4.2.

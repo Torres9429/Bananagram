@@ -4,14 +4,21 @@
   "packageManager": "pnpm@10.34.4",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:infra": "docker compose up -d",
+    "generate-keys": "node scripts/generate-keys.mjs",
+    "generate-swagger": "bash scripts/generate-swagger.sh",
+    "dev:backend": "turbo run dev --filter=@repo/api-gateway --filter=@repo/auth-service --filter=@repo/core-service --filter=@repo/alexa-service --filter=@repo/ai-service",
+    "dev:web": "turbo run dev --filter=@repo/web-shell",
+    "dev:frontend": "turbo run dev --filter=@repo/web-shell --filter=@repo/admin-front --filter=@repo/analytics-front --filter=@repo/auth-front --filter=@repo/brands-front --filter=@repo/posts-front",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "seed": "pnpm --filter seed run start",
-    "db:generate": "npx prisma generate --schema=apps/backend/commons/prisma/schema.prisma",
-    "db:migrate": "npx prisma migrate dev --schema=apps/backend/commons/prisma/schema.prisma",
-    "db:migrate:prod": "npx prisma migrate deploy --schema=apps/backend/commons/prisma/schema.prisma",
-    "db:studio": "npx prisma studio --schema=apps/backend/commons/prisma/schema.prisma"
+    "db:generate": "pnpm --filter @repo/auth-service run db:generate && pnpm --filter @repo/core-service run db:generate",
+    "db:migrate": "pnpm --filter @repo/auth-service run db:migrate && pnpm --filter @repo/core-service run db:migrate",
+    "db:migrate:prod": "pnpm --filter @repo/auth-service run db:migrate:prod && pnpm --filter @repo/core-service run db:migrate:prod",
+    "db:studio:auth": "pnpm --filter @repo/auth-service exec prisma studio",
+    "db:studio:core": "pnpm --filter @repo/core-service exec prisma studio"
   },
   "devDependencies": {
     "turbo": "^2.0.0",
@@ -22,5 +29,8 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": ["eslint --fix", "prettier --write"]
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["argon2"]
   }
 }

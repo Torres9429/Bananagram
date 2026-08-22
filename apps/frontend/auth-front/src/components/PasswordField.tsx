@@ -5,12 +5,8 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import type { TextFieldProps } from '@mui/material/TextField';
-import { LabeledField } from './LabeledField';
-
-interface PasswordFieldProps extends Omit<TextFieldProps, 'type' | 'label'> {
-  label?: string;
-}
+import { LabeledField } from '@repo/ui/ui';
+import type { PasswordFieldProps } from '../interfaces/interface';
 
 export function PasswordField({ label = 'Contraseña', ...props }: PasswordFieldProps) {
   const [visible, setVisible] = useState(false);

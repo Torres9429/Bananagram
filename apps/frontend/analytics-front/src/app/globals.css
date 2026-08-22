@@ -4,7 +4,7 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @theme {
-  --color-brand-primary: #FDC726;
+  --color-brand-primary: #E0A800;
   --color-brand-primary-dark: #D4AC40;
   --color-brand-primary-light: #FFF8E1;
   --color-brand-text-on-yellow: #7A5C00;

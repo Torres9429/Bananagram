@@ -7,276 +7,356 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
-import Select, { type SelectChangeEvent } from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
+import Select, { type SelectChangeEvent } from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
+import Collapse from '@mui/material/Collapse';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
-import { CHAR_LIMITS, MOCK_CAMPAIGNS } from '../../../lib/mock-data';
+import Alert from '@mui/material/Alert';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import TextField from '@mui/material/TextField';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { PrimaryButton, useToast, usePermissions } from '@repo/ui/ui';
+import { useListSocialNetworksQuery } from '@repo/ui/state';
+import { POST_CHAR_LIMIT, NETWORK_DISPLAY_COLORS, NETWORK_SHORT_LABELS } from '../../../lib/mock-data';
+import { useListCampaignsQuery } from '../../../store/api/campaigns.api';
+import { useCreatePostMutation, useUploadMediaMutation, useDeletePostMutation, useSubmitForReviewMutation } from '../../../store/api/posts.api';
+import { MediaCarousel } from '../../../components/MediaCarousel';
+import { SuggestCaptionPanel } from '../../../components/SuggestCaptionPanel';
 
-const NETWORKS = [
-  { code: 'IG', label: 'Instagram' },
-  { code: 'TK', label: 'TikTok' },
-  { code: 'LI', label: 'LinkedIn' },
-  { code: 'FB', label: 'Facebook' },
-  { code: 'X', label: 'X' },
-  { code: 'YT', label: 'YouTube' },
-];
-
-const DEFAULT_CONTENT =
-  '✨ El verano llegó con todo. Descubre nuestra colección SS25 — piezas pensadas para vivir el calor con estilo. #ZaraSS25 #Verano2025 #Moda';
-
-const SUGGESTIONS = [
-  'Agrega una llamada a la acción clara al final del copy.',
-  'Reduce a 3-5 hashtags. Más de 7 reduce el alcance orgánico.',
-  'Mejor horario para tu audiencia: 18:00–20:00.',
-];
-
-const TIME_SLOTS = ['Hoy 18:00', 'Mañana 12:00', 'Jue 09:00'];
-
+// Reescrita a datos reales (Fase N). Cambios de fondo respecto al mock:
+// - Ya no hay "biblioteca de media" reutilizable (no existe ese concepto en
+//   el backend real) — se adjuntan archivos nuevos desde el dispositivo,
+//   subidos recién después de crear el post (POST /posts/:id/media exige
+//   que el post ya exista).
+// - Se quitó el panel de IA (sugerencias/engagement estimado): inventado,
+//   sin ninguna integración real detrás.
+// - Redes = catálogo real (catalogsApi), no las cuentas conectadas de la
+//   marca — la validación de "¿está conectada de verdad?" ya la hace el
+//   backend al programar (schedulePost), no hace falta duplicarla aquí.
 export default function NewPostPage() {
   const router = useRouter();
-  const [network, setNetwork] = useState('IG');
-  const [campaignId, setCampaignId] = useState('c1');
-  const [content, setContent] = useState(DEFAULT_CONTENT);
-  const [datetime, setDatetime] = useState('2025-06-30T18:00');
+  const { showSuccess, showError } = useToast();
+  const { can } = usePermissions();
+  const [campaignId, setCampaignId] = useState('');
+  const [socialNetworkIds, setSocialNetworkIds] = useState<string[]>([]);
+  const [content, setContent] = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
-  const networkLabel = NETWORKS.find((n) => n.code === network)?.label ?? network;
-  const limit = CHAR_LIMITS[network] ?? 2200;
+  const { data: campaigns = [] } = useListCampaignsQuery();
+  const { data: socialNetworks = [] } = useListSocialNetworksQuery();
+  const [createPost] = useCreatePostMutation();
+  const [uploadMedia] = useUploadMediaMutation();
+  const [deletePost] = useDeletePostMutation();
+  const [submitForReview] = useSubmitForReviewMutation();
+
+  const selectedCampaign = campaigns.find((c) => c.id === campaignId);
+  const selectedNetworks = socialNetworks.filter((n) => socialNetworkIds.includes(n.id));
+
+  const limit = POST_CHAR_LIMIT;
   const charCount = content.length;
   const nearLimit = charCount > limit * 0.9;
   const hashtags = content.match(/#\S+/g) ?? [];
-  const previewText = content.length > 120 ? `${content.slice(0, 120)}...` : content;
+  const previewText = content.length > 140 ? `${content.slice(0, 140)}...` : content;
+  const filePreviews = files.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
+  const carouselItems = filePreviews.map((f) => ({
+    url: f.url,
+    type: f.file.type.startsWith('video') ? ('video' as const) : ('image' as const),
+    alt: f.file.name,
+  }));
+
+  function toggleSocialNetwork(id: string) {
+    setSocialNetworkIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    setFiles((prev) => [...prev, ...picked]);
+    e.target.value = '';
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleCreate(submitAfter: boolean) {
+    if (!selectedCampaign || !content.trim() || socialNetworkIds.length === 0) return;
+    setSubmitting(true);
+    try {
+      const post = await createPost({
+        brandId: selectedCampaign.brandId,
+        campaignId: selectedCampaign.id,
+        socialNetworkIds,
+        content: content.trim(),
+        instructions: instructions.trim() || undefined,
+      }).unwrap();
+
+      if (files.length > 0) {
+        try {
+          await uploadMedia({ id: post.id, files }).unwrap();
+        } catch {
+          // Si el adjunto falla, no debe quedar un borrador huérfano sin
+          // imagen — se deshace la creación en vez de avisar y seguir.
+          await deletePost(post.id).catch(() => {});
+          showError('No se pudieron adjuntar los archivos — la publicación no se creó, intenta de nuevo.');
+          return;
+        }
+      }
+
+      if (submitAfter) {
+        // Solo el CM asignado a la campaña puede enviar a revisión — si
+        // quien crea es un Diseñador, el post igual queda guardado como
+        // borrador (avisamos en vez de fallar en silencio).
+        try {
+          await submitForReview(post.id).unwrap();
+          showSuccess('Publicación creada y enviada a revisión.');
+        } catch {
+          showSuccess('Publicación guardada como borrador — solo el CM asignado puede enviarla a revisión.');
+        }
+      } else {
+        showSuccess('Publicación guardada como borrador.');
+      }
+      router.push(`/posts/${post.id}`);
+    } catch {
+      showError('No se pudo crear la publicación.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <Box sx={{ bgcolor: '#F7F7F7', minHeight: '100vh', p: 3 }}>
+      <Tooltip title="Volver">
+        <IconButton
+          onClick={() => router.back()}
+          sx={{ mb: 2, color: 'secondary.main', bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFF8E1' } }}
+        >
+          <ArrowBackIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3 }}>
-            <Typography variant="subtitle2" color="text.secondary" mb={1}>
-              Red social
-            </Typography>
-            <Stack direction="row" gap={1} flexWrap="wrap" mb={2}>
-              {NETWORKS.map((n) => {
-                const active = network === n.code;
-                return (
-                  <Chip
-                    key={n.code}
-                    label={n.code}
-                    onClick={() => setNetwork(n.code)}
-                    sx={{
-                      cursor: 'pointer',
-                      border: active ? '1px solid #FDC726' : '1px solid #E8E8E8',
-                      bgcolor: active ? '#FFF8E1' : 'transparent',
-                      color: active ? '#7A5C00' : '#1A1A1A',
-                      fontWeight: active ? 600 : 400,
-                    }}
-                  />
-                );
-              })}
-            </Stack>
-
-            <Typography variant="subtitle2" color="text.secondary" mb={1} mt={2}>
-              Campaña
-            </Typography>
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>Campaña</Typography>
             <Select
               fullWidth
               size="small"
+              displayEmpty
               value={campaignId}
               onChange={(e: SelectChangeEvent) => setCampaignId(e.target.value)}
+              sx={{ mb: 2.5, borderRadius: 2 }}
             >
-              {MOCK_CAMPAIGNS.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name} — {c.brand}
-                </MenuItem>
+              <MenuItem value=""><em>Selecciona una campaña</em></MenuItem>
+              {campaigns.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
               ))}
-              <MenuItem value="none">Sin campaña</MenuItem>
             </Select>
 
-            <Typography variant="subtitle2" color="text.secondary" mb={1} mt={2}>
-              Contenido
-            </Typography>
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>Redes de publicación</Typography>
+            {socialNetworks.length === 0 ? (
+              <Alert severity="info" sx={{ mb: 2.5, borderRadius: 2 }}>
+                No hay redes sociales en el catálogo todavía.
+              </Alert>
+            ) : (
+              <Stack direction="row" gap={1} flexWrap="wrap" mb={2.5}>
+                {socialNetworks.map((n) => {
+                  const active = socialNetworkIds.includes(n.id);
+                  return (
+                    <Chip
+                      key={n.id}
+                      label={n.name}
+                      onClick={() => toggleSocialNetwork(n.id)}
+                      sx={{
+                        cursor: 'pointer',
+                        height: 32,
+                        border: `1px solid ${active ? '#E0A800' : '#E8E8E8'}`,
+                        bgcolor: active ? '#FFF8E1' : 'transparent',
+                        color: active ? 'primary.contrastTextMuted' : '#1A1A1A',
+                        fontWeight: 600,
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
+            )}
+
+            {/* Asistente de IA arriba del contenido a propósito (2026-08-19):
+                se usa para REDACTAR el copy, tiene más sentido antes que el
+                campo que termina llenando. Antes un Dialog modal
+                (SuggestCaptionDialog) — ahora una sección inline que se
+                abre/cierra con este mismo botón, sin tapar el formulario. */}
+            {can('publicaciones', 'crear') && (
+              <>
+                <Stack direction="row" justifyContent="flex-end" mb={1}>
+                  <Button
+                    size="small"
+                    startIcon={<AutoAwesomeIcon fontSize="small" />}
+                    endIcon={
+                      <ExpandMoreIcon
+                        fontSize="small"
+                        sx={{ transform: suggestOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                      />
+                    }
+                    onClick={() => setSuggestOpen((v) => !v)}
+                    sx={{ color: '#6A1B9A' }}
+                  >
+                    Sugerir con IA
+                  </Button>
+                </Stack>
+                <Collapse in={suggestOpen} sx={{ mb: suggestOpen ? 2 : 0 }}>
+                  <SuggestCaptionPanel
+                    platform={selectedNetworks[0]?.name ?? ''}
+                    files={files}
+                    active={suggestOpen}
+                    onApply={(text) => { setContent(text); setSuggestOpen(false); }}
+                  />
+                </Collapse>
+              </>
+            )}
+
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>Contenido Final</Typography>
             <TextField
               multiline
               minRows={5}
               fullWidth
-              placeholder="Escribe el copy..."
+              placeholder="Escribe el copy para las redes seleccionadas…"
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
-            <Stack direction="row" justifyContent="flex-end" mt={0.5}>
-              <Typography variant="caption" sx={{ color: nearLimit ? '#C62828' : '#6B6B6B' }}>
-                {charCount} / {limit} — {networkLabel}
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5} mb={2}>
+              <Typography variant="caption" color="text.secondary">
+                Límite de caracteres: {limit.toLocaleString()} (mismo límite para todas las redes)
+              </Typography>
+              <Typography variant="caption" sx={{ color: nearLimit ? '#C62828' : '#6B6B6B', fontWeight: nearLimit ? 700 : 400 }}>
+                {charCount.toLocaleString()} / {limit.toLocaleString()}
               </Typography>
             </Stack>
 
-            <Typography variant="subtitle2" color="text.secondary" mb={1} mt={2}>
-              Fecha y hora de publicación
-            </Typography>
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>Instrucciones internas (opcional)</Typography>
             <TextField
-              type="datetime-local"
+              multiline
+              minRows={2}
               fullWidth
-              size="small"
-              value={datetime}
-              onChange={(e) => setDatetime(e.target.value)}
+              placeholder="Notas para el equipo, no se publican…"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              sx={{ mb: 2.5, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
 
-            <Divider sx={{ mt: 3, mb: 2 }} />
+            <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" mb={filePreviews.length > 0 ? 1 : 2}>
+              <Button component="label" startIcon={<AttachFileIcon fontSize="small" />} sx={{ color: 'secondary.main' }}>
+                Adjuntar archivos
+                <input type="file" hidden multiple accept="image/*,video/*" onChange={handleFilesSelected} />
+              </Button>
+              {filePreviews.length > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  {filePreviews.length} {filePreviews.length === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}
+                </Typography>
+              )}
+            </Stack>
 
-            <Box sx={{ border: '1.5px solid #FDC726', borderRadius: 2, bgcolor: '#FFFDE7', p: 2 }}>
-              <Chip
-                label="IA · Análisis pre-publicación"
-                size="small"
-                sx={{ bgcolor: '#FDC726', color: '#7A5C00', fontWeight: 700, mb: 1.5 }}
-              />
-
-              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Engagement estimado
-                  </Typography>
-                  <Stack direction="row" gap={1} alignItems="center">
-                    <Typography variant="h6" fontWeight={700} sx={{ color: '#2E7D32' }}>
-                      4.2%
-                    </Typography>
-                    <Chip size="small" label="Alto" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32' }} />
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    vs benchmark Instagram 3.5%
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: '50%',
-                    bgcolor: '#FDC726',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Typography fontWeight={700} sx={{ color: '#7A5C00' }}>
-                    84
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#7A5C00', fontSize: 9 }}>
-                    Score
-                  </Typography>
-                </Box>
-              </Stack>
-
-              <Typography variant="caption" fontWeight={600} color="text.secondary" mb={0.5} display="block">
-                Sugerencias
-              </Typography>
-              <Stack gap={0.5}>
-                {SUGGESTIONS.map((s, i) => (
-                  <Stack
-                    key={i}
-                    direction="row"
-                    gap={1}
-                    alignItems="flex-start"
-                    sx={{ py: 0.75, borderBottom: i < SUGGESTIONS.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}
-                  >
-                    <Typography fontWeight={700} sx={{ color: '#D4AC40' }}>
-                      {i + 1}.
-                    </Typography>
-                    <Typography variant="caption">{s}</Typography>
-                  </Stack>
+            {filePreviews.length > 0 && (
+              <Stack direction="row" gap={1} flexWrap="wrap" mb={2}>
+                {filePreviews.map((f, i) => (
+                  <Box key={i} sx={{ position: 'relative', width: 64, height: 64 }}>
+                    {f.file.type.startsWith('image') ? (
+                      <Box component="img" src={f.url} alt={f.file.name} sx={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 1.5, border: '1px solid #E8E8E8', display: 'block' }} />
+                    ) : (
+                      <Box sx={{ width: '100%', height: '100%', borderRadius: 1.5, border: '1px solid #E8E8E8', bgcolor: '#F0F0F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Chip label="Video" size="small" sx={{ fontSize: 10 }} />
+                      </Box>
+                    )}
+                    <IconButton
+                      size="small"
+                      onClick={() => removeFile(i)}
+                      sx={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, bgcolor: '#fff', border: '1px solid #E8E8E8', '&:hover': { bgcolor: '#FFEBEE' } }}
+                    >
+                      <CloseIcon sx={{ fontSize: 12 }} />
+                    </IconButton>
+                  </Box>
                 ))}
               </Stack>
+            )}
 
-              <Stack direction="row" gap={1} mt={1.5} flexWrap="wrap">
-                {TIME_SLOTS.map((slot) => (
-                  <Chip
-                    key={slot}
-                    label={slot}
-                    sx={{ cursor: 'pointer', bgcolor: '#FFF8E1', color: '#7A5C00', border: '1px solid #D4AC40' }}
-                  />
-                ))}
-              </Stack>
+            {nearLimit && (
+              <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                Estás cerca del límite de caracteres.
+              </Alert>
+            )}
 
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                fontStyle="italic"
-                mt={1}
-                display="block"
-                fontSize={10}
+            <Divider sx={{ mb: 2 }} />
+
+            <Stack direction="row" gap={1.5}>
+              <Button
+                variant="outlined"
+                disabled={submitting || !selectedCampaign || !content.trim() || socialNetworkIds.length === 0}
+                sx={{ borderColor: '#E8E8E8', color: '#6B6B6B' }}
+                onClick={() => handleCreate(false)}
               >
-                Análisis orientativo generado por IA. Los resultados reales pueden variar.
-              </Typography>
-            </Box>
-
-            <Stack direction="row" gap={1.5} mt={3}>
-              <Button variant="outlined" sx={{ borderColor: '#E8E8E8', color: '#6B6B6B' }} onClick={() => router.push('/posts')}>
                 Guardar borrador
               </Button>
-              <Button
-                variant="contained"
-                sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}
-                onClick={() => router.push('/posts/approvals')}
+              <PrimaryButton
+                disabled={submitting || !selectedCampaign || !content.trim() || socialNetworkIds.length === 0}
+                onClick={() => handleCreate(true)}
               >
-                Enviar a revisión →
-              </Button>
+                Crear y enviar a revisión →
+              </PrimaryButton>
             </Stack>
           </Paper>
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3 }}>
+          <Paper elevation={0} sx={{ border: '1px solid #E8E8E8', borderRadius: 3, p: 3, position: 'sticky', top: 24 }}>
             <Typography variant="subtitle2" color="text.secondary" mb={2}>
-              Vista previa
+              Vista previa {selectedNetworks.length > 0 && `(${selectedNetworks.length} ${selectedNetworks.length === 1 ? 'red' : 'redes'})`}
             </Typography>
-            <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
-              <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
-                <Avatar sx={{ bgcolor: '#FDC726', color: '#7A5C00', width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
-                  ZA
-                </Avatar>
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    @zaramx
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {networkLabel} · Ahora
-                  </Typography>
-                </Box>
-              </Stack>
-
-              <Box
-                sx={{
-                  bgcolor: '#E0E0E0',
-                  borderRadius: 1.5,
-                  height: 160,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Typography variant="caption" sx={{ color: '#9E9E9E' }}>
-                  Imagen adjunta
+            {selectedNetworks.length === 0 ? (
+              <Box sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Selecciona al menos una red para ver la vista previa.
                 </Typography>
               </Box>
-
-              <Typography variant="body2" mt={1.5} sx={{ lineHeight: 1.6 }}>
-                {previewText}
-              </Typography>
-
-              <Stack direction="row" gap={0.75} mt={1} flexWrap="wrap">
-                {hashtags.map((tag, i) => (
-                  <Chip
-                    key={i}
-                    size="small"
-                    label={tag}
-                    sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontSize: 10, height: 20 }}
-                  />
-                ))}
+            ) : (
+              <Stack gap={2}>
+                {selectedNetworks.map((n) => {
+                  const colors = NETWORK_DISPLAY_COLORS[n.code];
+                  return (
+                    <Box key={n.id} sx={{ bgcolor: '#F7F7F7', borderRadius: 2, p: 2 }}>
+                      <Stack direction="row" gap={1} alignItems="center" mb={1.5}>
+                        <Avatar sx={{ bgcolor: colors.bg, color: colors.color, width: 32, height: 32, fontSize: 11, fontWeight: 600 }}>
+                          {NETWORK_SHORT_LABELS[n.code]}
+                        </Avatar>
+                        <Typography variant="body2" fontWeight={600}>{n.name}</Typography>
+                      </Stack>
+                      <Box sx={{ mb: 1.5 }}>
+                        <MediaCarousel items={carouselItems} />
+                      </Box>
+                      <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 1 }}>
+                        {previewText || <span style={{ color: '#9E9E9E' }}>El copy aparecerá aquí…</span>}
+                      </Typography>
+                      <Stack direction="row" gap={0.75} mt={0.5} flexWrap="wrap">
+                        {hashtags.map((tag, i) => (
+                          <Chip key={i} size="small" label={tag} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontSize: 10, height: 20 }} />
+                        ))}
+                      </Stack>
+                      <Chip size="small" label="BORRADOR" sx={{ bgcolor: '#F5F5F5', color: '#616161', fontWeight: 600, mt: 1.5 }} />
+                    </Box>
+                  );
+                })}
               </Stack>
-
-              <Chip size="small" label="BORRADOR" sx={{ bgcolor: '#F5F5F5', color: '#616161', fontWeight: 600, mt: 1.5 }} />
-            </Box>
+            )}
           </Paper>
         </Grid>
       </Grid>

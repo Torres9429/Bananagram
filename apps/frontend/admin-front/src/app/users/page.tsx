@@ -1,60 +1,79 @@
 'use client';
 
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
-import Avatar from '@mui/material/Avatar';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import { DataTable, type DataTableColumn, ProtectedAction } from '@repo/ui';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import { DataTable, type DataTableColumn, ProtectedAction, PrimaryButton, ConfirmDialog, useToast } from '@repo/ui/ui';
+import { formatRoleName } from '@repo/ui/utils';
 import { AdminTabs } from '../../components/AdminTabs';
-import { MOCK_USERS, type MockUser } from '../../lib/mock-data';
+import { CreateUserDialog } from '../../components/CreateUserDialog';
+import { useListUsersQuery, useRemoveUserMutation, type AdminUser } from '../../store/api/admin.api';
 
-const STATUS_STYLE: Record<MockUser['status'], { bg: string; color: string; label: string }> = {
-  activo: { bg: '#E8F5E9', color: '#2E7D32', label: 'Activo' },
-  inactivo: { bg: '#F5F5F5', color: '#616161', label: 'Inactivo' },
+const STATUS_STYLE: Record<string, { label: string; bg: string; color: string }> = {
+  active: { label: 'Activo', bg: '#E8F5E9', color: '#2E7D32' },
+  inactive: { label: 'Inactivo', bg: '#F5F5F5', color: '#6B6B6B' },
+  suspended: { label: 'Suspendido', bg: '#FFEBEE', color: '#C62828' },
 };
 
 export default function UsersPage() {
-  const columns: DataTableColumn<MockUser>[] = [
+  const { data: users = [], isLoading, isError } = useListUsersQuery();
+  const [removeUser] = useRemoveUserMutation();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const { showSuccess, showError } = useToast();
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    try {
+      await removeUser(deleteTarget.id).unwrap();
+      showSuccess(`${deleteTarget.email} eliminado.`);
+    } catch {
+      showError('No se pudo eliminar el usuario.');
+    } finally {
+      setDeleteTarget(null);
+    }
+  }
+
+  const columns: DataTableColumn<AdminUser>[] = [
+    { key: 'email', header: 'Correo', render: (u) => <Typography variant="body2" fontWeight={600}>{u.email}</Typography> },
     {
-      key: 'user',
-      header: 'Usuario',
+      key: 'roles',
+      header: 'Roles',
       render: (u) => (
-        <Stack direction="row" gap={1.5} alignItems="center">
-          <Avatar sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', width: 36, height: 36, fontSize: 13, fontWeight: 600 }}>
-            {u.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-          </Avatar>
-          <Box>
-            <Typography variant="body2" fontWeight={600}>{u.name}</Typography>
-            <Typography variant="caption" color="text.secondary">{u.email}</Typography>
-          </Box>
+        <Stack direction="row" gap={0.5} flexWrap="wrap">
+          {u.roles.map((r) => (
+            <Chip key={r.role.id} size="small" label={formatRoleName(r.role.name)} sx={{ bgcolor: '#FFF8E1', color: 'primary.contrastTextMuted', fontWeight: 600 }} />
+          ))}
         </Stack>
       ),
     },
-    { key: 'role', header: 'Rol', render: (u) => <Chip size="small" label={u.role} sx={{ bgcolor: '#FFF8E1', color: '#7A5C00', fontWeight: 600 }} /> },
-    { key: 'brand', header: 'Marca', render: (u) => <Typography variant="body2">{u.brand ?? '—'}</Typography> },
     {
       key: 'status',
       header: 'Estado',
       render: (u) => {
-        const s = STATUS_STYLE[u.status];
+        const s = STATUS_STYLE[u.status] ?? { label: u.status, bg: '#F5F5F5', color: '#6B6B6B' };
         return <Chip size="small" label={s.label} sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600 }} />;
       },
     },
-    { key: 'lastLogin', header: 'Último acceso', render: (u) => <Typography variant="caption" color="text.secondary">{u.lastLogin}</Typography> },
+    {
+      key: 'createdAt',
+      header: 'Creado',
+      render: (u) => <Typography variant="caption" color="text.secondary">{new Date(u.createdAt).toLocaleDateString('es-MX')}</Typography>,
+    },
     {
       key: 'actions',
       header: '',
       align: 'right',
-      render: () => (
-        <ProtectedAction module="users" action="manage">
-          <Tooltip title="Editar">
-            <IconButton size="small" onClick={(e) => e.stopPropagation()} sx={{ color: '#D4AC40' }}>
-              <EditOutlinedIcon fontSize="small" />
+      render: (u) => (
+        <ProtectedAction module="usuarios" action="eliminar">
+          <Tooltip title="Eliminar">
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); setDeleteTarget(u); }} sx={{ color: '#C62828' }}>
+              <DeleteOutlineIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </ProtectedAction>
@@ -68,14 +87,36 @@ export default function UsersPage() {
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h5" fontWeight={700}>Usuarios</Typography>
-          <ProtectedAction module="users" action="manage">
-            <Button variant="contained" sx={{ bgcolor: '#FDC726', color: '#7A5C00', '&:hover': { bgcolor: '#D4AC40' } }}>
+          <ProtectedAction module="usuarios" action="crear">
+            <PrimaryButton onClick={() => setCreateOpen(true)}>
               + Nuevo usuario
-            </Button>
+            </PrimaryButton>
           </ProtectedAction>
         </Stack>
-        <DataTable columns={columns} rows={MOCK_USERS} getRowKey={(u) => u.id} />
+        {isError ? (
+          <Typography variant="body2" color="error">No se pudieron cargar los usuarios.</Typography>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={users}
+            getRowKey={(u) => u.id}
+            pagination
+            initialPageSize={10}
+            isLoading={isLoading}
+            emptyMessage="No hay usuarios para mostrar."
+          />
+        )}
       </Box>
+      <CreateUserDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Eliminar usuario"
+        description={deleteTarget ? `Se eliminará ${deleteTarget.email} y se cerrarán sus sesiones activas.` : ''}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </Box>
   );
 }

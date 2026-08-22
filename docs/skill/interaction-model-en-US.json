@@ -1,0 +1,565 @@
+{
+    "interactionModel": {
+        "languageModel": {
+            "invocationName": "flash ideas",
+            "intents": [
+                {
+                    "name": "AMAZON.CancelIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.HelpIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.StopIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.NavigateHomeIntent",
+                    "samples": []
+                },
+                {
+                    "name": "LogoutIntent",
+                    "slots": [],
+                    "samples": [
+                        "log out",
+                        "sign out",
+                        "unlink my account",
+                        "sign out of my account",
+                        "switch user",
+                        "disconnect my account"
+                    ]
+                },
+                {
+                    "name": "LinkAccountIntent",
+                    "slots": [
+                        {
+                            "name": "linkCode",
+                            "type": "AMAZON.FOUR_DIGIT_NUMBER"
+                        }
+                    ],
+                    "samples": [
+                        "link my account",
+                        "link my account with code {linkCode}",
+                        "my code is {linkCode}",
+                        "connect my account",
+                        "the code is {linkCode}"
+                    ]
+                },
+                {
+                    "name": "GetActiveCampaignsIntent",
+                    "slots": [],
+                    "samples": [
+                        "what campaigns are available",
+                        "what are my campaigns",
+                        "show me the active campaigns",
+                        "list my campaigns",
+                        "what campaigns do I have"
+                    ]
+                },
+                {
+                    "name": "SelectCampaignIntent",
+                    "slots": [
+                        {
+                            "name": "campaignName",
+                            "type": "AMAZON.SearchQuery"
+                        }
+                    ],
+                    "samples": [
+                        "let's go with {campaignName}",
+                        "open campaign {campaignName}",
+                        "open {campaignName}",
+                        "I want to check {campaignName}",
+                        "select {campaignName}"
+                    ]
+                },
+                {
+                    "name": "GetCampaignMetricsIntent",
+                    "slots": [],
+                    "samples": [
+                        "what is the engagement",
+                        "how much reach does this campaign have",
+                        "how is the campaign doing",
+                        "give me the metrics",
+                        "how is this campaign going",
+                        "tell me the metrics"
+                    ]
+                },
+                {
+                    "name": "GetTopContentIntent",
+                    "slots": [
+                        {
+                            "name": "networkName",
+                            "type": "LISTA_REDES"
+                        },
+                        {
+                            "name": "dateRange",
+                            "type": "LISTA_PERIODOS"
+                        }
+                    ],
+                    "samples": [
+                        "the best post on {networkName} this {dateRange}",
+                        "which one had more likes",
+                        "what was the best post on {networkName}",
+                        "which post performed best",
+                        "what was the top post"
+                    ]
+                },
+                {
+                    "name": "GenerateContentIdeasIntent",
+                    "slots": [
+                        {
+                            "name": "networkName",
+                            "type": "LISTA_REDES"
+                        },
+                        {
+                            "name": "quantity",
+                            "type": "AMAZON.NUMBER"
+                        }
+                    ],
+                    "samples": [
+                        "give me {quantity} ideas for {networkName}",
+                        "what can I post on {networkName}",
+                        "suggest three ideas",
+                        "generate content for this campaign",
+                        "what can I post",
+                        "give me content ideas"
+                    ]
+                },
+                {
+                    "name": "SaveIdeaIntent",
+                    "slots": [
+                        {
+                            "name": "ideaNumber",
+                            "type": "CustomAnswer"
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "samples": [
+                                "save it as {ideaTitle}",
+                                "save as {ideaTitle}",
+                                "with the title {ideaTitle}",
+                                "name it {ideaTitle}",
+                                "call the idea {ideaTitle}"
+                            ]
+                        }
+                    ],
+                    "samples": [
+                        "{ideaNumber}",
+                        "save {ideaNumber}",
+                        "store {ideaNumber}",
+                        "save number {ideaNumber}",
+                        "I want to save idea {ideaNumber}",
+                        "save option {ideaNumber}"
+                    ]
+                },
+                {
+                    "name": "SaveCustomIdeaIntent",
+                    "slots": [
+                        {
+                            "name": "ideaText",
+                            "type": "AMAZON.SearchQuery"
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "samples": [
+                                "save it as {ideaTitle}",
+                                "save as {ideaTitle}",
+                                "name it {ideaTitle}",
+                                "the title is {ideaTitle}",
+                                "call it {ideaTitle}"
+                            ]
+                        }
+                    ],
+                    "samples": [
+                        "I have an idea",
+                        "save this idea",
+                        "jot down an idea",
+                        "I want to log a note",
+                        "I want to save something",
+                        "save {ideaText}"
+                    ]
+                },
+                {
+                    "name": "GetSavedIdeasIntent",
+                    "slots": [],
+                    "samples": [
+                        "what ideas do I have saved",
+                        "read me my ideas",
+                        "show me my notes",
+                        "what are my ideas",
+                        "how many ideas have I saved"
+                    ]
+                },
+                {
+                    "name": "DeleteIdeaIntent",
+                    "slots": [
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery"
+                        }
+                    ],
+                    "samples": [
+                        "delete the idea {ideaTitle}",
+                        "delete {ideaTitle}",
+                        "remove {ideaTitle}",
+                        "remove the idea {ideaTitle}",
+                        "erase {ideaTitle}"
+                    ]
+                },
+                {
+                    "name": "ChangeCampaignIntent",
+                    "slots": [
+                        {
+                            "name": "campaignName",
+                            "type": "AMAZON.SearchQuery"
+                        }
+                    ],
+                    "samples": [
+                        "change campaign",
+                        "select another campaign",
+                        "go back to my campaigns",
+                        "switch to {campaignName}",
+                        "I want to see another campaign",
+                        "let's move to {campaignName}"
+                    ]
+                },
+                {
+                    "name": "GetIdeaRecommendationsIntent",
+                    "slots": [],
+                    "samples": [
+                        "give me recommendations",
+                        "how do I improve this campaign",
+                        "what should I change",
+                        "what do you recommend",
+                        "give me advice for this campaign",
+                        "how do I improve engagement"
+                    ]
+                },
+                {
+                    "name": "GetCampaignSummaryIntent",
+                    "slots": [],
+                    "samples": [
+                        "give me a summary",
+                        "summarize the campaign",
+                        "what have we seen so far",
+                        "how are we doing",
+                        "give me the big picture",
+                        "quick summary"
+                    ]
+                },
+                {
+                    "name": "AMAZON.YesIntent",
+                    "samples": [
+                        "yes",
+                        "yeah",
+                        "confirm",
+                        "sure",
+                        "of course",
+                        "do it",
+                        "okay",
+                        "I confirm"
+                    ]
+                },
+                {
+                    "name": "AMAZON.NoIntent",
+                    "samples": [
+                        "no",
+                        "cancel",
+                        "no thanks",
+                        "never mind",
+                        "negative",
+                        "discard"
+                    ]
+                },
+                {
+                    "name": "AMAZON.FallbackIntent",
+                    "samples": []
+                }
+            ],
+            "types": [
+                {
+                    "name": "LISTA_REDES",
+                    "values": [
+                        {
+                            "name": {
+                                "value": "x"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "linkedin"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "facebook"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "tiktok"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "instagram"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "LISTA_PERIODOS",
+                    "values": [
+                        {
+                            "name": {
+                                "value": "campaign"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "month"
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "week"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "CustomAnswer",
+                    "values": [
+                        {
+                            "name": {
+                                "value": "3",
+                                "synonyms": [
+                                    "three",
+                                    "the three",
+                                    "third",
+                                    "the third",
+                                    "number three"
+                                ]
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "2",
+                                "synonyms": [
+                                    "two",
+                                    "the two",
+                                    "second",
+                                    "the second",
+                                    "number two"
+                                ]
+                            }
+                        },
+                        {
+                            "name": {
+                                "value": "1",
+                                "synonyms": [
+                                    "one",
+                                    "the one",
+                                    "first",
+                                    "the first",
+                                    "number one"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "dialog": {
+            "intents": [
+                {
+                    "name": "LinkAccountIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "linkCode",
+                            "type": "AMAZON.FOUR_DIGIT_NUMBER",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.LinkAccountIntent.linkCode"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "SaveIdeaIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "ideaNumber",
+                            "type": "CustomAnswer",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.35014411070.458707042689"
+                            }
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": true,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "confirmation": "Confirm.Slot.35014411070.172588795167",
+                                "elicitation": "Elicit.Slot.35014411070.172588795167"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "SelectCampaignIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "campaignName",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.1699521565153.97120113117"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "SaveCustomIdeaIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "ideaText",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.SaveCustomIdeaIntent.ideaText"
+                            }
+                        },
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.SaveCustomIdeaIntent.ideaTitle"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "DeleteIdeaIntent",
+                    "confirmationRequired": false,
+                    "prompts": {},
+                    "slots": [
+                        {
+                            "name": "ideaTitle",
+                            "type": "AMAZON.SearchQuery",
+                            "confirmationRequired": false,
+                            "elicitationRequired": true,
+                            "prompts": {
+                                "elicitation": "Elicit.Slot.DeleteIdeaIntent.ideaTitle"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "delegationStrategy": "ALWAYS"
+        },
+        "prompts": [
+            {
+                "id": "Elicit.Slot.LinkAccountIntent.linkCode",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "What is your linking code?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.35014411070.458707042689",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "Which idea number do you want to save?"
+                    }
+                ]
+            },
+            {
+                "id": "Confirm.Slot.35014411070.458707042689",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "Are you sure you want to save {ideaTitle}?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.35014411070.172588795167",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "What title would you give this idea?"
+                    }
+                ]
+            },
+            {
+                "id": "Confirm.Slot.35014411070.172588795167",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "Are you sure you want to save it?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.1699521565153.97120113117",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "Which campaign do you want to check?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.SaveCustomIdeaIntent.ideaTitle",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "What title do you want to save this idea with?"
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.SaveCustomIdeaIntent.ideaText",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "Sure, tell me the idea."
+                    }
+                ]
+            },
+            {
+                "id": "Elicit.Slot.DeleteIdeaIntent.ideaTitle",
+                "variations": [
+                    {
+                        "type": "PlainText",
+                        "value": "Which idea do you want to delete? Tell me its title."
+                    }
+                ]
+            }
+        ]
+    }
+}

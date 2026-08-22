@@ -1,13 +1,22 @@
 'use client';
 
 import Box from '@mui/material/Box';
+import { usePathname } from 'next/navigation';
+import { TopBar } from '@repo/ui/ui';
 import { Sidebar } from './layout/Sidebar';
+import { getTopBarTitle } from '../lib/topbar-titles';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const title = getTopBarTitle(pathname ?? '');
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar />
-      <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <TopBar title={title} />
+        {children}
+      </Box>
     </Box>
   );
 }

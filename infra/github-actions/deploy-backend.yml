@@ -8,8 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [auth-service, brands-service, posts-service, campaigns-service,
-                  metrics-service, reports-service, notifications-service, ai-service, api-gateway]
+        service: [auth-service, core-service, alexa-service, api-gateway]
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
@@ -19,12 +18,23 @@ jobs:
           aws-region: us-east-1
       - name: Login ECR
         run: aws ecr get-login-password | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+      - name: Resolve Dockerfile path
+        id: dockerfile
+        run: |
+          case "${{ matrix.service }}" in
+            api-gateway)
+              echo "path=apps/backend/gateway/Dockerfile" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "path=apps/backend/services/${{ matrix.service }}/Dockerfile" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
       - name: Build & Push
         run: |
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.sha }} \
-            apps/backend/services/${{ matrix.service }} || \
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.sha }} \
-            apps/backend/gateway
+          docker build \
+            -f ${{ steps.dockerfile.outputs.path }} \
+            -t ${{ secrets.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.sha }} \
+            .
           docker push ${{ secrets.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
       - name: Deploy ECS
         run: |
